@@ -1,0 +1,380 @@
+--EquipStarUpTriggerUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_RoleEquipItem = typeof(CS.RoleEquipItem)
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_itemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+
+local CS_EquipDataProxyInst = CS.EquipDataProxy.inst
+local CS_ItemBagProxyInst = CS.ItemBagProxy.inst
+
+local CS_GUIHelper = CS.GUIHelper
+
+EquipStarUpTriggerUI = class(ViewBase)
+
+function EquipStarUpTriggerUI:ctor()
+	self.viewID = Constants.ViewName.EquipStarUpTriggerUI
+	EquipStarUpTriggerUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+end
+------------------------------------------------
+
+
+function EquipStarUpTriggerUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.btn_close = contentPane:GetButton("btn_close")
+
+	--top common
+	self.tx_title = contentPane:GetText("tx_title")
+	self.icon_effect = contentPane:GetGUIIcon("icon_effect")
+	self.tx_effectTitle = contentPane:GetText("tx_effectTitle")
+	self.tx_effectDes = contentPane:GetText("tx_effectDes")
+
+	--返还材料
+	self.obj_return = contentPane:GetObjByName("obj_return")
+
+	local objList_return = self.obj_return:GetComponent(CS_type_ObjList).objList
+
+	self.return_matItems = {}
+	self.return_matIcons = {}
+	self.return_matNumTxs = {}
+
+	for i = 0, objList_return.Count - 1 do
+
+		self.return_matItems[#self.return_matItems + 1] = objList_return[i]
+		local behaviour = objList_return[i]:GetComponent(CS_type_LuaBehaviour)
+
+		self.return_matIcons[#self.return_matIcons + 1] = behaviour:GetGUIIcon("icon_mat")
+		self.return_matNumTxs[#self.return_matNumTxs + 1] = behaviour:GetText("tx_num")
+
+	end
+
+	--双重制作
+	self.obj_double = contentPane:GetObjByName("obj_double")
+
+	local behaviour_double = self.obj_double:GetComponent(CS_type_LuaBehaviour)
+	self.double_tx_equipName_1 = behaviour_double:GetText("tx_equipName_1")
+	self.double_tx_equipName_2 = behaviour_double:GetText("tx_equipName_2")
+	self.double_tx_equipLv_1 = behaviour_double:GetText("tx_equipLv_1")
+	self.double_tx_equipLv_2 = behaviour_double:GetText("tx_equipLv_2")
+	self.double_icon_equip_1 = behaviour_double:GetGUIIcon("icon_equip_1")
+	self.double_icon_equip_2 = behaviour_double:GetGUIIcon("icon_equip_2")
+	self.double_tx_price = behaviour_double:GetText("tx_price")
+
+	local objList_doubleProperty = behaviour_double:GetObjByName("objList_property"):GetComponent(CS_type_ObjList).objList
+
+	self.double_allPropertyList = {}
+
+	for i = 0, objList_doubleProperty.Count - 1 do
+
+		self.double_allPropertyList[#self.double_allPropertyList + 1] = objList_doubleProperty[i]:GetComponent(CS_type_RoleEquipItem)
+
+	end
+
+	--超凡装备
+	self.obj_super = contentPane:GetObjByName("obj_super")
+
+	local behaviour_super = self.obj_super:GetComponent(CS_type_LuaBehaviour)
+	self.super_icon_equip = behaviour_super:GetGUIIcon("icon_equip")
+	self.super_tx_lv = behaviour_super:GetText("tx_lv")
+	self.super_tx_name = behaviour_super:GetText("tx_name")
+	self.super_tx_price = behaviour_super:GetText("tx_price")
+
+	local objList_property = behaviour_super:GetObjByName("objList_property"):GetComponent(CS_type_ObjList).objList
+
+	self.super_allPropertyList = {}
+
+	for i = 0, objList_property.Count - 1 do
+
+		self.super_allPropertyList[#self.super_allPropertyList + 1] = objList_property[i]:GetComponent(CS_type_RoleEquipItem)
+
+	end
+
+
+end
+
+
+function EquipStarUpTriggerUI:onInit()
+
+	self:initComp()
+
+	self.btn_close.onClick:AddListener(function ()
+			self:GoOn()
+		end)
+
+end
+
+function EquipStarUpTriggerUI:closeAllSubPanel()
+
+	self.obj_return:SetActive(false)
+	self.obj_double:SetActive(false)
+	self.obj_super:SetActive(false)
+
+end
+
+function EquipStarUpTriggerUI:SetData(triggerData)
+
+	self:closeAllSubPanel()
+
+	self:setTopInfo(triggerData)
+
+	if triggerData.type == CS.ReceiveInfoUIType.StarUpEffectTrigger_return then --升星效果触发 - 返还材料
+
+		self:setReturnInfo(triggerData.val)
+
+	elseif triggerData.type == CS.ReceiveInfoUIType.StarUpEffectTrigger_double then --升星效果触发 - 双重制作
+
+		self:setDoubleInfo(triggerData.val)
+
+	elseif triggerData.type == CS.ReceiveInfoUIType.StarUpEffectTrigger_super then --升星效果触发 - 超凡装备
+
+		self:setSuperInfo(triggerData.val)
+
+	end
+
+end
+
+function EquipStarUpTriggerUI:setTopInfo(triggerData)
+
+	local equipCfg = CS_EquipConfigManagerInst:GetEquipDrawingsCfgByEquipId(triggerData.val)
+
+	local starUpProgressItemInfos = equipCfg:GetStarUpProgressItemInfos()
+	local starUpProgressItemInfo = nil
+
+	for i = 0, starUpProgressItemInfos.Length - 1 do
+
+		if starUpProgressItemInfos[i].type == triggerData.type then
+			starUpProgressItemInfo = starUpProgressItemInfos[i]
+			break
+		end
+
+	end
+
+	if starUpProgressItemInfo ~= nil then
+
+		self.icon_effect:SetSprite(starUpProgressItemInfo.atlas,starUpProgressItemInfo.iconName,"",false,true)
+		self.tx_effectTitle.text = CS_LanguageManagerInst:GetValueByKey(starUpProgressItemInfo.title)
+		self.tx_effectDes.text = CS_LanguageManagerInst:GetValueByKey(starUpProgressItemInfo.des)
+
+	end
+
+end
+
+function EquipStarUpTriggerUI:setReturnInfo(equipId)
+
+	for i = 1, #self.return_matItems do
+		self.return_matItems[i]:SetActive(false)
+	end
+
+	local equipCfg = CS_EquipConfigManagerInst:GetEquipDrawingsCfgByEquipId(equipId)
+	local equipData = CS_EquipDataProxyInst:GetEquipData(equipCfg.id)
+
+	if equipData ~= nil then
+
+		local needRes = equipData.needRes;
+
+		local index = 1
+
+		for i = 0, needRes.Length - 1 do
+
+			local info = needRes[i];
+			if info.type == 0 then
+
+				local resCfg = CS_itemConfigManagerInst:GetConfig(info.needId)
+				if resCfg ~= nil then
+
+					self.return_matItems[index]:SetActive(true)
+					self.return_matIcons[index]:SetSprite(resCfg.atlas,resCfg.icon)
+					self.return_matNumTxs[index].text = tostring(info.needCount)
+					index = index + 1
+
+				end
+
+
+			end
+
+		end
+
+		if equipData.specialRes_1.type > 0 then
+
+			if equipData.specialRes_1.type == 1 then --装备
+
+				local equipcfg = CS_EquipConfigManagerInst:GetEquipInfoConfig(equipData.specialRes_1.needId);
+				if equipCfg ~= nil then
+
+					self.return_matItems[index]:SetActive(true)
+					self.return_matIcons[index]:SetSprite(equipcfg.equipDrawingsConfig.atlas,equipcfg.equipDrawingsConfig.icon)
+					self.return_matNumTxs[index].text = tostring(equipData.specialRes_1.needCount)
+					index = index + 1
+
+				end
+
+			elseif equipData.specialRes_1.type == 2 then --特殊资源
+
+				local resCfg = CS_itemConfigManagerInst:GetConfig(equipData.specialRes_1.needId);
+				if resCfg ~= nil then
+
+					self.return_matItems[index]:SetActive(true)
+					self.return_matIcons[index]:SetSprite(resCfg.atlas,resCfg.icon)
+					self.return_matNumTxs[index].text = tostring(equipData.specialRes_1.needCount)
+					index = index + 1
+
+				end
+
+			end
+
+		end
+
+		if equipData.specialRes_2.type > 0 then
+
+			if equipData.specialRes_2.type == 1 then --装备
+
+				local equipcfg = CS_EquipConfigManagerInst:GetEquipInfoConfig(equipData.specialRes_2.needId);
+				if equipCfg ~= nil then
+
+					self.return_matItems[index]:SetActive(true)
+					self.return_matIcons[index]:SetSprite(equipcfg.equipDrawingsConfig.atlas,equipcfg.equipDrawingsConfig.icon)
+					self.return_matNumTxs[index].text = tostring(equipData.specialRes_2.needCount)
+					index = index + 1
+
+				end
+
+			elseif equipData.specialRes_2.type == 2 then --特殊资源
+
+				local resCfg = CS_itemConfigManagerInst:GetConfig(equipData.specialRes_2.needId);
+				if resCfg ~= nil then
+
+					self.return_matItems[index]:SetActive(true)
+					self.return_matIcons[index]:SetSprite(resCfg.atlas,resCfg.icon)
+					self.return_matNumTxs[index].text = tostring(equipData.specialRes_2.needCount)
+					index = index + 1
+
+				end
+
+			end
+
+		end
+
+
+	else
+
+		self:GoOn();
+		CS.Logger.error("没有此装备的数据 无法弹出返还材料的界面")
+		return
+
+	end
+
+	self.obj_return:SetActive(true)
+
+
+end
+
+function EquipStarUpTriggerUI:setDoubleInfo(equipId)
+
+	local equipItem = CS_ItemBagProxyInst:GetEquipItem(equipId);
+	if equipItem == nil then
+		self:GoOn();
+		return
+	end
+
+	--todo 特效
+
+
+	self.double_icon_equip_1:SetSpriteURL(equipItem.equipConfig.equipDrawingsConfig.big_icon,CS.StaticConstants.qualityColor[equipItem.quality - 1],true)
+	self.double_icon_equip_2:SetSpriteURL(equipItem.equipConfig.equipDrawingsConfig.big_icon,CS.StaticConstants.qualityColor[equipItem.quality - 1],true)
+
+	self.double_tx_equipName_1.text = CS_LanguageManagerInst:GetValueByKey(equipItem.equipConfig.equipDrawingsConfig.name)
+	self.double_tx_equipName_1.color = CS_GUIHelper.GetColorByColorHex(CS.StaticConstants.qualityColor[equipItem.quality - 1])
+	self.double_tx_equipName_2.text = CS_LanguageManagerInst:GetValueByKey(equipItem.equipConfig.equipDrawingsConfig.name)
+	self.double_tx_equipName_2.color = CS_GUIHelper.GetColorByColorHex(CS.StaticConstants.qualityColor[equipItem.quality - 1])
+
+	self.double_tx_equipLv_1.text = tostring(equipItem.equipConfig.equipDrawingsConfig.level)
+	self.double_tx_equipLv_2.text = tostring(equipItem.equipConfig.equipDrawingsConfig.level)
+
+	self.double_tx_price.text = CS_GUIHelper.GetMoneyStr(equipItem.sellPrice);
+
+
+	local propertyList = CS_EquipConfigManagerInst:GetEquipAllPropertyList(equipId)
+	for i = 1, #self.double_allPropertyList do
+
+		local onePropertyCtrl = self.double_allPropertyList[i]
+
+		if propertyList[i - 1] > 0 then
+
+			onePropertyCtrl.gameObject:SetActive(true)
+			onePropertyCtrl.valText.text = "+"..tostring(propertyList[i - 1])
+
+		else
+			onePropertyCtrl.gameObject:SetActive(false)
+		end
+	end
+
+
+	self.obj_double:SetActive(true)
+
+
+end
+
+function EquipStarUpTriggerUI:setSuperInfo(equipId)
+
+	local equipItem = CS_ItemBagProxyInst:GetEquipItem(equipId);
+	if equipItem == nil then
+		self:GoOn();
+		return
+	end
+
+	self.super_icon_equip:SetSpriteURL(equipItem.equipConfig.equipDrawingsConfig.big_icon,CS.StaticConstants.qualityColor[equipItem.quality - 1],true)
+	self.super_tx_name.text = CS_LanguageManagerInst:GetValueByKey("<color=#fb1470>超凡</color>").." <color=#ffffff></color> "..CS_LanguageManagerInst:GetValueByKey(equipItem.equipConfig.equipDrawingsConfig.name)
+	self.super_tx_name.color = CS_GUIHelper.GetColorByColorHex(CS.StaticConstants.qualityColor[equipItem.quality - 1])
+	self.super_tx_lv.text = tostring(equipItem.equipConfig.equipDrawingsConfig.level)
+
+	self.super_tx_price.text = CS_GUIHelper.GetMoneyStr(equipItem.sellPrice);
+
+	local propertyList = CS_EquipConfigManagerInst:GetEquipAllPropertyList(equipId)
+	for i = 1, #self.super_allPropertyList do
+
+		local onePropertyCtrl = self.super_allPropertyList[i]
+
+		if propertyList[i - 1] > 0 then
+
+			onePropertyCtrl.gameObject:SetActive(true)
+			onePropertyCtrl.valText.text = "+"..tostring(propertyList[i - 1])
+
+		else
+			onePropertyCtrl.gameObject:SetActive(false)
+		end
+	end
+
+	self.obj_super:SetActive(true)
+
+end
+
+
+function EquipStarUpTriggerUI:GoOn()
+
+	self:hide()
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.ReceiveEvent.GO_ON)
+
+end
+
+function EquipStarUpTriggerUI:onShowed()
+
+	CS.FGUI.inst:showGlobalMask(0.2);
+
+end

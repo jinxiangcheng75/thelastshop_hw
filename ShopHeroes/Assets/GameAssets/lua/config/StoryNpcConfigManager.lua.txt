@@ -1,0 +1,87 @@
+-- StoryNpcConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+StoryNpcConfig =
+class(
+	{
+		story_id,
+		story_pre,
+		story,
+		story_type,
+		story_parameter,
+		story_npc,
+	}
+)
+
+
+StoryNpcConfigManager = class()
+--StoryNpcConfigManager.cfgDict = {}
+local csv_name = "story_npc"
+
+function StoryNpcConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+
+	local cfgs = CSVParser:parseClass(csv, 3, StoryNpcConfig)
+	StoryNpcConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("StoryNpcConfigManager  错误")
+	end
+end
+
+function StoryNpcConfigManager:processConfigs(cfgs)
+
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		self.cfgDict[tonumber(c.story_id)] = c
+	end
+
+end
+
+
+
+function StoryNpcConfigManager:GetConfig(storyType,parame)
+	
+	for i = 1, #self.cfgDict do
+
+		if tonumber(self.cfgDict[i].story_type) == storyType then
+			
+			if storyType == 2  then --礼包
+	
+				if tonumber(self.cfgDict[i].story_parameter) == parame then
+					return self.cfgDict[i]
+				end
+							
+			else --巧匠大赛活动 金条月卡 3 4 类型相同即返回
+				
+				return self.cfgDict[i]
+				
+			end
+			
+		end
+
+	end
+	
+	return nil
+	
+end
+
+function StoryNpcConfigManager:GetStorys(story_type)
+	
+	local storys = {}
+	
+	for i = 1, #self.cfgDict do
+		
+		if tonumber(self.cfgDict[i].story_type) == story_type then
+			storys[#storys + 1] = self.cfgDict[i].story
+		end
+		
+	end
+	
+	return storys
+	
+end

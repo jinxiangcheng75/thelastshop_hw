@@ -1,0 +1,65 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("network/MsgType")
+require("ui/view/VisitShop/VisitShopView")
+local EventDispatcherInis = require("event/EventDispatcher")
+
+VisitShopSys = class(BaseSystem)
+
+VisitShopSys.super = BaseSystem
+
+function VisitShopSys:ctor()
+	
+end
+
+function VisitShopSys:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.OnGetVisitUserData,self,self.OnGetVisitUserDataEnd)
+	EventDispatcherInis:addEvent(GameEvent.GetVisitUserData, self, self.GetVisitUserData)
+	EventDispatcherInis:addEvent(GameEvent.Show_VisitShopUI, self, self.ShowVisitShopUI)
+	EventDispatcherInis:addEvent(GameEvent.Exit_VisitShop, self, self.ExitVisitShop)
+end
+
+function VisitShopSys:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.OnGetVisitUserData,self, self.OnGetVisitUserDataEnd)
+	EventDispatcherInis:removeEvent(GameEvent.GetVisitUserData, self, self.GetVisitUserData)	
+	EventDispatcherInis:removeEvent(GameEvent.Show_VisitShopUI, self, self.ShowVisitShopUI)
+	EventDispatcherInis:removeEvent(GameEvent.Exit_VisitShop, self, self.ExitVisitShop)
+end
+
+function VisitShopSys:OnInit()
+	
+end
+
+function VisitShopSys:OnGetVisitUserDataEnd()
+	--进入拜访场景
+	EventDispatcherInis:dispatchEvent(
+		GameEvent.State.Change_State,
+		{
+			state = kGameState.VisitShop,
+			loading = true
+		}
+	)
+end
+
+function VisitShopSys:GetVisitUserData(userid)
+	--获得玩家数据
+	local req = MsgType.Request_User_Detail:New()
+	req.userId = userid
+	req:Send()
+end
+
+function VisitShopSys:ExitVisitShop()
+	GUIManager.inst:HideView("VisitShopView")
+	EventDispatcherInis:dispatchEvent(GameEvent.State.ChangeLastState)
+end
+
+function VisitShopSys:ShowVisitShopUI()
+	GUIManager.inst:OpenView("VisitShopView")
+end
+
+function VisitShopSys:HideVisitShopUI()
+	GUIManager.inst:HideView("VisitShopView")
+end
+
+

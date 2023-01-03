@@ -1,0 +1,139 @@
+--AddressableManager
+require("utils/XLuaUtils")
+local coroutine_cs = require("coroutine_cs")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Addressables = CS.UnityEngine.AddressableAssets.Addressables
+local AsyncOperationStatus = CS.UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus
+
+local AddressableManager = class()
+local downloadIndex = 0
+local totalCount = 0
+local csKeyList = nil
+
+local function CSStringListToCSObjectList(csStringList)
+	local objList = get_csharp_list(CS.System.Object)
+	--for i = 0, csStringList.Count do
+	--objList[i] = csStringList[i]
+	--end
+	return objList
+end
+
+function AddressableManager:ctor()
+	downloadIndex = 0
+	totalCount = 0
+	csKeyList = nil
+end
+
+function AddressableManager:CheckUpdate()
+	-- notify initialization
+	local catalogList = get_csharp_list(CS.System.String)
+	coroutine_cs.start(
+		function()
+			print("checkUpdate start")
+			local aop = Addressables.CheckForCatalogUpdates()
+			--aop:add_Completed(function (op)
+			aop:Completed(
+				"+",
+				function(op)
+					if (op ~= nil and op.Result ~= nil and op.Result.Count > 0) then
+						catalogList:AddRange(op.Result)
+					end
+				end
+			)
+			print("checkUpdate wait")
+			coroutine_cs.wait(2)
+			coroutine.yield(aop)
+			print("checkUpdate ok:", catalogList.Count)
+			if (catalogList.Count > 0) then
+				-- schedule download
+				csKeyList = CSStringListToCSObjectList(catalogList)
+				totalCount = catalogList.Count
+				AddressableManager:GetDownloadSize(catalogList)
+			else
+				AddressableManager:AllDownloadCompleted()
+			end
+		end
+	)
+end
+
+function AddressableManager:GetDownloadSize(keyList)
+	print("GetDownloadSize")
+	Addressables.ClearDependencyCacheAsync(keyList)
+	local sizeAop = Addressables.GetDownloadSizeAsync(keyList)
+	local sizeCo =
+		coroutine_cs.start(
+		function()
+			coroutine.yield(sizeAop)
+			if (sizeAop.Status == AsyncOperationStatus.Succeeded) then
+				local size = sizeAop.Result
+				if (size > 0) then
+					AddressableManager:DownloadItem()
+				else
+					-- notify get size 0
+				end
+				Addressables.Release(sizeAop)
+			else
+				-- notify get size failed
+			end
+		end
+	)
+end
+
+function AddressableManager:DownloadUpdates(keyList)
+	local aop = Addressables.DownloadDependenciesAsync(keyList)
+	local downloadCo =
+		coroutine_cs.start(
+		function()
+			coroutine.yield(aop)
+			if (aop.Status == AsyncOperationStatus.Succeeded) then
+			else
+			end
+		end
+	)
+end
+
+function AddressableManager:DownloadItem()
+	local key = csKeyList[downloadIndex]
+	local aop = Addressables.DownloadDependenciesAsync(key)
+	local downloadCo =
+		coroutine_cs.start(
+		function()
+			while true do
+				while (aop.isDone == false) do
+					coroutine_cs.wait(0.1)
+					EventDispatcher:dispatchEvent(GameEvent.Asset.Load_Progress, downloadIndex, totalCount, aop.PercentComplete)
+				end
+				coroutine.yield(aop)
+				--notify aop.PercentComplete
+				if (aop.isDone) then
+					break
+				end
+			end
+			if (aop.Status == AsyncOperationStatus.Succeeded) then
+				AddressableManager:onDownloadItemCompleted()
+			else
+				-- notify download failed
+			end
+		end
+	)
+end
+
+function AddressableManager:onDownloadItemCompleted()
+	-- notify downloadIndex totalCount
+	EventDispatcher:dispatchEvent(GameEvent.Asset.Load_Progress, downloadIndex, totalCount, 1)
+	downloadIndex = downloadIndex + 1
+	if (downloadIndex < totalCount) then
+		AddressableManager:DownloadItem()
+	else
+		AddressableManager:AllDownloadCompleted()
+	end
+end
+
+function AddressableManager:AllDownloadCompleted()
+	-- notify
+	print("AllDownloadCompleted")
+	EventDispatcher:dispatchEvent(GameEvent.Asset.AA_UpdateComplete)
+end
+
+return AddressableManager

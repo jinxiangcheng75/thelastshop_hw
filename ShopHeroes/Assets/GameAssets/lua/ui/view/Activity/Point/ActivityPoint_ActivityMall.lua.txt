@@ -1,0 +1,102 @@
+--ActivityPoint_ActivityMall
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_TimeUtils = CS.TimeUtils
+local CS_type_luaList = typeof(CS.LuaListItem)
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local ActivityPoint_ActivityMall = class(luaClass_Welfare_CtrlBase)
+
+function ActivityPoint_ActivityMall:initComp(luaBehaviour)
+
+	local contentPane = luaBehaviour
+
+	self.superList = contentPane.gameObject:GetComponent(CS_type_superList)
+
+	self.noActivityObj = contentPane:GetObjByName("noActivityObj")
+
+end
+
+function ActivityPoint_ActivityMall:Init(luaBehaviour)
+
+	self:initComp(luaBehaviour)
+
+	self.taskList = nil
+
+	self.superList.itemRenderer = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+	self.superList.itemUpdateInfo = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+	self.maxCount = 3
+	self.listItemCount = 0
+
+end
+
+function ActivityPoint_ActivityMall:superListItemRenderer(index,item)
+
+	local itemScript = item
+	for i = 1, self.maxCount do
+		local itemIndex = index * self.maxCount + i
+		local smallObj = itemScript.buttonList[i - 1].gameObject
+		if (itemIndex > self.listItemCount) then
+			smallObj:SetActive(false)
+		else
+			if (itemIndex <= self.listItemCount) then
+				smallObj:SetActive(true)
+				local smallItem = smallObj:GetComponent(CS_type_luaList)
+				local itemData = {type = 2,data = self.activityMallList[itemIndex]}
+				smallItem:SetData(itemData)
+			else
+				smallObj:SetActive(false)
+			end
+		end
+	end
+
+end
+
+
+function ActivityPoint_ActivityMall:RefreshUIData(needScrollToTop)
+
+	self.activityMallList = ActivityPointDataProxy.inst:GetActivityMallList()
+
+	self.listItemCount = #self.activityMallList
+	if (self.listItemCount < 0) then
+		self.listItemCount = 0
+	end
+
+	local count1 = math.floor(self.listItemCount / self.maxCount)
+	if (self.listItemCount % self.maxCount > 0) then
+		count1 = count1 + 1
+	end
+	self.superList.totalItemCount = count1
+
+	self.noActivityObj:SetActive(#self.activityMallList == 0)
+
+	if(needScrollToTop)then
+		self.superList:ScrollToTop()
+	end
+
+end
+
+function ActivityPoint_ActivityMall:Clear()
+
+	--self.superList:clear()
+
+end
+
+return ActivityPoint_ActivityMall

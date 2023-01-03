@@ -1,0 +1,144 @@
+
+
+--HeroSystem
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("network/MsgType")
+require("ui/view/Hero/HeroUseGeneItemUI")
+require("ui/view/Hero/CanWearEquipHeroTipsView")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_RoleDataProxyInst = CS.RoleDataProxy.inst
+
+HeroSystem = class(BaseSystem)
+
+HeroSystem.super = BaseSystem
+
+function HeroSystem:ctor()
+
+end
+
+function HeroSystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.HeroEvent.ShowUI_UseGeneItem,self,self.showHeroUseGeneItemUI)
+	EventDispatcher:addEvent(GameEvent.HeroEvent.HideUI_UseGeneItem,self,self.hideHeroUseGeneItemUI)
+	
+	EventDispatcher:addEvent(GameEvent.HeroEvent.ShowUI_CanWearEquipTip,self,self.showCanWearEquipTipUI)
+
+	----------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcher:addEvent(GameEvent.HeroEvent.Request_UseGeneItem,self,self.request_useGeneItem)
+
+
+end
+
+function HeroSystem:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.HeroEvent.ShowUI_UseGeneItem,self, self.showHeroUseGeneItemUI)
+	EventDispatcher:removeEvent(GameEvent.HeroEvent.HideUI_UseGeneItem,self, self.hideHeroUseGeneItemUI)
+	
+	EventDispatcher:removeEvent(GameEvent.HeroEvent.ShowUI_CanWearEquipTip,self, self.showCanWearEquipTipUI)
+
+	----------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcher:removeEvent(GameEvent.HeroEvent.Request_UseGeneItem,self,self.request_useGeneItem)
+
+
+end
+
+function HeroSystem:OnInit()
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Hero_UseHeroStatusItem_Cmd,
+		function(resp)
+			print("Response_Hero_UseHeroStatusItem success", resp)
+			self:GeUseHeroStatusItemResp(resp)
+		end,
+		function(code)
+			print("Response_Hero_UseHeroStatusItem fail --- code", code)
+		end
+	)
+
+end
+
+function HeroSystem:showCanWearEquipTipUI(trans, equip_subType)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.CanWearEquipHeroTipsView,
+		function(view)
+			view:SetData(trans, equip_subType)
+		end
+	)
+
+end
+
+function HeroSystem:showHeroUseGeneItemUI(heroUid,propertyType)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.HeroUseGeneItemUI,
+		function(view)
+			view:SetData(heroUid,propertyType)
+		end
+	)
+
+end
+
+function HeroSystem:hideHeroUseGeneItemUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.HeroUseGeneItemUI)
+
+end
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+function HeroSystem:request_useGeneItem(itemId,heroUid,itemCount)
+
+	local req = MsgType.Request_Hero_UseHeroStatusItem:New()
+	req.itemId = itemId
+	req.heroId = heroUid
+	req.itemCount = itemCount
+	req:Send()
+
+end
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+function HeroSystem:GeUseHeroStatusItemResp(respData)
+
+	local data = MsgType.Response_Hero_UseHeroStatusItem:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	if data.itemUse == MsgType.EItemUse.Success then
+
+		local roleData = CS_RoleDataProxyInst:GetHeroDataByUid(data.heroInfo.heroUid);
+		
+		if roleData ~= nil then
+			
+			local heroInfoJson = data.heroInfo:ToEncodeString()
+			local contentObj = CS.JsonMapper.ToObject(heroInfoJson);
+			local heroInfo = CS.HeroInfo()
+			heroInfo:Decode(contentObj)
+			
+			roleData:setData(heroInfo)
+			
+		end
+		
+		self:hideHeroUseGeneItemUI()
+		
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+		local func_1 = funcGeneric(CS.System.Int32)
+		func_1(CS_EventControllerInst,CS_GameEventType.RoleEvent.ROLEINFO_SHOWUI,data.heroInfo.heroUid)
+		
+		print("英雄基因药水使用成功")
+		
+	end
+
+end
+
+

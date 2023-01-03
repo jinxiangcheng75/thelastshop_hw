@@ -1,0 +1,77 @@
+--ActivityTaskConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local CS_CSVParser = CS.CSVParser
+
+ActivityTaskConfig =
+class({
+		type = 1,
+		name = "",
+		pay_type = 1,
+		atlas = "",
+		icon = "",
+		condition = 1,
+		task_scenes = "",
+		task_guide_1 = 1,
+		task_guide_2 = 1,
+		task_guide_3 = 1,
+		task_guide_4 = 1,
+		task_guide_5 = 1,
+		dialog = "",
+	})
+
+ActivityTaskConfigManager = class()
+--ActivityTaskConfigManager.cfgDict = {}
+local csv_name = "task_activity"
+
+function ActivityTaskConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = CS_CSVParser.GetCSV(csv_name)
+
+	local cfgs = CSVParser:parseClass(csv, 3, ActivityTaskConfig)
+	ActivityTaskConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("ActivityTaskConfigManager  错误")
+	end
+end
+
+function ActivityTaskConfigManager:processConfigs(cfgs)
+
+	for i=1, #cfgs do
+
+		local c = cfgs[i]
+		
+		c.type = tonumber(c.type)
+		c.pay_type = tonumber(c.pay_type)
+		--c.condition = tonumber(c.condition)
+		--c.task_guide_1 = tonumber(c.task_guide_1)
+		--c.task_guide_2 = tonumber(c.task_guide_2)
+		--c.task_guide_3 = tonumber(c.task_guide_3)
+		--c.task_guide_4 = tonumber(c.task_guide_4)
+		--c.task_guide_5 = tonumber(c.task_guide_5)
+
+		self.cfgDict[tonumber(c.type)] = c
+	end
+
+end
+
+function ActivityTaskConfigManager:GetAllConfig()
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+		tempList[index] = v
+		index = index + 1
+	end
+
+	table.sort(tempList,function (a,b)
+			return a.type < b.type
+		end)
+
+	return tempList
+end
+
+function ActivityTaskConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

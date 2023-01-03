@@ -1,0 +1,195 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csCharacterManagerInst = CS.CharacterManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local csEGender = CS.EGender
+local Vector3 = CS.UnityEngine.Vector3
+local Vector2 = CS.UnityEngine.Vector2
+local csSpineUtils = CS.SpineUtils
+
+local goldenScoreRewardItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	goldenScoreRewardItem_dlc = GoldenScoreRewardItem_dlc.new()
+	goldenScoreRewardItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if goldenScoreRewardItem_dlc~=nil then
+		goldenScoreRewardItem_dlc:Clear()
+		goldenScoreRewardItem_dlc = nil
+	end
+end
+
+function SetData(index)
+	if goldenScoreRewardItem_dlc~=nil then
+		goldenScoreRewardItem_dlc:SetData(index)
+	end
+end
+
+GoldenScoreRewardItem_dlc = class()
+
+function GoldenScoreRewardItem_dlc:ctor()
+
+end
+
+function GoldenScoreRewardItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+end
+
+function GoldenScoreRewardItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	local allReward = self.contentPane:GetObjByName("bgIcon"):GetComponent("ObjList").objList
+	self.rewardList = {}
+	for i = 0, allReward.Count - 1 do
+		self.rewardList[#self.rewardList + 1] = allReward[i]:GetComponent("LuaListItem")
+	end
+
+	self.scoreSlider = self.contentPane:GetObjByName("scoreSlider"):GetComponent("Slider")
+	self.curScoreText = self.contentPane:GetObjByName("curScoreText"):GetComponent("Text")
+	self.scoreLvBg_cur = self.contentPane:GetObjByName("scoreLvBg_cur")
+	self.levelText = self.contentPane:GetObjByName("levelText"):GetComponent("Text")
+	self.scoreLvBg_last = self.contentPane:GetObjByName("scoreLvBg_last")
+	self.lastLevelText = self.contentPane:GetObjByName("lastLevelText"):GetComponent("Text")
+	--self.bgIcon = self.contentPane:GetObjByName("bgIcon"):GetComponent("GUIIcon")
+	self.scoreText = self.contentPane:GetObjByName("scoreText"):GetComponent("Text")
+	--self.notEnoughTx = self.contentPane:GetObjByName("notEnoughTx"):GetComponent("Text")
+	self.score_tipsBg = self.contentPane:GetObjByName("score_tipsBg"):GetComponent("RectTransform")
+	self.lastScoreIcon = self.contentPane:GetObjByName("scoreIcon"):GetComponent("GUIIcon")
+	self.itemIcon = self.contentPane:GetObjByName("itemIcon"):GetComponent("GUIIcon")
+
+	local sliderRect = self.scoreSlider.gameObject:GetComponent("RectTransform")
+	self.sliderWidth = 0
+	self.sliderHeight = 0
+	if(sliderRect ~= nil)then
+		self.sliderWidth = sliderRect.rect.width
+		self.sliderHeight = sliderRect.rect.height
+	end
+	self.data = nil
+end
+
+function GoldenScoreRewardItem_dlc:SetData(index)
+
+	local allNum = #GoldenCityDataProxy.inst.scoreRewardList--GoldenCityDataProxy.inst.scoreRewardList
+	local unionScore = GoldenCityDataProxy.inst.unionScore
+
+	local itemWdpCfg = CS.WorldParConfigManager.inst:GetConfig(8403)
+	local itemCfg = nil
+	if(itemWdpCfg ~= nil)then
+		itemCfg = CS.ItemconfigManager.inst:GetConfig(itemWdpCfg.parameters)
+	end
+
+	local curIndex = 0
+	if(not CS.FGUI.inst.isLandscape)then
+		curIndex = allNum - index + 1
+	else
+		curIndex = index
+	end
+
+	local curData = GoldenCityDataProxy.inst.scoreRewardList[curIndex]--GoldenCityDataProxy.inst.scoreRewardList[curIndex]
+	local lastData = GoldenCityDataProxy.inst.scoreRewardList[curIndex - 1]--GoldenCityDataProxy.inst.scoreRewardList[curIndex - 1]
+	local lastScore = 0
+	if(lastData ~= nil)then
+		lastScore = lastData.needPoint
+	end
+
+	if(itemCfg ~= nil)then
+		self.itemIcon.enabled = true
+		self.itemIcon:SetSprite(itemCfg.atlas,itemCfg.icon)
+	else
+		self.itemIcon.enabled = false
+	end
+
+	if(curData ~= nil)then
+		self.data = curData
+		if(unionScore >= curData.needPoint) then
+			self.scoreSlider.maxValue = 1
+			self.scoreSlider.value = 1
+		else
+			self.scoreSlider.maxValue = curData.needPoint - lastScore
+			local sliderVal = math.max(unionScore - lastScore,0)
+			self.scoreSlider.value = sliderVal
+		end
+		self.levelText.text = tostring(curIndex)
+		self.scoreText.text = tostring(curData.needPoint)
+	end
+
+	local x = 0
+	local y = 0
+	if(unionScore <= curData.needPoint and unionScore > lastScore)then
+		self.score_tipsBg.gameObject:SetActive(true)
+		self.curScoreText.text = tostring(unionScore)
+
+		if(CS.FGUI.inst.isLandscape)then
+			
+			local calVal = (unionScore - lastScore) / (curData.needPoint - lastScore)
+			if(calVal > 0.9 or calVal < 0.06)then
+				y = -60
+			else
+				y = -30
+			end
+			x = self.sliderHeight * calVal
+			
+		else
+			local calVal = (unionScore - lastScore) / (curData.needPoint - lastScore)
+			if(calVal > 0.9 or calVal < 0.06)then
+				x = -64
+			else
+				x = -32
+			end
+			y = self.sliderHeight * calVal
+
+		end
+
+		self.score_tipsBg.anchoredPosition = Vector2(x,y)
+	else
+		self.score_tipsBg.gameObject:SetActive(false)
+	end
+
+	if(curIndex == 1)then
+		self.lastLevelText.text = ""
+		if(itemCfg ~= nil)then
+			self.lastScoreIcon.gameObject:SetActive(true)
+			self.lastScoreIcon:SetSprite(itemCfg.atlas,itemCfg.icon)
+		else
+			self.lastScoreIcon.gameObject:SetActive(false)
+		end
+
+	else
+
+		self.lastScoreIcon.gameObject:SetActive(false)
+		self.lastLevelText.text = tostring(curIndex - 1)
+	end
+
+	self:SetAwardData()
+end
+
+function GoldenScoreRewardItem_dlc:SetAwardData()
+	if(self.data == nil) then return end
+	for i = 1, #self.data.rewardList do
+		local index = i
+		self.rewardList[index]:SetData({groupId = self.data.groupId,data = self.data.rewardList[index],userNeedPoint = self.data.userNeedPoint,unionNeedPoint = self.data.needPoint})
+	end
+end
+
+function GoldenScoreRewardItem_dlc:Clear()
+
+	self:removeListeners()
+
+end
+
+function GoldenScoreRewardItem_dlc:addListeners()
+
+end
+
+function GoldenScoreRewardItem_dlc:removeListeners()
+
+end

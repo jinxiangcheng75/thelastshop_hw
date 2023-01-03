@@ -1,0 +1,100 @@
+
+--Mall_daily
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_TimeUtils = CS.TimeUtils
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Mall_daily = class(luaClass_Welfare_CtrlBase)
+
+function Mall_daily:initComp(luaBehaviour)
+
+	local contentPane = luaBehaviour
+
+	self.superList = contentPane:GetObjByName("superList"):GetComponent(CS_type_superList)
+	self.tx_countdown = contentPane:GetText("tx_countdown")
+	self.obj_dailyBanner = contentPane:GetObjByName("obj_dailyBanner")
+
+end
+
+function Mall_daily:Init(luaBehaviour)
+
+	self:initComp(luaBehaviour)
+
+	self.countdownTimer = false
+	self.dailyGiftList = nil
+
+	self.superList.itemRenderer = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+	self.superList.itemUpdateInfo = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+end
+
+function Mall_daily:superListItemRenderer(index,item)
+
+	local isDailyGet = index + 1 > #self.dailyGiftList
+
+	item:SetData(
+		{obj = item.gameObject, type = isDailyGet and 1 or 0, data = isDailyGet and nil or self.dailyGiftList[index + 1]}
+	)
+
+end
+
+function Mall_daily:RefreshUIData()
+
+	--倒计时
+	if(MallDataProxy.inst.dailySaleRemainTime ~= nil)then
+		if (MallDataProxy.inst.dailySaleRemainTime > 0) then
+			self.tx_countdown.text = CS_TimeUtils.timeSpan3Str(MallDataProxy.inst.dailySaleRemainTime)
+		end
+
+		self.countdownTimer =
+		CS_GameTimerInst:AddLoopTimerComp(
+			self.tx_countdown.gameObject,
+			1,
+			function()
+				if (MallDataProxy.inst.dailySaleRemainTime > 0) then
+					self.tx_countdown.text = CS_TimeUtils.timeSpan3Str(MallDataProxy.inst.dailySaleRemainTime)
+				else
+					CS_GameTimerInst:removeLoopTimer(self.countdownTimer)
+					self.countdownTimer = false
+				end
+			end
+		)
+	end
+
+	self.dailyGiftList = {}
+
+	if (MallDataProxy.inst.dailySaleList ~= nil) then
+		self.dailyGiftList = MallDataProxy.inst.dailySaleList.saleList
+	end
+
+	self.superList.totalItemCount = #self.dailyGiftList + 1
+
+	self.obj_dailyBanner:SetActive(#self.dailyGiftList ~= 0)
+
+end
+
+function Mall_daily:Clear()
+
+	if self.countdownTimer then
+		CS_GameTimerInst:removeLoopTimer(self.countdownTimer)
+	end
+
+end
+
+return Mall_daily

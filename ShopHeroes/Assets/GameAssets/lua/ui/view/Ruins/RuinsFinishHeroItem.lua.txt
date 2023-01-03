@@ -1,0 +1,112 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csCharacterManagerInst = CS.CharacterManager.inst
+local csEGender = CS.EGender
+local csSpineUtils = CS.SpineUtils
+local csVector3 = CS.UnityEngine.Vector3
+
+local ruinsFinishHeroItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	ruinsFinishHeroItem_dlc = RuinsFinishHeroItem_dlc.new()
+	ruinsFinishHeroItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if ruinsFinishHeroItem_dlc~=nil then
+		ruinsFinishHeroItem_dlc:Clear()
+		ruinsFinishHeroItem_dlc = nil
+	end
+end
+
+function SetData(_data)
+	if ruinsFinishHeroItem_dlc~=nil then
+		ruinsFinishHeroItem_dlc:SetData(_data)
+	end
+end
+
+RuinsFinishHeroItem_dlc = class()
+
+function RuinsFinishHeroItem_dlc:ctor()
+
+end
+
+function RuinsFinishHeroItem_dlc:init(obj)
+	self:initComp(obj)
+	self:addListeners()
+
+	self.data = nil
+	self.graphicDressUp = nil
+end
+
+function RuinsFinishHeroItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.bgIcon = self.gameObject:GetComponent("GUIIcon")
+	self.headDressParent = self.contentPane:GetObjByName("headDressParent").transform
+	self.levelText = self.contentPane:GetObjByName("levelText"):GetComponent("Text")
+	self.hpSlider = self.contentPane:GetObjByName("hpSlider"):GetComponent("Slider")
+	self.deadText = self.contentPane:GetObjByName("deadText"):GetComponent("Text")
+	self.typeBgIcon = self.contentPane:GetObjByName("typeBgIcon"):GetComponent("GUIIcon")
+	self.typeIcon = self.contentPane:GetObjByName("typeIcon"):GetComponent("GUIIcon")
+end
+
+function RuinsFinishHeroItem_dlc:SetData(_data)
+	if(_data == nil)then return end
+
+	self.data = _data
+
+	local rarity = CS.RoleDataProxy.inst:ReturnRarityByAptitude(self.data.intelligence)
+	self.bgIcon:SetSprite(CS.StaticConstants.roleAtlasName, CS.StaticConstants.roleHeroBgIconName[rarity - 1])
+	self.levelText.text = tostring(self.data.level)
+	self.typeBgIcon:SetSprite(CS.StaticConstants.roleAtlasName, CS.StaticConstants.heroTypeBgIconName[self.data.config.type - 1])
+	self.typeIcon:SetSprite(self.data.config.atlas, self.data.config.ocp_icon)
+
+	self.hpSlider.maxValue = self.data.attributeConfig.hp_basic
+
+	if(self.data.currentState == 3)then
+		self.hpSlider.value = 0
+		self.deadText.enabled = true
+	else
+		self.deadText.enabled = false
+		if(self.data.remainHp <= 0)then
+			self.hpSlider.value = self.data.attributeConfig.hp_basic
+		else
+			self.hpSlider.value = self.data.remainHp
+		end
+	end
+	
+	self:setHeroHeadIcon()
+end
+
+function RuinsFinishHeroItem_dlc:setHeroHeadIcon()
+	if (self.graphicDressUp == nil)then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		func(csCharacterManagerInst,csCharacterManagerInst:GetPeopleShapeNudeSpinePath(csEGender.__CastFrom(self.data.gender)),self.data:GetHeadDressIds(),csEGender.__CastFrom(self.data.gender),0.35,true,function (system)
+				self.graphicDressUp = system
+				system.transform:SetParent(self.headDressParent)
+				system.transform.localScale = csVector3(1,1,1)
+				system.transform.localPosition = csVector3(0,0,0)
+			end,nil)
+	else
+		csCharacterManagerInst:ReSetCharacter(self.graphicDressUp, csCharacterManagerInst:GetPeopleShapeNudeSpinePath(csEGender.__CastFrom(self.data.gender)), self.data:GetHeadDressIds(), csEGender.__CastFrom(self.data.gender))
+	end
+end
+
+function RuinsFinishHeroItem_dlc:Clear()
+
+	self:removeListeners()
+
+end
+
+function RuinsFinishHeroItem_dlc:addListeners()
+
+end
+
+function RuinsFinishHeroItem_dlc:removeListeners()
+
+end

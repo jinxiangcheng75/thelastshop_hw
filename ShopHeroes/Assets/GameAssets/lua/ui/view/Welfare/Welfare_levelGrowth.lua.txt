@@ -1,0 +1,118 @@
+
+--Welfare_levelGrowth
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local CS_type_ProgressStateTip = typeof(CS.ProgressStateTip)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_TimeUtils = CS.TimeUtils
+local CS_PayInst = CS.GamePay.inst
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Welfare_levelGrowth = class(luaClass_Welfare_CtrlBase)
+
+function Welfare_levelGrowth:initComp(luaBehaviour)
+
+	local contentPane = luaBehaviour
+
+	self.explainText = contentPane:GetText("ExplainText")
+	self.payButton = contentPane:GetButton("PayButton")
+	self.yigoumai = contentPane:GetObjByName("yigoumai")
+	self.payPriceText = contentPane:GetText("PayPriceText")
+	self.lvstallList = contentPane:GetObjByName("lvstallList"):GetComponent(CS_type_superList)
+
+end
+
+function Welfare_levelGrowth:Init(luaBehaviour)
+
+	self:initComp(luaBehaviour)
+
+	self.currLvGrowthData = nil
+	
+	self.lvstallList.itemRenderer = function(index, item)
+		self:GrowthListItemRenderer(index, item)
+	end
+	
+	self.payButton:ButtonClickTween(function ()
+		self:onPayButtonClick()
+	end)
+
+end
+
+function Welfare_levelGrowth:GrowthListItemRenderer(index, item) --CS.LuaListItem
+	
+	local rewardcfg = GrowthRewardConfigManager:GetConfig(index + 1)
+	if item ~= nil and rewardcfg ~= nil then
+		item:SetData(tonumber(rewardcfg.id))
+		item.onitemclick = function(id)
+			self:growthListitemClick(id)
+		end
+	end
+	
+end
+
+function Welfare_levelGrowth:growthListitemClick(itemid)
+	
+	CS.FGUI.inst:showGlobalMask(1)
+	local rep = MsgType.Request_User_ShopperLevelPurchaseReward:New()
+	rep.id = itemid
+	rep:Send()
+	
+end
+
+function Welfare_levelGrowth:RefreshUIData()
+
+	self.currLvGrowthData = MallDataProxy.inst:GetLVGrowthData()
+	local _count = GrowthRewardConfigManager:GetRewardListCount()
+	self.lvstallList.totalItemCount = _count
+	local shuoming = CS_LanguageManagerInst:GetValueByKey("领袖之路成长计划")
+	self.explainText.text = (shuoming:gsub("\\([nt])", {n = "\n", t = "\t"}))
+	self.payButton.gameObject:SetActive(self.currLvGrowthData.flag == "0")
+	self.yigoumai:SetActive(self.currLvGrowthData.flag == "1")
+	--if self.currLvGrowthData.flag == "0" then
+	self.payPriceText.text = CS_PayInst:GetProductPrice(self.currLvGrowthData.orderID)
+	--end
+	
+end
+
+function Welfare_levelGrowth:ToFirstGrowthReward()
+	
+	local cindex = 0
+	cindex = MallDataProxy.inst:GetFirstGrowthReward()
+	self.lvstallList:scrollByItemIndex(cindex - 1)
+	
+end
+
+
+function Welfare_levelGrowth:onPayButtonClick()
+
+	CS_PayInst:Pay(
+		300,
+		self.currLvGrowthData.orderID,
+		6,
+		self.currLvGrowthData.payActivityId,
+		function(isSuccess)
+			if (isSuccess) then
+				print("充值成功")
+				--EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallBuyVipOtherComUI,data.)
+			end
+		end
+	)
+	
+end
+
+function Welfare_levelGrowth:Clear()
+
+end
+
+return Welfare_levelGrowth

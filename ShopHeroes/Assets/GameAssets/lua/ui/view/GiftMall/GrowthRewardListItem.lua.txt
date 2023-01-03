@@ -1,0 +1,144 @@
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+
+local data
+
+local rewardIcon1Btn;
+local rewardIcon2Btn;
+
+function InitComp()
+
+	rewardIcon1Btn = self:GetObjByName("rewardicon_1"):GetComponent("Button")
+	rewardIcon2Btn = self:GetObjByName("rewardicon_2"):GetComponent("Button")
+
+	rewardIcon1Btn:ButtonClickTween(function ()
+			rewardIconBtnClick(1)
+		end)
+
+	rewardIcon2Btn:ButtonClickTween(function ()
+			rewardIconBtnClick(2)
+		end)
+
+end
+
+function rewardIconBtnClick(pos)
+
+	local rewardcfg = GrowthRewardConfigManager:GetConfig(data)
+	
+	local commonData = nil
+	local transform = nil
+	
+	if pos == 1 then
+		
+		transform = rewardIcon1Btn.transform
+		
+		commonData = CS.CommonRewardData(tonumber(rewardcfg.reward1_id),tonumber(rewardcfg.reward1_num),0,tonumber(rewardcfg.reward1_type))
+		
+		
+	elseif pos == 2 then
+		
+		transform = rewardIcon2Btn.transform
+		
+		commonData = CS.CommonRewardData(tonumber(rewardcfg.reward2_id),tonumber(rewardcfg.reward2_num),0,tonumber(rewardcfg.reward2_type))
+		
+	end
+	
+	
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+	func(CS_EventControllerInst, CS_GameEventType.CommonEvent.COMMONTIPS_SETINFO, commonData, transform)
+	
+	
+end
+
+function SetData(_data)
+	data = _data
+	local currLvGrowthData = MallDataProxy.inst:GetLVGrowthData()
+	local luaListItem = self
+	-- item.gameObject:GetComponent(CS_type_luaList)
+	local rewardcfg = GrowthRewardConfigManager:GetConfig(data)
+	if luaListItem ~= nil and rewardcfg ~= nil then
+		--luaListItem:onUpdateItem(index)
+		local indexText = luaListItem:GetText("indexText")
+		indexText.text = tostring(rewardcfg.need_lv)
+
+		local rewardIcon1 = luaListItem:GetGUIIcon("rewardicon_1")
+		rewardIcon1.transform.parent.gameObject:SetActive(false)
+		if tonumber(rewardcfg.reward1_id) > 0 then
+			rewardIcon1.transform.parent.gameObject:SetActive(true)
+			if tonumber(rewardcfg.reward1_id) ~= nil and rewardcfg.reward1_type == "16" then
+				local equipdrawingcfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(tonumber(rewardcfg.reward1_id))
+				rewardIcon1:SetSprite(equipdrawingcfg.atlas, equipdrawingcfg.icon)
+			else
+				local itemcfg = CS.ItemconfigManager.inst:GetConfig(tonumber(rewardcfg.reward1_id))
+				rewardIcon1:SetSprite(itemcfg.atlas, itemcfg.icon)
+			end
+
+			local counttext = luaListItem:GetText("rewardcount_1")
+			counttext.text = rewardcfg.reward1_num
+		end
+
+		local rewardIcon2 = luaListItem:GetGUIIcon("rewardicon_2")
+		rewardIcon2.transform.parent.gameObject:SetActive(false)
+		if tonumber(rewardcfg.reward2_id) ~= nil and tonumber(rewardcfg.reward2_id) > 0 then
+			rewardIcon2.transform.parent.gameObject:SetActive(true)
+			if rewardcfg.reward2_type == "16" then
+				local equipdrawingcfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(tonumber(rewardcfg.reward2_id))
+				rewardIcon2:SetSprite(equipdrawingcfg.atlas, equipdrawingcfg.icon)
+			else
+				local itemcfg = CS.ItemconfigManager.inst:GetConfig(tonumber(rewardcfg.reward2_id))
+				rewardIcon2:SetSprite(itemcfg.atlas, itemcfg.icon)
+			end
+
+			local counttext2 = luaListItem:GetText("rewardcount_2")
+			counttext2.text = rewardcfg.reward2_num
+		end
+
+		local GetButton = luaListItem:GetButton("GetButton")
+		local GetBtnText = luaListItem:GetText("GetBtnText")
+		local img_finish = luaListItem:GetImage("img_finish")
+		local obj_cantGet = luaListItem:GetObjByName("obj_cantGet")
+		local tx_needLv = luaListItem:GetText("tx_needLv")
+		
+		GetButton.onClick:RemoveAllListeners()
+		
+		if currLvGrowthData.flag == "1" then
+			local iteminfo = currLvGrowthData.rewardList[tonumber(rewardcfg.id)]
+			if iteminfo ~= nil then
+				if iteminfo.state == 1 then
+					img_finish.enabled = false
+					GetButton.gameObject:SetActive(true)
+					GetBtnText.text = ""
+					CS.GUIHelper.SetSingleUIGray(GetButton.transform, true)
+					obj_cantGet:SetActive(true)
+					tx_needLv.text = tostring(rewardcfg.need_lv)
+					
+				elseif iteminfo.state == 2 then
+					img_finish.enabled = false
+					GetButton.gameObject:SetActive(true)
+					GetBtnText.text = CS.LanguageManager.inst:GetValueByKey("领取")
+					CS.GUIHelper.SetSingleUIGray(GetButton.transform, false)
+					obj_cantGet:SetActive(false)
+					GetButton.onClick:RemoveAllListeners()
+					GetButton:ButtonClickTween(
+						function()
+							self.onitemclick(data)
+						end
+					)
+				elseif iteminfo.state == 3 then
+					img_finish.enabled = true
+					GetBtnText.text = ""
+					GetButton.gameObject:SetActive(false)
+				end
+			end
+		else
+			img_finish.enabled = false
+			GetButton.gameObject:SetActive(true)
+			GetBtnText.text = CS.LanguageManager.inst:GetValueByKey("未购买")
+			CS.GUIHelper.SetSingleUIGray(GetButton.transform, true)
+			obj_cantGet:SetActive(false)
+		end
+	end
+end

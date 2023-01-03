@@ -1,0 +1,329 @@
+-- ShopRankSystem
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/ShopRank/ShopRankUIView")
+require("ui/view/Exchange/ExchangeUIView")
+require("ui/view/LookBack/LookBackInfoUIView")
+require("ui/view/Hero/LookOtherUserRoleEquipUI")
+require("ui/view/Role/RoleInfoView")
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_TimeUtils = CS.TimeUtils
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+
+ShopRankSystem = class(BaseSystem)
+ShopRankSystem.super = BaseSystem
+
+local rankUIView
+local exchangeUIView
+local lookBackUIView
+local roleInfoView
+-- 排行  兑换码   首次登陆公会信息  查看排行上英雄数据
+function ShopRankSystem:ctor()
+
+end
+
+function ShopRankSystem:OnInit()
+	self.thisLoginUnionTipIsShow = false
+	self.thisLoginDailyTipIsShow = false
+end
+
+function ShopRankSystem:ReInitSystem()
+	self.thisLoginUnionTipIsShow = false
+	self.thisLoginDailyTipIsShow = false
+end
+
+function ShopRankSystem:AddListeners()
+	-- 排行
+	EventDispatcherInis:addEvent(GameEvent.RankEvent.Request_RankList,self,self.requestRankList)
+	EventDispatcherInis:addEvent(GameEvent.RankEvent.Open_RankUI,self,self.openRankUI)
+	EventDispatcherInis:addEvent(GameEvent.RankEvent.Open_RankUIByBtn,self,self.openUI)
+
+	-- 兑换
+	EventDispatcherInis:addEvent(GameEvent.ExchangeEvent.Open_ExchangeUI,self,self.openExchangeUI)
+	EventDispatcherInis:addEvent(GameEvent.ExchangeEvent.Hide_ExchangeUI,self,self.hideExchangeUI)
+	EventDispatcherInis:addEvent(GameEvent.ExchangeEvent.Request_ExchangeCodeReward,self,self.requestExchangeCodeReward)
+
+	--弹出系统消息
+	EventDispatcherInis:addEvent(GameEvent.LookBackEvent.Open_LookBackUI,self,self.openLookBackUI)
+	EventDispatcherInis:addEvent(GameEvent.LookBackEvent.Check_LookBackUI,self,self.ShowLookBackPanel)
+
+	--查看其它玩家英雄装备
+	EventDispatcherInis:addEvent(GameEvent.RankEvent.ShowUI_LookOtherUserRoleEquip,self,self.openLookOtherUserRoleEquip)
+	EventDispatcherInis:addEvent(GameEvent.RankEvent.ShowUI_RoleInfo,self,self.openRoleInfo)
+	EventDispatcherInis:addEvent(GameEvent.RankEvent.Request_OtherHeroData,self,self.requestOtherHeroData)
+
+
+	EventDispatcherInis:addEvent(GameEvent.TopInfoEvent.Check_UnionTaskTip,self,self.CheckUnionTaskTip)
+	EventDispatcherInis:addEvent(GameEvent.TopInfoEvent.Check_DailyTaskTip,self,self.CheckDailyTaskTip)
+	EventDispatcherInis:addEvent(GameEvent.TopInfoEvent.Show_UnionTaskTip,self,self.ShowUnionTaskTip)
+	EventDispatcherInis:addEvent(GameEvent.TopInfoEvent.Show_DailyTaskTip,self,self.ShowDailyTaskTip)
+
+	EventDispatcherInis:addEvent(GameEvent.MarketEvent.Market_BuyOrSellOneSuccessed,self,self.MarketOperationSuccess)
+
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.OpenUI_RuinsHeroInfo,self,self.openRuinsRoleInfo)
+
+end
+
+function ShopRankSystem:RemoveListeners()
+
+	EventDispatcherInis:removeEvent(GameEvent.RankEvent.Request_RankList,self.requestRankList)
+	EventDispatcherInis:removeEvent(GameEvent.RankEvent.Open_RankUI,self.openRankUI)
+	EventDispatcherInis:removeEvent(GameEvent.RankEvent.Open_RankUIByBtn,self.openUI)
+
+	EventDispatcherInis:removeEvent(GameEvent.ExchangeEvent.Open_ExchangeUI,self.openExchangeUI)
+	EventDispatcherInis:removeEvent(GameEvent.ExchangeEvent.Hide_ExchangeUI,self.hideExchangeUI)
+	EventDispatcherInis:removeEvent(GameEvent.ExchangeEvent.Request_ExchangeCodeReward,self.requestExchangeCodeReward)
+
+	EventDispatcherInis:removeEvent(GameEvent.LookBackEvent.Open_LookBackUI,self.openLookBackUI)
+	EventDispatcherInis:removeEvent(GameEvent.LookBackEvent.Check_LookBackUI,self.ShowLookBackPanel)
+
+	--查看其它玩家英雄装备
+	EventDispatcherInis:removeEvent(GameEvent.RankEvent.ShowUI_LookOtherUserRoleEquip,self,self.openLookOtherUserRoleEquip)
+	EventDispatcherInis:removeEvent(GameEvent.RankEvent.ShowUI_RoleInfo,self,self.openRoleInfo)
+	EventDispatcherInis:removeEvent(GameEvent.RankEvent.Request_OtherHeroData,self,self.requestOtherHeroData)
+
+
+	EventDispatcherInis:removeEvent(GameEvent.TopInfoEvent.Check_UnionTaskTip,self,self.CheckUnionTaskTip)
+	EventDispatcherInis:removeEvent(GameEvent.TopInfoEvent.Check_DailyTaskTip,self,self.CheckDailyTaskTip)
+	EventDispatcherInis:removeEvent(GameEvent.TopInfoEvent.Show_UnionTaskTip,self,self.ShowUnionTaskTip)
+	EventDispatcherInis:removeEvent(GameEvent.TopInfoEvent.Show_DailyTaskTip,self,self.ShowDailyTaskTip)
+
+	EventDispatcherInis:removeEvent(GameEvent.MarketEvent.Market_BuyOrSellOneSuccessed,self,self.MarketOperationSuccess)
+
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.OpenUI_RuinsHeroInfo,self,self.openRuinsRoleInfo)
+
+end
+
+function ShopRankSystem:MarketOperationSuccess(payload,itemType,itemId,itemQuality)
+	if(payload == nil or #payload <= 0)then return end
+	local vars = split(payload,"|")
+	local type = vars[1]
+
+	if(type ~= nil)then
+
+		if(tonumber(type) == 1 and itemType == 0)then
+			GUIManager.inst:HideViewCS(typeof(CS.MarketItemInfoUI))
+			GUIManager.inst:HideViewCS(typeof(CS.MarketInventoryUIView))
+			CS.FGUI.inst:showGlobalMask(1.5)
+
+			local equipData = CS.ItemBagProxy.inst:GetEquipItem(itemId,itemQuality)
+
+			local rep = MsgType.Request_Hero_Equip:New()
+			rep.heroUid = vars[2]
+			rep.equipField = vars[3]
+			rep.onOrOff = 0
+			rep.equipUid = equipData.itemUid
+			rep:Send()
+		end
+
+	end
+end
+
+function ShopRankSystem:CheckUnionTaskTip()
+	if(CS.UserDataProxy.inst.playerData.hasUnion)then
+		if(not CS.UserDataProxy.inst.task_unionTaskNeedShowRedPoint)then
+			if(not self.thisLoginUnionTipIsShow)then
+				self.thisLoginUnionTipIsShow = true
+
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+				local func = funcGeneric(CS.queueItem)
+				local queueItem = CS.queueItem(CS.ReceiveInfoUIType.UnionTaskTip, "", 0, 0, 0)
+				func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+			end
+		end
+	end
+end
+
+function ShopRankSystem:CheckDailyTaskTip()
+	local wdpCfg = CS.WorldParConfigManager.inst:GetConfig(133)
+	if(wdpCfg ~= nil)then
+		local level = wdpCfg.parameters
+		if (CS.UserDataProxy.inst.playerData.level < level)then
+			return
+		end
+	end
+
+	if(not self.thisLoginDailyTipIsShowo)then
+		self.thisLoginDailyTipIsShowo = true
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.queueItem)
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.DailyTaskTip, "", 0, 0, 0)
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	end
+end
+
+function ShopRankSystem:ShowUnionTaskTip()
+	csEventControllerInst:TriggerEvent(csGameEventType.TaskEvent.SHOWTIP_UNIONTASK)
+end
+
+function ShopRankSystem:ShowDailyTaskTip()
+	csEventControllerInst:TriggerEvent(csGameEventType.TaskEvent.SHOWTIP_DAILYTASK)
+end
+
+function ShopRankSystem:ShowLookBackPanel()
+	if(GoldenCityDataProxy.inst.isShowGoldenCityUI)then
+		GoldenCityDataProxy.inst.isShowGoldenCityUI = false
+		if(GoldenCityDataProxy.inst.flag)then
+			CS.FGUI.inst:showGlobalMask(1)
+			EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityMain,1)
+			--CS.GameTimer.inst:AddTimer(1,1,function ()
+					
+				--end)
+		end
+	end
+
+	if(GoldenCityDataProxy.inst.cachePointChangeData ~= nil)then
+		
+		EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.RefreshUI_Activity_GoldenCity_PointChanged,GoldenCityDataProxy.inst.cachePointChangeData)
+		GoldenCityDataProxy.inst.cachePointChangeData = nil
+		
+	end
+
+	local dateTime = CS_TimeUtils.getDateTimeBySecs(CS_GameTimerInst.serverNow)
+
+	if(CS.UserDataProxy.inst.playerData.unionId == nil or CS.UserDataProxy.inst.playerData.unionId == "") then
+		CS_PlayerPrefs.SetString(
+			CS_AccountDataProxyInst.account ..
+			"_LookBack_" .. tostring(dateTime.Year) .. tostring(dateTime.Month) .. tostring(dateTime.Day),"1"
+		)
+		return
+	end
+
+	--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	--local func = funcGeneric(CS.queueItem)
+	--local queueItem = CS.queueItem(CS.ReceiveInfoUIType.LookBack, "", 0, 0, 0)
+	--func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+
+	if CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_LookBack_"..tostring(dateTime.Year)..tostring(dateTime.Month)..tostring(dateTime.Day), "-1") == "-1" then
+		if(CS.ChatDataProxy.inst.sysMsgChannelList.Count > 0)then
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.queueItem)
+			local queueItem = CS.queueItem(CS.ReceiveInfoUIType.LookBack, "", 0, 0, 0)
+			func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+		end
+	end
+
+	CS_PlayerPrefs.SetString(
+		CS_AccountDataProxyInst.account ..
+		"_LookBack_" .. tostring(dateTime.Year) .. tostring(dateTime.Month) .. tostring(dateTime.Day),"1"
+	)
+end
+
+function ShopRankSystem:openLookBackUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.LookBackInfoUIView,
+		function(view)
+			lookBackUIView = view
+		end
+	)
+end
+
+function ShopRankSystem:openExchangeUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.ExchangeUIView,
+		function(view)
+			exchangeUIView = view
+		end
+	)
+end
+
+function ShopRankSystem:hideExchangeUI()
+	GUIManager.inst:HideView(Constants.ViewName.ExchangeUIView)
+end
+
+function ShopRankSystem:requestExchangeCodeReward(exchangeCode)
+	local rep = MsgType.Request_User_ExchangeCodeReward:New()
+	rep.exchangeCode = exchangeCode
+	rep:Send()
+end
+
+function ShopRankSystem:openUI(index)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.ShopRankUIView,
+		function(view)
+			rankUIView = view
+			rankUIView:SetTargetToggle(index)
+		end
+	)
+end
+
+function ShopRankSystem:openRankUI(rankId,rankList,selfRankInfo)
+	if(rankUIView == nil)then
+		GUIManager.inst:OpenView(
+			Constants.ViewName.ShopRankUIView,
+			function(view)
+				rankUIView = view
+				rankUIView:SetUIData(rankId,rankList,selfRankInfo)
+			end
+		)
+		return
+	end
+
+	if(rankUIView.isShowing)then
+		rankUIView:SetUIData(rankId,rankList,selfRankInfo)
+	else
+		GUIManager.inst:OpenView(
+			Constants.ViewName.ShopRankUIView,
+			function(view)
+				rankUIView = view
+				rankUIView:SetUIData(rankId,rankList,selfRankInfo)
+			end
+		)
+	end
+end
+
+function ShopRankSystem:openLookOtherUserRoleEquip(equip,heroUid) --??
+	GUIManager.inst:OpenView(
+		Constants.ViewName.LookOtherUserRoleEquipUI,
+		function(view)
+			lookBackUIView = view
+			lookBackUIView:SetData(equip,heroUid)
+		end
+	)
+end
+
+function ShopRankSystem:openRoleInfo(heroInfo,userId,nickName)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RoleInfoView,
+		function(view)
+			roleInfoView = view
+			roleInfoView:SetData(heroInfo,userId,nickName)
+		end
+	)
+end
+
+function ShopRankSystem:openRuinsRoleInfo(heroInfo)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RoleInfoView,
+		function(view)
+			roleInfoView = view
+			roleInfoView:SetDataFromRuins(heroInfo)
+		end
+	)
+end
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+function ShopRankSystem:requestRankList(rankType)
+	local rep = MsgType.Request_User_RankList:New()
+	rep.rankListType = rankType
+	rep:Send()
+end
+
+function ShopRankSystem:requestOtherHeroData(userUid,heroUid)
+	local rep = MsgType.Request_User_SearchHeroInfo:New()
+	rep.userId = userUid
+	rep.heroUid = heroUid
+	rep:Send()
+end

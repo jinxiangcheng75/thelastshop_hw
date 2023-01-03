@@ -1,0 +1,44 @@
+-- TestNewConfig
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+TestNewConfig =
+	class(
+	{
+		id = 0,
+		a = 0,
+		b = 1.1,
+		c = "abc"
+	}
+)
+
+TestNewConfigManager = class()
+TestNewConfigManager.cfgDict = {}
+local csv_name = "testnew"
+
+function TestNewConfigManager:InitCSVConfig()
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("TestNewConfigManager:InitCSVConfig csv:", csv)
+	-- local cfgs = CSVParser:parseClass(csv, 2, TestNewConfig)
+	-- TestNewConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("TestNewConfigManager  ´íÎó")
+	end
+end
+
+function TestNewConfigManager:processConfigs(cfgs)
+	--print("TestNewConfigManager:processConfigs ", cfgs, " len:", #cfgs)
+	-- for i=1, #cfgs do
+	--    local c = cfgs[i]
+	--    --print("TestNewConfigManager c i:", i," c:", c, " idtype:", type(c.id))
+	--    TestNewConfigManager.cfgDict[tonumber(c.id)] = c
+	-- end
+	--print("TestNewConfigManager:processConfigs completed")
+end
+
+function TestNewConfigManager:GetConfig(id)
+	return TestNewConfigManager.cfgDict[id]
+end

@@ -1,0 +1,89 @@
+--LuxuryLevelUpUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("config/LuxuryConfigManager")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+
+local data
+
+LuxuryLevelUpUIView = class(ViewBase)
+
+function LuxuryLevelUpUIView:ctor()
+	self.viewID = Constants.ViewName.LuxuryLevelUpUIView
+	LuxuryLevelUpUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+
+function LuxuryLevelUpUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("continueBtn")
+	self.curIcon = contentPane:GetGUIIcon("icon")
+	self.nameText = contentPane:GetText("nameText")
+	self.upText = contentPane:GetText("descUp")
+	self.downText = contentPane:GetText("descDown")
+	self.curStars = {}
+	self.curStars[1] = contentPane:GetGUIIcon("star1")
+	self.curStars[2] = contentPane:GetGUIIcon("star2")
+	self.curStars[3] = contentPane:GetGUIIcon("star3")
+	self.curStars[4] = contentPane:GetGUIIcon("star4")
+	self.curStars[5] = contentPane:GetGUIIcon("star5")
+end
+
+function LuxuryLevelUpUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+end
+
+function LuxuryLevelUpUIView:onHide()
+	--print("LuxuryLevelUpUIView onHide")
+	csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON)
+end
+
+function  LuxuryLevelUpUIView:onShowed()
+	--print("LuxuryLevelUpUIView onShowed")
+end
+
+function LuxuryLevelUpUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function LuxuryLevelUpUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function LuxuryLevelUpUIView:closeBtnClick()
+	self:hide()
+end
+
+function LuxuryLevelUpUIView:SetUIData(level)
+	data = LuxuryConfigManager:GetConfig(level)
+	if(data ~= nil)then
+		self.curIcon:SetSprite(data.atlas,data.icon)
+		for i = 1, #self.curStars do
+			if(i <= tonumber(data.stars))then
+				self.curStars[i]:SetSprite("luxury_atlas","yingxiong_xingcheng")
+			else
+				self.curStars[i]:SetSprite("luxury_atlas","yingxiong_xingcheng1")
+			end
+		end
+		
+		self.nameText.text = cs_LanguageManagerInst:GetValueByKey("{0}-{1}星",cs_LanguageManagerInst:GetValueByKey(data.type),tostring(data.stars))
+		self.upText.text = LuxuryConfigManager:GetStrUp(tonumber(data.buff_type))
+		self.downText.text = LuxuryConfigManager:GetStrDown(tonumber(data.buff_type),tostring(data.buff_val))
+	end
+end
+------------------------------------------------

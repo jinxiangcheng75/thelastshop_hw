@@ -1,0 +1,788 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Duplicate Asset Isolation
+  m_EditorClassIdentifier: 
+  m_GroupName: Duplicate Asset Isolation
+  m_Data:
+    m_SerializedData: []
+  m_GUID: df51ea4e20a82ce4aa90d2c2b01cc720
+  m_SerializeEntries:
+  - m_GUID: 40c74bdb314e60147be4706b27817189
+    m_Address: Assets/_Artworks/Map/Sprites/Environment/Flat/desert-sliced_02.png
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 4495010f0f608e84498564b6ae27cfff
+    m_Address: Assets/_Artworks/Map/Sprites/Environment/Flat/desert-sliced_17.png
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 1e8a610c9e01c3648bac42585e5fc676
+    m_Address: Assets/Spine/Runtime/spine-unity/Shaders/Spine-Skeleton.shader
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 32f528dac8542864a8351e8ac025b55a
+    m_Address: Assets/_Artworks/materials/default_sprite.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 4353c788e9aa0f3429797c5dbd1b953e
+    m_Address: Assets/_Artworks/Map/Sprites/guide/zhuwang_2.png
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: ea3de3693504c7b45979213292ea4201
+    m_Address: Assets/_Artworks/Map/Sprites/guide/zhuwang_3.png
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 79b4e73d0bf186d4bacfed419559d209
+    m_Address: Assets/_Artworks/materials/urp_sprite.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 92710a813b7da8f47b191bfae9f34fe0
+    m_Address: Assets/_Artworks/Map/Sprites/guide/zhuwang_4.png
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 1646eeaac780b9e4e9025ebeb345f112
+    m_Address: Assets/_Artworks/Vfx/Texture/Glow_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 7081de01bf4e2ce4f8b2745a92c3e735
+    m_Address: Assets/_Artworks/Vfx/Mesh/blade.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: a2fc9362a0a136e4bb3bbb82f1ba831e
+    m_Address: Assets/_Artworks/Vfx/shader/P_alpha.shader
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 567a78c5287d46c47a44bde11a26326c
+    m_Address: Assets/_Artworks/Vfx/shader/P_add.shader
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 72cc2faa2f567a94cb037fdcc8124d53
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_star_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: e72045847f451934b93d6c71d1d39aac
+    m_Address: Assets/_Artworks/Vfx/Texture/star_0003.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: dc3d65c12a6f3234bb982bbd7e14fac3
+    m_Address: Assets/_Artworks/Vfx/Texture/trail_0012.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 56f99983eb57d5342bb487d838c22c59
+    m_Address: Assets/_Artworks/Vfx/Texture/Noise_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 86327946bc0bbc54dafa1c7615700c33
+    m_Address: Assets/_Artworks/Vfx/Texture/trail_0012.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: e2351b1353701e6478a7f794c98b8330
+    m_Address: Assets/_Artworks/Vfx/Texture/star_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: a5a8c6ae5faa7c9428212680f108db1a
+    m_Address: Assets/_Artworks/Vfx/Texture/Glow_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 6a0c0efe81462214da7b712830babbe5
+    m_Address: Assets/_Artworks/Vfx/Texture/star_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 67f89843943cce641a3b0622f176ee6a
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_flare_0003.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: c1ded4c3de8588c47ad8cfc4cc386ed2
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_flash_0003.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: bdbc449a27b0c254984705ad376933b3
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_flash_0004.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: f6898b831138c684383a9079c4713574
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_flash_0002.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 9e71a07a8db268e4189695f2a801098c
+    m_Address: Assets/_Artworks/Vfx/Texture/glow_001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 43c83752b7171344ea0704e58a0c1d85
+    m_Address: Assets/_Artworks/Vfx/Texture/ring_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 7d6597767f87c6e47b72896739b9c130
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_ring_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 638e781c15e43a9448faadd886f30e42
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_flash_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 17e1c7d90841b354583115e087bec762
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_fire_0002.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 3cecd71e2a5089e4ea4b76ad28e43aaf
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_card_mask_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: bba0146f6e3c43a4abf8a3a6aa2b1264
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_fireflame.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 0352f58b81fc74a49a2c99ad2aa7033e
+    m_Address: Assets/GUI2D/Animation/MainUI/MakeSlot_Jump.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 41479d04c611b8b4ca67933fdf53be56
+    m_Address: Assets/GUI2D/Animation/Common/hide.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 0fa81974ecf50f84abba069b5accf97d
+    m_Address: Assets/_Artworks/Vfx/Mesh/cone2.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 3bfc9da60432e62478e10e8d2cf7aa0c
+    m_Address: Assets/GUI2D/Animation/Common/TemplateCtrl.controller
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 2b003f1a728ce6541bdecf4e8d7932f3
+    m_Address: Assets/_Artworks/Vfx/Texture/aura_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 7ef37c9a30012e14f93e9864e858c366
+    m_Address: Assets/_Artworks/Vfx/Texture/aura_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 11bb919c2ab31414aaa7e324508b08fe
+    m_Address: Assets/GUI2D/Animation/Common/show.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: d95fe10e1cca64141b4db2925707c96e
+    m_Address: Assets/_Artworks/Vfx/Texture/Mask_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 68e6db2ebdc24f95958faec2be5558d6
+    m_Address: Assets/TextMesh Pro/Shaders/TMP_SDF.shader
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 95850563e9ea89841b5f382ea2e07df7
+    m_Address: Assets/_Artworks/Vfx/Texture/Smoke_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 8263c8fc6f87e3b458149e55df0beffa
+    m_Address: Assets/_Artworks/Vfx/Texture/Smoke_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 346f36c0995a25d44b3dad56cc3a4383
+    m_Address: Assets/GUI2D/Animation/ShopkeeperAnimation/ShopkeeperItem_ClickUp.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: bf6408c08aac41148bfe3b5ae12ee8b3
+    m_Address: Assets/GUI2D/Animation/ShopkeeperAnimation/ShopkeeperItem_click.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 2dce4e241ba9ae0438f657301702d559
+    m_Address: Assets/GUI2D/Animation/ShopkeeperAnimation/ShopkeeperItem_show.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 19ebf946bba1c1f4fbf7a3b889f5c5f6
+    m_Address: Assets/GUI2D/Animation/ShopkeeperAnimation/spBtn.controller
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 2f1b0717bd2fd0947aa1261711d39287
+    m_Address: Assets/GUI2D/Animation/common_popUpUI.controller
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 894f57dcfe89aa949a1c4286fbda37b5
+    m_Address: Assets/GUI2D/Animation/common_popUpUI_hide.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 4ec97a0e2e451d9489d721edf3938482
+    m_Address: Assets/GUI2D/Animation/common_popUpUI_show.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: ef7fed87fed58794ab20b34435382057
+    m_Address: Assets/GUI2D/Animation/commonBagUI_hide.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: dfd0aa9b210af7e41bf4ad755a9fe2f8
+    m_Address: Assets/GUI2D/Animation/commonBagUI_show.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 9f7265bdd2e99434695050cede5b535c
+    m_Address: Assets/GUI2D/Animation/CommonBagUI.controller
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 9d500c94ad4953648ac44c23cd8473f1
+    m_Address: Assets/GUI2D/Animation/ShopkeeperAnimation/ShopkeeperSub.controller
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 454cecfa8bceae84988ba2a00c5f1360
+    m_Address: Assets/GUI2D/Animation/ShopkeeperAnimation/ShopkeeperSub_show.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 68bc0c7b26d1cf34780c295e2f22310a
+    m_Address: Assets/GUI2D/Animation/ShopkeeperAnimation/ShopkeeperSub_hide.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 44ed9d40ea7dacc4d9abd6b9fbe5026d
+    m_Address: Assets/GUI2D/Animation/MainUI/Slot_liuguang_Ctr.controller
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 8a6b0541c9887e248a50fc8b53323be1
+    m_Address: Assets/GUI2D/Animation/MainUI/liuguang.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: aee47ae547f8e3d4ea1f3ac11be26aea
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_liuguang_0002.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 3c2a2469853dcde4cbea2b1db5a0a51d
+    m_Address: Assets/_Artworks/Vfx/Texture/ui_liuguang_003.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 2730225b9ff51d247ac11835423587f1
+    m_Address: Assets/_Artworks/Vfx/Texture/UI_liuguang_1.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 17a96edbd25f5bd43af7485f89cbf6d4
+    m_Address: Assets/GUI2D/Animation/MainUI/yuanliuguang.controller
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 69968b5cd2b47bf4e9e82bb1242c7fd1
+    m_Address: Assets/_Artworks/Vfx/shader/ui_shader.shader
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 9e898aad72151a940b92904569fbf304
+    m_Address: Assets/_Artworks/Vfx/Texture/UI_liuguang_3.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 79c3173eb25343f4c85d958288e69b9a
+    m_Address: Assets/GUI2D/Animation/MainUI/makeSlot_liuguang.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 45a69f01aa1fa574b86128171b7b8fdb
+    m_Address: Assets/GUI2D/Animation/EquipItemDataUI/top_hide.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 72cc5f34f41d5a54bb04c28bf19a5385
+    m_Address: Assets/GUI2D/Animation/EquipItemDataUI/top_show.anim
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 5752d6648ead6c0488c127352580cb9d
+    m_Address: Assets/_Artworks/Vfx/Texture/Trail_0002.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 91fb1b8c4579d5946b465a355f24943c
+    m_Address: Assets/_Artworks/Vfx/Texture/Trail_0002.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 0d8f00dc0d826a94695ee771e439155d
+    m_Address: Assets/_Artworks/Vfx/Mesh/blade2.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 9aa77b97dc4c78047ae49c6f8203c187
+    m_Address: Assets/_Artworks/Vfx/Texture/smoke_0003.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: fbc9059eb59c12b44a3b5b6038aaf4f1
+    m_Address: Assets/_Artworks/Vfx/Texture/smoke_0003.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 27a4e9be1186d0f4ea9f0a3a485ec025
+    m_Address: Assets/_Artworks/Vfx/Texture/Bubble_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 61581ba84b5b9ed4d8cc0802cc00059a
+    m_Address: Assets/_Artworks/Vfx/Texture/ring_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 7521d1751fde5514ba36e67532233bde
+    m_Address: Assets/_Artworks/Vfx/Texture/Trail_0004.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 96d31fdaa4d458d42b159f33854f3b34
+    m_Address: Assets/_Artworks/Vfx/Texture/Trail_0004.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 43b0a0825fa2b8f419edf34cba4fc92b
+    m_Address: Assets/_Artworks/Vfx/Mesh/cone_001.FBX
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 3ae9b3b5ee79722479d07cfc6cc8b76b
+    m_Address: Assets/_Artworks/Vfx/Texture/Noise_0008.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 4b8569689469b334e9ca42b184cbaa73
+    m_Address: Assets/_Artworks/Vfx/Texture/shock_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 0b006d6ff49a1104383fd43be1e67e1d
+    m_Address: Assets/_Artworks/Vfx/Texture/shock_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 9ed0896ab40dfcc4d9209ceaf15ef541
+    m_Address: Assets/_Artworks/Vfx/Texture/fireimpact_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 11d5045d7d47fb14a81e09fc6289921b
+    m_Address: Assets/_Artworks/Vfx/Texture/fireimpact_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 41ec4701d9391474da6187aa79299272
+    m_Address: Assets/_Artworks/Vfx/Texture/hex_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 92686e05cab574c4f8d2e79a1b6493e1
+    m_Address: Assets/_Artworks/Vfx/Texture/ring_0002.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 9215156855f8c3a41b9c8757dbc0471a
+    m_Address: Assets/_Artworks/Vfx/Texture/ring_0002.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: ca4a5465cd35f30479802bf06f6a172d
+    m_Address: Assets/_Artworks/Vfx/Texture/Noise_0014.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: a4c6148829cc9844c8ed9fbf42956fae
+    m_Address: Assets/_Artworks/Vfx/Texture/ring_0004.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 82551f7c6d86d00459dbcfa9c8066541
+    m_Address: Assets/_Artworks/Vfx/Texture/ring_0003.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: c21f5088ed09250419fb5a3c1c77c6f3
+    m_Address: Assets/_Artworks/Vfx/Texture/Bubble_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 2cb09304cdfa20d49a2d6610086c9827
+    m_Address: Assets/_Artworks/Vfx/Texture/lightning_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 80275f4c752859c48b989037dbea5ebf
+    m_Address: Assets/_Artworks/Vfx/Texture/lightning_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 258435673d6395142b6a91654553d75e
+    m_Address: Assets/_Artworks/Vfx/Texture/gunflash_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: e884424a868c8714ba646195eea4aa6c
+    m_Address: Assets/_Artworks/Vfx/Texture/gunflash_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: fa5d68dc451bcfd4ca2484ab1ef5152d
+    m_Address: Assets/_Artworks/Vfx/Texture/smoke_0005.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 94acc44da7bde844191a7e1478e6342d
+    m_Address: Assets/_Artworks/Vfx/Texture/fire_0005.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: e6ad56cd41a00da4790ca84f5912dc11
+    m_Address: Assets/_Artworks/Vfx/Texture/fire_0005.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: f7f3aeb1d8626ad4fabe2698859dfd2a
+    m_Address: Assets/_Artworks/Vfx/Texture/mask_0002.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 6168985a9581b894b958a437fad0a00b
+    m_Address: Assets/_Artworks/Vfx/Texture/arrow_0001.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 80d1dbbbf729c5c43bf2aceca000cec6
+    m_Address: Assets/_Artworks/Vfx/Texture/arrow_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: b0e0c3f4827ea4948a02fc16144beac3
+    m_Address: Assets/_Artworks/Vfx/Texture/blast_0001.tga
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 4a95b738ed958984aba9540d3dd28779
+    m_Address: Assets/_Artworks/Vfx/Texture/star_0003.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: bca12e1e7341476468e9c25c63fdfc1c
+    m_Address: Assets/_Artworks/Vfx/Texture/blast_0002.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: ae3f155df8ae0b64aadaa2fc40209795
+    m_Address: Assets/_Artworks/Vfx/Texture/UI_liuguang_4.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: ffd5ba65d915a454cbb89ebd907ba19d
+    m_Address: Assets/_Artworks/Vfx/Texture/UI_liuguang_5.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: d1b335dc46f1de9429e4a704d9b3a120
+    m_Address: Assets/GUI2D/Animation/Furniture/furnitureAnim.controller
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: fe393ace9b354375a9cb14cdbbc28be4
+    m_Address: Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 7a08b1908f5540b4abd366150ac45bc8
+    m_Address: Assets/TextFont/AlibabaPuHuiTi-Bold.ttf
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 668d295fbd96b3749bd3193704314f67
+    m_Address: Assets/TextFont/AlibabaPuHuiTi-Bold SDF.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 0}
+    m_TargetAsset: {fileID: 0}
+  - m_GUID: 3a88bb028d30aef45ad45a58923e5f3f
+    m_Address: Assets/_Artworks/TextFont/AlibabaPuHuiTi-Bold SDF_inputOutLine.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 11400000, guid: 3a88bb028d30aef45ad45a58923e5f3f, type: 2}
+    m_TargetAsset: {fileID: 11400000, guid: 3a88bb028d30aef45ad45a58923e5f3f, type: 2}
+  - m_GUID: 694d83dee6e88c64eb1eb431fcfbe810
+    m_Address: Assets/_Artworks/TextFont/AlibabaPuHuiTi-Bold SDF_outline.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - default
+    m_MainAsset: {fileID: 11400000, guid: 694d83dee6e88c64eb1eb431fcfbe810, type: 2}
+    m_TargetAsset: {fileID: 11400000, guid: 694d83dee6e88c64eb1eb431fcfbe810, type: 2}
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 226dcfeb7442b9d45bfc5e45022dd1c0, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 1aaad93002d1a9945abfcc7981bfbf9f, type: 2}
+    - {fileID: 11400000, guid: 2706910662ddb2e429ab95b125f8d9f3, type: 2}

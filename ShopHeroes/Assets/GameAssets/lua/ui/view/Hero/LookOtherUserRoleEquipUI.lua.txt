@@ -1,0 +1,210 @@
+--LookOtherUserRoleEquipUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+local luaClass_PetBoothItem =  require("ui/view/Pet/PetBoothItem")
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_RoleEquipItem = typeof(CS.RoleEquipItem)
+local CS_GameTimerInst = CS.GameTimer.inst
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local csStaticConstants = CS.StaticConstants
+local csGUIHelper = CS.GUIHelper
+local csVector2 = CS.UnityEngine.Vector2
+
+local csRoleDataProxyInst = CS.RoleDataProxy.inst
+
+
+LookOtherUserRoleEquipUI = class(ViewBase)
+
+function LookOtherUserRoleEquipUI:ctor()
+	self.viewID = Constants.ViewName.LookOtherUserRoleEquipUI
+	LookOtherUserRoleEquipUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = false
+	--self.topResPanelType = CS.TopPlayerShowType.noSetting
+end
+------------------------------------------------
+
+
+function LookOtherUserRoleEquipUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.btn_mask = contentPane:GetButton("btn_mask")
+	self.btn_close = contentPane:GetButton("btn_close")
+	self.tx_fighting = contentPane:GetText("tx_fighting")
+	self.icon_equip = contentPane:GetGUIIcon("icon_equip")
+	self.icon_qualityBg = contentPane:GetGUIIcon("icon_qualityBg")
+	self.tx_name = contentPane:GetText("tx_name")
+	self.tx_class = contentPane:GetText("tx_class")
+	self.icon_quality = contentPane:GetGUIIcon("icon_quality")
+	self.tx_quality = contentPane:GetText("tx_quality")
+	self.tx_damage = contentPane:GetText("tx_damage")
+	self.tf_propertyContent = contentPane:GetObjByName("tf_propertyContent"):GetComponent("RectTransform")
+	self.contentRect = contentPane:GetObjByName("tf_propertyContent"):GetComponent("ContentSizeFitter")
+	self.btn_left = contentPane:GetButton("btn_left")
+	self.btn_right = contentPane:GetButton("btn_right")
+	self.superNormalImage = contentPane:GetObjByName("superNormalImage")
+	self.ItemIconBg = contentPane:GetGUIIcon("ItemIconBg")
+
+	local objList_allProperty = contentPane:GetObjByName("obj_allProperty"):GetComponent(CS_type_ObjList)
+	if(objList_allProperty ~= nil)then
+		self.allProperty = objList_allProperty.objList
+	end
+
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+
+function LookOtherUserRoleEquipUI:onInit()
+
+	self:initComp()
+
+	self.btn_mask.onClick:AddListener(
+		function ()
+			self:hide()
+		end)
+
+	self.btn_close:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+
+	self.btn_left:ButtonClickTween(
+		function ()
+			self:onTurnBtnClick(false)
+		end)
+
+	self.btn_right:ButtonClickTween(
+		function ()
+			self:onTurnBtnClick(true)
+		end)
+
+	self.data = nil
+	self.equipData = nil
+	self.fightingSum = nil
+end
+
+function LookOtherUserRoleEquipUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+
+end
+
+function LookOtherUserRoleEquipUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end)
+
+end
+
+function LookOtherUserRoleEquipUI:SetData(equip,heroData)
+	self.equipData = equip
+	self.data = heroData
+	self.equipData = equip
+	local tempItem = CS.EquipConfigManager.inst:GetEquipDrawingsCfgByEquipId(equip.equipId)
+	self.tx_fighting.text = ""
+	self.icon_equip:SetSprite(tempItem.atlas, tempItem.icon)
+	local equipCfg = CS.EquipConfigManager.inst:GetEquipQualityConfig(equip.equipId)
+	self.icon_qualityBg:SetSprite("StaticIcon", csStaticConstants.qualityColorSprict[equipCfg.quality - 1])
+	csGUIHelper.showQualiyIcon(self.icon_qualityBg:GetComponent("RectTransform"), equipCfg.quality)
+	
+	local equipInfoCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(equip.equipId)
+	self.tx_name.text = CS_LanguageManagerInst:GetValueByKey(equipInfoCfg.name)
+	self.tx_name.color = csGUIHelper.GetColorByColorHex(csStaticConstants.qualityTxtColor[equipCfg.quality - 1])
+	
+	self.icon_quality:SetSprite("StaticIcon", csStaticConstants.qualityicon[equipCfg.quality - 1])
+	self.tx_quality.text = CS_LanguageManagerInst:GetValueByKey(csStaticConstants.qualityNames[equipCfg.quality - 1])
+	self.tx_quality.color = csGUIHelper.GetColorByColorHex(csStaticConstants.qualityTxtColor[equipCfg.quality - 1])
+	self.tx_class.text = CS_LanguageManagerInst:GetValueByKey("{0}阶", tostring(tempItem.level)) .. CS_LanguageManagerInst:GetValueByKey(csStaticConstants.roleEquipSubType[tempItem.sub_type - 1])
+	local abProb = CS.RoleDataProxy.inst:GetEquipDamagerVal(equipCfg.quality) / 100
+	local damagePercent = CS.FurnitureBuffMgr.inst:GetBuffValByType(CS.FurnitureBuffType.equip_damageRaceDown)
+	abProb = abProb - abProb * damagePercent
+	self.tx_damage.text = abProb .. "%"
+
+	self.superNormalImage:SetActive(equipCfg.quality > CS.StaticConstants.SuperEquipBaseQuality)
+	if(equipCfg.quality > CS.StaticConstants.SuperEquipBaseQuality)then
+		self.ItemIconBg:SetSprite("__common_1","cktb_wupinkuang_super")
+	else
+		self.ItemIconBg:SetSprite("__common_1","cktb_wupinkuang")
+	end
+
+	self:calculateFightingNum()
+end
+
+function LookOtherUserRoleEquipUI:calculateFightingNum()
+	local propertyList = CS.EquipConfigManager.inst:GetEquipAllPropertyList(self.equipData.equipId)
+	local sum = 0
+	local valCount = 0
+
+	for i = 0, self.allProperty.Count - 1 do
+		local index = i
+		local curItem = self.allProperty[index]:GetComponent(CS_type_RoleEquipItem)
+		if (propertyList[index] > 0) then
+			curItem.gameObject:SetActive(true)
+			curItem.valText.text = "+" .. tostring(propertyList[index])
+			sum = sum + math.ceil(CS.WorldParConfigManager.inst:GetConfig(200 + index).parameters * propertyList[index])
+			valCount = valCount + 1
+		else
+			curItem.gameObject:SetActive(false)
+		end
+	end
+
+	self.fightingSum = sum
+	self.tx_fighting.text = tostring(sum)
+
+	if (valCount <= 4)then
+		self.contentRect.verticalFit = CS.UnityEngine.UI.ContentSizeFitter.FitMode.Unconstrained
+		self.tf_propertyContent.sizeDelta = csVector2(0, self.tf_propertyContent.transform.parent:GetComponent("RectTransform").rect.height)
+	else
+		self.contentRect.verticalFit = CS.UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize
+	end
+end
+
+function LookOtherUserRoleEquipUI:onTurnBtnClick(isAdd)
+	local addNum = 0
+	if(isAdd)then
+		addNum = 1
+	else
+		addNum = -1
+	end
+	local field = self.equipData.equipPosId + addNum
+
+	if (isAdd)then
+		if (field > 6)then
+			field = 1
+		end
+	else
+		if (field < 1)then
+			field = 6
+		end
+	end
+
+	self.equipData = self.data:GetEquipByField(field)
+	if (self.equipData ~= nil and self.equipData.equipId ~= 0)then
+		self:SetData(self.equipData, self.data)
+	else
+		self:onTurnBtnClick(isAdd)
+	end
+end
+------------------------------------------------

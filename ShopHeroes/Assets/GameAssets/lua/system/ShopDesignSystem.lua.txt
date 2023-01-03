@@ -1,0 +1,308 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/Furniture/ShopDesignUI")
+require("ui/view/Furniture/FurnitureSelectionUI")
+require("ui/view/Furniture/CustomizeSelectionUI")
+require("ui/view/Furniture/FurnitureUpgradePanel")
+require("ui/view/Furniture/FurnitureUpgradeFinishPanel")
+
+local EventDispatcherInis = require("event/EventDispatcher")
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+
+ShopDesignSystem = class(BaseSystem)
+ShopDesignSystem.super = BaseSystem
+
+
+function ShopDesignSystem:ctor()
+end
+
+function ShopDesignSystem:AddListeners()
+
+	--ShopDesignUI
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShowUI_ShopDesignUI,self,self.showShopDesignUI)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.HideUI_ShopDesignUI,self,self.hideShopDesignUI)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Refresh,self,self.refreshShopDesignUI)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Create_Furniture,self,self.shopDesignUI_createFurniture)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Create_Customize,self,self.shopDesignUI_createCustomize)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Furniture_CANAPPLY,self,self.shopDesignUI_canApply)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShopDesignUI_OnPickItem,self,self.shopDesignUI_onPickItem)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShopDesignUI_ReSetContentSliderVal,self,self.shopDesignUI_reSetContentSliderVal)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShopDesignUI_OnResourceProductionRefreshCom,self,self.shopDesignUI_onResourceProductionRefreshCom)
+
+	--FurnitureSelectionUI
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShowUI_FurnitureSelectionUI,self,self.showFurnitureSelectionUI)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.HideUI_FurnitureSelectionUI,self,self.hideFurnitureSelectionUI)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.FurnitureSelectionUI_RefreshListData,self,self.furnitureSelectionUI_refreshListData)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.FurnitureSelectionUI_ShowTargetType,self,self.furnitureSelectionUI_showTargetType)
+
+	--CustomizeSelectionUI
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShowUI_CustomizeSelectionUI,self,self.showCustomizeSelectionUI)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.HideUI_CustomizeSelectionUI,self,self.hideCustomizeSelectionUI)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.CustomizeSelectionUI_RefreshListData,self,self.customizeSelectionUI_refreshListData)
+
+	--FurnitureUpgradePanel
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShowUI_FurnitureUpgradePanel,self,self.showFurnitureUpgradePanel)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.HideUI_FurnitureUpgradePanel,self,self.hideFurnitureUpgradePanel)
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.FurnitureUpgradePanel_RefreshShelfGridItem,self,self.furnitureUpgradePanel_refreshShelfGridItem)
+
+	--FurnitureUpgradeFinishView
+	EventDispatcherInis:addEvent(GameEvent.ShopDesignEvent.ShowUI_FurnitureUpgradeFinishView,self,self.showFurnitureUpgradeFinishView)
+
+
+end
+
+function ShopDesignSystem:RemoveListeners()
+
+	--ShopDesignUI
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShowUI_ShopDesignUI,self,self.showShopDesignUI)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.HideUI_ShopDesignUI,self,self.hideShopDesignUI)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Refresh,self,self.refreshShopDesignUI)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Create_Furniture,self,self.shopDesignUI_createFurniture)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Create_Customize,self,self.shopDesignUI_createCustomize)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Furniture_CANAPPLY,self,self.shopDesignUI_canApply)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShopDesignUI_OnPickItem,self,self.shopDesignUI_onPickItem)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShopDesignUI_ReSetContentSliderVal,self,self.shopDesignUI_reSetContentSliderVal)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShopDesignUI_OnResourceProductionRefreshCom,self,self.shopDesignUI_onResourceProductionRefreshCom)
+
+	--FurnitureSelectionUI
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShowUI_FurnitureSelectionUI,self,self.showFurnitureSelectionUI)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.HideUI_FurnitureSelectionUI,self,self.hideFurnitureSelectionUI)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.FurnitureSelectionUI_RefreshListData,self,self.FurnitureSelectionUI_refreshListData)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.FurnitureSelectionUI_ShowTargetType,self,self.furnitureSelectionUI_showTargetType)
+
+	--CustomizeSelectionUI
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShowUI_CustomizeSelectionUI,self,self.showCustomizeSelectionUI)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.HideUI_CustomizeSelectionUI,self,self.hideCustomizeSelectionUI)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.CustomizeSelectionUI_RefreshListData,self,self.customizeSelectionUI_refreshListData)
+
+	--FurnitureUpgradePanel
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShowUI_FurnitureUpgradePanel,self,self.showFurnitureUpgradePanel)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.HideUI_FurnitureUpgradePanel,self,self.hideFurnitureUpgradePanel)
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.FurnitureUpgradePanel_RefreshShelfGridItem,self,self.furnitureUpgradePanel_refreshShelfGridItem)
+
+	--FurnitureUpgradeFinishView
+	EventDispatcherInis:removeEvent(GameEvent.ShopDesignEvent.ShowUI_FurnitureUpgradeFinishView,self,self.showFurnitureUpgradeFinishView)
+
+end
+
+--ShopDesignUI
+
+function ShopDesignSystem:showShopDesignUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.ShopDesignUI,
+		function(view)
+
+		end
+	)
+end
+
+function ShopDesignSystem:hideShopDesignUI()
+	GUIManager.inst:HideView(Constants.ViewName.ShopDesignUI)
+end
+
+function ShopDesignSystem:refreshShopDesignUI()
+
+	local shopDesignUI = GUIManager.inst:GetWindow(Constants.ViewName.ShopDesignUI, false)
+
+	if shopDesignUI ~= nil and shopDesignUI.isShowing == true then
+		shopDesignUI:Refresh()
+	else
+		self:showShopDesignUI()
+	end
+
+end
+
+function ShopDesignSystem:shopDesignUI_createFurniture(uiDisplayData)
+
+	local shopDesignUI = GUIManager.inst:GetWindow(Constants.ViewName.ShopDesignUI, false)
+
+	if shopDesignUI ~= nil and shopDesignUI.isShowing == true then
+		shopDesignUI:onCreateFurniture(uiDisplayData)
+	end
+
+end
+
+function ShopDesignSystem:shopDesignUI_createCustomize(furnitureId)
+
+	local shopDesignUI = GUIManager.inst:GetWindow(Constants.ViewName.ShopDesignUI, false)
+
+	if shopDesignUI ~= nil and shopDesignUI.isShowing == true then
+		shopDesignUI:onCreateCustomize(furnitureId)
+	end
+
+end
+
+function ShopDesignSystem:shopDesignUI_canApply(canApply)
+
+	local shopDesignUI = GUIManager.inst:GetWindow(Constants.ViewName.ShopDesignUI, false)
+
+	if shopDesignUI ~= nil and shopDesignUI.isShowing == true then
+		shopDesignUI:CanApply(canApply)
+	end
+
+end
+
+function ShopDesignSystem:shopDesignUI_onPickItem(furnitureUid)
+
+	local shopDesignUI = GUIManager.inst:GetWindow(Constants.ViewName.ShopDesignUI, false)
+
+	if shopDesignUI ~= nil and shopDesignUI.isShowing == true then
+		shopDesignUI:onPickItem(furnitureUid)
+	end
+
+end
+
+function ShopDesignSystem:shopDesignUI_reSetContentSliderVal()
+
+	local shopDesignUI = GUIManager.inst:GetWindow(Constants.ViewName.ShopDesignUI, false)
+
+	if shopDesignUI ~= nil and shopDesignUI.isShowing == true then
+		shopDesignUI:reSetContentSliderVal()
+	end
+
+end
+
+function ShopDesignSystem:shopDesignUI_onResourceProductionRefreshCom(itemId)
+
+	local shopDesignUI = GUIManager.inst:GetWindow(Constants.ViewName.ShopDesignUI, false)
+
+	if shopDesignUI ~= nil and shopDesignUI.isShowing == true then
+
+		local uid = CS.IndoorMapEditSys.inst.currEntityUid
+
+		local fData = CS_UserDataProxyInst:GetFuriture(uid);
+
+		if fData ~= nil then
+
+			local upCfg = CS.ResourceBinUpgradeConfigManager.inst:getConfigByType(fData.config.type_2, fData.level);
+
+			if upCfg ~= nil and upCfg.item_id == itemId then
+				shopDesignUI:onPickItem(uid)
+			end
+
+		end
+
+	end
+
+end
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+
+---FurnitureSelectionUI
+function ShopDesignSystem:showFurnitureSelectionUI()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.FurnitureSelectionUI,
+		function(view)
+
+		end
+	)
+
+end
+
+function ShopDesignSystem:hideFurnitureSelectionUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.FurnitureSelectionUI)
+
+end
+
+function ShopDesignSystem:furnitureSelectionUI_refreshListData(list)
+
+	local furnitureSelectionUI = GUIManager.inst:GetWindow(Constants.ViewName.FurnitureSelectionUI, false)
+
+	if furnitureSelectionUI ~= nil and furnitureSelectionUI.isShowing == true then
+		furnitureSelectionUI:refreshData(list)
+	end
+
+end
+
+function ShopDesignSystem:furnitureSelectionUI_showTargetType(type,curFurnId)
+
+	local furnitureSelectionUI = GUIManager.inst:GetWindow(Constants.ViewName.FurnitureSelectionUI, false)
+
+	if furnitureSelectionUI ~= nil and furnitureSelectionUI.isShowing == true then
+		furnitureSelectionUI:showTargetType(type,curFurnId)
+	else
+		GUIManager.inst:OpenView(
+			Constants.ViewName.FurnitureSelectionUI,
+			function(view)
+				furnitureSelectionUI = view
+				furnitureSelectionUI:showTargetType(type,curFurnId)
+			end)
+	end
+
+end
+
+--
+function ShopDesignSystem:showCustomizeSelectionUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.CustomizeSelectionUI,
+		function(view)
+
+		end
+	)
+end
+
+function ShopDesignSystem:hideCustomizeSelectionUI()
+	GUIManager.inst:HideView(Constants.ViewName.CustomizeSelectionUI)
+end
+
+function ShopDesignSystem:customizeSelectionUI_refreshListData(list)
+
+	local customizeSelectionUI = GUIManager.inst:GetWindow(Constants.ViewName.CustomizeSelectionUI, false)
+
+	if customizeSelectionUI ~= nil and customizeSelectionUI.isShowing == true then
+		customizeSelectionUI:refreshData(list)
+	end
+
+end
+
+--FurnitureUpgradePanel
+function ShopDesignSystem:showFurnitureUpgradePanel(item)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.FurnitureUpgradePanel,
+		function(view)
+			view:setData(item)
+		end
+	)
+end
+
+function ShopDesignSystem:hideFurnitureUpgradePanel()
+	GUIManager.inst:HideView(Constants.ViewName.FurnitureUpgradePanel)
+end
+
+
+function ShopDesignSystem:furnitureUpgradePanel_refreshShelfGridItem(item)
+
+	local furnitureUpgradePanel = GUIManager.inst:GetWindow(Constants.ViewName.FurnitureUpgradePanel, false)
+
+	if furnitureUpgradePanel ~= nil and furnitureUpgradePanel.isShowing == true then
+		furnitureUpgradePanel:RefreshShelfGridItem(item)
+	end
+
+
+end
+
+--FurnitureUpgradeFinishView
+function ShopDesignSystem:showFurnitureUpgradeFinishView(item)
+
+	local furnitureUpgradeFinishView = GUIManager.inst:GetWindow(Constants.ViewName.FurnitureUpgradeFinishPanel, false)
+
+	if furnitureUpgradeFinishView ~= nil and furnitureUpgradeFinishView.isShowing == true then
+		furnitureUpgradeFinishView:SetData(item)
+	else
+		GUIManager.inst:OpenView(
+			Constants.ViewName.FurnitureUpgradeFinishPanel,
+			function(view)
+				view:SetData(item)
+			end
+		)
+	end
+
+end
+
+---------------------------------------------------------------------------------------------------------------------------------------------------

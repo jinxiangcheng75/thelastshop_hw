@@ -1,0 +1,38 @@
+--BaseSystem
+
+BaseSystem = class()
+
+function BaseSystem:ctor()
+	self.isEnter = false
+end
+
+function BaseSystem:AddListeners()
+
+end
+
+function BaseSystem:RemoveListeners()
+
+end
+
+function BaseSystem:OnInit()
+
+end
+
+function BaseSystem:OnEnter()
+	self:AddListeners()
+	self.isEnter = true;
+	self:OnInit()
+end
+
+function BaseSystem:OnExit()
+	self:RemoveListeners()
+	self.isEnter = false
+end
+
+function BaseSystem:OnUpdate()
+
+end
+
+function BaseSystem:ReInitSystem()
+	
+end

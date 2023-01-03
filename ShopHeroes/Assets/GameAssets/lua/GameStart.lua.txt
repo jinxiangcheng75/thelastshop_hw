@@ -1,0 +1,109 @@
+--require("LuaDebuggee").StartDebug("127.0.0.1", 9826)
+--GameStart
+
+require("hotfix/hotfixManager")
+GameStateManagerInst = require("state/GameStateManager")
+local ManagerBinderInst = require("ManagerBinder")
+local EventDispatcher = require("event/EventDispatcher")
+require("event/GameEvent")
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_UnityUtils = CS.UnityUtils
+local CS_ManagerBinderInst = CS.ManagerBinder.inst
+local Addressables = CS.UnityEngine.AddressableAssets.Addressables
+xlua.private_accessible(CS.FGUI)
+xlua.private_accessible(CS.LuaBehaviour)
+xlua.private_accessible(CS.ReceiveAwardUIMediator)
+xlua.private_accessible(CS.EmailSystem)
+local GameStart = {}
+
+
+local function start()
+	
+	setEcoMode()
+	FGUIInit()
+	initManagers()
+	
+end
+
+function setEcoMode()
+	
+	local isEcoMode = CS.UnityEngine.PlayerPrefs.GetInt("EcoMode", 0) 
+	
+	CS.UnityEngine.Application.targetFrameRate = (isEcoMode == 1) and 35 or 60;
+	
+end
+
+function FGUIInit()
+	
+	local CS_FGUI = CS.FGUI.inst
+	local Vector2 = CS.UnityEngine.Vector2
+	
+	if CS_FGUI.arrow > CS_FGUI.heights.Length then
+		CS_FGUI.arrow = CS_FGUI.heights.Length - 1
+		CS.SaveManager.inst:SaveInt("arrow", CS_FGUI.arrow)
+	end
+	
+	local rectTf = CS_FGUI.vfxPlanel:GetComponent("RectTransform")
+	rectTf.pivot = Vector2(0.5,0.5)
+	
+	local guiIcon = CS_FGUI.holdTopTf.gameObject:AddComponent(typeof(CS.GUIIcon))
+	guiIcon:SetSpriteURL("pressHold","",false,true)
+	
+	CS_FGUI.unionCoinTargetTf_.anchoredPosition = Vector2(-822,-118 - 50)
+	CS_FGUI.energyTargetTf_.anchoredPosition = Vector2(-822,-118 - 50)
+	CS_FGUI.goldFlyTargetTf_.anchoredPosition = Vector2(-560,-118 - 50)
+	CS_FGUI.gemFlyTargetTf_.anchoredPosition = Vector2(-308,-118 - 50)
+	
+	--播放过场动画时不让点击下方UI
+	local graphicRaycaster = CS_FGUI.sceneExcess.transform.parent:GetComponent("GraphicRaycaster")
+	local gameAnimationEvent = CS_FGUI.sceneExcess:GetComponent("GameAnimationEvent")
+	
+	if gameAnimationEvent ~= nil then
+		
+		gameAnimationEvent.onPlayStart = function()
+			
+			if graphicRaycaster ~= nil then
+				graphicRaycaster.enabled = true
+			end
+			
+		end
+		
+		gameAnimationEvent.onPlayStop = function()
+			
+			if graphicRaycaster ~= nil then
+				graphicRaycaster.enabled = false
+			end
+			
+		end
+		
+	end
+	
+end
+
+function initManagers()
+
+	--AddComponent
+	--local lb = CS.Helper.AddLuaBehaviour(CS.FGUI.inst.gameObject, "myluatest")
+	GameStateManagerInst:init()
+	ManagerBinderInst:Init()
+
+	EventDispatcher:dispatchEvent(
+		GameEvent.State.Change_State,
+		{
+			state = kGameState.Splash,
+			loading = false
+		}
+	)
+end
+
+function init()
+end
+
+function OnDestroy()
+end
+
+start()

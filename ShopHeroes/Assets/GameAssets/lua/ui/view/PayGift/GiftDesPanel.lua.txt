@@ -1,0 +1,84 @@
+--GiftDesPanel
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector3 = CS.UnityEngine.Vector3
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_UnityUtils = CS.UnityUtils
+
+GiftDesPanel = class(ViewBase)
+
+function GiftDesPanel:ctor()
+	self.viewID = Constants.ViewName.GiftDesPanel
+	GiftDesPanel.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.noSetting
+end
+------------------------------------------------
+
+--[[
+
+closeBtn
+
+--]]
+
+function GiftDesPanel:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn =  contentPane:GetButton("closeBtn");
+	self.moveTf = contentPane:GetObjByName("moveTf"):GetComponent("RectTransform")
+	self.bgTf = contentPane:GetObjByName("bgTf"):GetComponent("RectTransform")
+	self.contentTx = contentPane:GetText("contentTx")
+
+end
+
+
+function GiftDesPanel:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+end
+
+function GiftDesPanel:SetData(worldPos,content)
+
+	local v2 = CS.GUIHelper.GetFGuiCameraUIPointByWorldPos(worldPos)
+
+	local pos = Vector3(v2.x - 300, v2.y - 100, 0);
+	self.moveTf.anchoredPosition3D = pos;
+	
+	self.contentTx.text = CS_LanguageManagerInst:GetValueByKey(content)
+	
+	self.moveTf.gameObject:SetActive(true)
+
+end
+
+function GiftDesPanel:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function GiftDesPanel:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function GiftDesPanel:closeBtnClick()
+	self.moveTf.gameObject:SetActive(false)
+	self:hide()
+end
+
+------------------------------------------------

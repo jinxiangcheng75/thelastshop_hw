@@ -1,0 +1,46 @@
+xlua.private_accessible(CS.HeroWearEquipView)
+
+-- C#已同步
+
+xlua.hotfix(
+	CS.HeroWearEquipView,
+	"GetItemLists",
+	function(self, typeidArray, heroUid, equipField, onOrOff)
+
+		self._typeidArray = typeidArray
+		self._heroId = heroUid
+		self._equipFieldId = equipField
+		self._onOrOff = onOrOff
+
+		local curHero = CS.RoleDataProxy.inst:GetHeroDataByUid(heroUid)
+		self.maxLevel = CS.heroupgradeconfigManager.inst:GetHeroUpgradeConfig(curHero.level).equip_lv
+		self.currOnShelfEquips = CS.ItemBagProxy.inst:GetEquipItemsByHero(typeidArray, self.maxLevel)
+
+		local tempTable = CSharpListToLuaTable(self.currOnShelfEquips)
+
+		table.sort(tempTable,function (a,b)
+				return EquipProperty_make_integral_ConfigManager:GetEquipFighting(a.equipConfig,curHero.talentConfig) > EquipProperty_make_integral_ConfigManager:GetEquipFighting(b.equipConfig,curHero.talentConfig)
+			end)
+
+		self.currOnShelfEquips:Clear()
+
+		for i = 1, #tempTable do
+			local index = i
+
+			if(tempTable[index] ~= nil)then
+				self.currOnShelfEquips:Add(tempTable[index])
+			end
+		end
+
+		if (self.currOnShelfEquips.Count > 0)then
+			self:SetListItemTotalCount(self.currOnShelfEquips.Count)
+		else
+			self.listItemCount = 1
+			self.contentPane.suggestItemList.totalItemCount = 1
+		end
+
+		self.contentPane.suggestItemList:refresh()
+		self.contentPane.tx_canWearHighestEquipLv.text = tostring(self.maxLevel)
+
+	end
+)

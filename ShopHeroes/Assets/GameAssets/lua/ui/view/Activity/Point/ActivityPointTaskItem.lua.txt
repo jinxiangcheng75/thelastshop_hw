@@ -1,0 +1,202 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local csVector2 = CS.UnityEngine.Vector2
+local CS_TimeUtils = CS.TimeUtils
+
+local activityPointTaskItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	activityPointTaskItem_dlc = ActivityPointTaskItem_dlc.new()
+	activityPointTaskItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if activityPointTaskItem_dlc~=nil then
+		activityPointTaskItem_dlc:Clear()
+		activityPointTaskItem_dlc = nil
+	end
+end
+
+function SetData(_data)
+	if activityPointTaskItem_dlc~=nil then
+		activityPointTaskItem_dlc:SetData(_data)
+	end
+end
+
+function onDisable()
+	if activityPointTaskItem_dlc~=nil then
+		activityPointTaskItem_dlc:ClearData()
+	end
+end
+
+ActivityPointTaskItem_dlc = class()
+
+function ActivityPointTaskItem_dlc:ctor()
+
+end
+
+function ActivityPointTaskItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+
+	self.data = nil
+	self.material = nil
+end
+
+function ActivityPointTaskItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.bgIcon = self.contentPane:GetObjByName("bgIcon"):GetComponent("GUIIcon")
+	self.selfBtn = self.contentPane:GetObjByName("bgIcon"):GetComponent("Button")
+	self.icon = self.contentPane:GetObjByName("icon"):GetComponent("GUIIcon")
+	self.taskDesc = self.contentPane:GetObjByName("taskDesc"):GetComponent("Text")
+	self.taskSlider = self.contentPane:GetObjByName("taskSlider"):GetComponent("Slider")
+	self.stateText = self.contentPane:GetObjByName("stateText"):GetComponent("Text")
+	self.goBtn = self.contentPane:GetObjByName("goBtn"):GetComponent("Button")
+	self.grayIcon = self.contentPane:GetObjByName("grayIcon"):GetComponent("Image")
+	self.scheduleText = self.contentPane:GetObjByName("scheduleText"):GetComponent("Text")
+	self.rewardGray1 = self.contentPane:GetObjByName("rewardGray1")
+	self.rewardGray2 = self.contentPane:GetObjByName("rewardGray2")
+	self.allRewardGray = {}
+	self.allRewardGray[1] = self.rewardGray1
+	self.allRewardGray[2] = self.rewardGray2
+
+	self.allRewardCom = self.contentPane:GetObjByName("allReward"):GetComponent("ObjList")
+	self.allReward = {}
+	if(self.allRewardCom ~= nil)then
+
+		self.allReward = self.allRewardCom.objList
+
+	end
+
+	self.selfBtn.onClick:AddListener(function ()
+			self:RewardClick()
+		end)
+
+	self.goBtn.onClick:AddListener(function ()
+			self:SetOperationData()
+		end)
+
+end
+
+function ActivityPointTaskItem_dlc:SetData(_data)
+	if(_data == nil)then return end
+
+	self.data = _data.data
+	self.material = _data.material
+	
+	if(self.data.cfg == nil)then
+
+		print("输出 没有类型是",self.data.type,"的任务数据")
+		self.icon.iconImage.enabled = false
+		self.taskDesc.text = ""
+
+	else
+
+		self.icon.iconImage.enabled = true
+		self.icon:SetSprite(self.data.cfg.atlas,self.data.cfg.icon)
+		self.taskDesc.text = cs_LanguageManagerInst:GetValueByKey(self.data.cfg.name,tostring(self.data.limit))
+
+	end
+
+	self.taskSlider.gameObject:SetActive(self.data.state == 1) -- 任务状态是正在做的状态时
+	self.stateText.enabled = self.data.state ~= 1
+	self.grayIcon.enabled = self.data.state == 3
+	self.goBtn.gameObject:SetActive(self.data.state == 1)
+
+	local bgIconName = ""
+	if(self.data.isSpecialTask)then
+		bgIconName = "hodong_libaodihuang"
+	else
+		bgIconName = "hodong_libaodizi"
+	end
+
+	self.bgIcon.iconImage.material = nil
+	if(self.data.state == 1)then
+		local paramNum = 0
+		if(self.data.param < self.data.limit)then
+			paramNum = self.data.param
+		else
+			paramNum = self.data.limit
+		end
+		self.scheduleText.text = paramNum .. "/" .. self.data.limit
+		self.taskSlider.maxValue = self.data.limit
+		self.taskSlider.value = paramNum
+		self.bgIcon:SetSprite("activity_point_atlas",bgIconName)
+	elseif(self.data.state == 2) then -- 可领取
+		self.bgIcon:SetSprite("activity_point_atlas","hodong_libaodilv")
+		self.stateText.text = cs_LanguageManagerInst:GetValueByKey("可领取")
+		self.bgIcon.iconImage.material = self.material
+	elseif self.data.state == 3 then -- 已领取
+		self.stateText.text = cs_LanguageManagerInst:GetValueByKey("已领取")
+		self.bgIcon:SetSprite("activity_point_atlas",bgIconName)
+	end
+
+	self:SetAwardData()
+end
+
+function ActivityPointTaskItem_dlc:SetAwardData()
+	if(self.data.allAwards == nil) then return end
+
+	for i = 0, self.allReward.Count - 1 do
+		local index = i
+		if(index < #self.data.allAwards)then
+
+			self.allReward[index]:SetActive(true)
+			local rewardData = CS.CommonRewardData(self.data.allAwards[index + 1].itemId,self.data.allAwards[index + 1].count,0,self.data.allAwards[index + 1].itemType)
+			self.allReward[index]:GetComponent("LuaListItem"):SetData(rewardData)
+			if(index + 1 <= #self.allRewardGray)then
+				if(self.data.state == 3)then
+					self.allRewardGray[index + 1]:SetActive(true)
+				else
+					self.allRewardGray[index + 1]:SetActive(false)
+				end
+			end
+		else
+			if(index + 1 <= #self.allRewardGray)then
+				self.allRewardGray[index + 1]:SetActive(false)
+			end
+
+			self.allReward[index]:SetActive(false)
+		end
+	end
+
+end
+
+function ActivityPointTaskItem_dlc:SetOperationData()
+	if(self.data == nil) then print("输出 没有该任务数据") return end
+	if(self.data.operationData == nil) then print("输出 没有该行为跳转数据") return end
+
+	CS.GoOperationManager.inst:StartJumpOperation(self.data.operationData)
+end
+
+function ActivityPointTaskItem_dlc:RewardClick()
+	if(self.data.state == 2)then
+		EventDispatcher:dispatchEvent(GameEvent.ActivityPointEvent.Request_ActivityPoint_Reward,self.data.id)
+		--ActivityPointDataProxy.inst:testReward(self.data.id)
+	end
+end
+
+function ActivityPointTaskItem_dlc:Clear()
+
+	self:removeListeners()
+end
+
+function ActivityPointTaskItem_dlc:ClearData()
+
+end
+
+function ActivityPointTaskItem_dlc:addListeners()
+
+end
+
+function ActivityPointTaskItem_dlc:removeListeners()
+
+end

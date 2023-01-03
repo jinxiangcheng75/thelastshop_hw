@@ -1,0 +1,59 @@
+--NetworkEvent
+require("class")
+
+CallbackHelper = class()
+
+function CallbackHelper:ctor()
+	self.mDelTable = {}
+end
+
+function CallbackHelper:SetCallback(cmd, func)
+	self.mDelTable[cmd] = func --{caller=caller, func =func}
+end
+
+-- function CallbackHelper:Call(cmd, resp)
+--     local del = self.mDelTable[cmd]
+--     if(del ~= nil) then
+--         local caller =del.caller
+--         local func = del.func
+--         if(caller ~= nil) then
+--             caller:func(resp)
+--         else
+--             func(resp)
+--         end
+--     end
+-- end
+
+function CallbackHelper:Call(cmd, resp)
+	print("CallbackHelper:Call self:", self, " cmd:", cmd, " resp:", resp)
+	local func = self.mDelTable[cmd]
+	if(func ~= nil) then
+		func(resp)
+	end
+end
+
+NetworkEvent = class()
+NetworkEvent.successHelper = CallbackHelper:new("success_helper")
+NetworkEvent.failedHelper = CallbackHelper:new("failed_helper")
+
+print("NetworkEvent.successHelper:", NetworkEvent.successHelper)
+print("NetworkEvent.failedHelper:", NetworkEvent.failedHelper)
+
+function NetworkEvent:init()
+
+end
+
+function NetworkEvent:SetCallback(cmd, successFunc, failedFunc)
+	NetworkEvent.successHelper:SetCallback(cmd, successFunc)
+	if(failedFunc ~= nil) then
+		NetworkEvent.failedHelper:SetCallback(cmd, failedFunc)
+	end
+end
+
+function NetworkEvent:OnSuccess(cmd, resp)
+	NetworkEvent.successHelper:Call(cmd, resp)
+end
+
+function NetworkEvent:OnFailed(cmd, resp)
+	NetworkEvent.failedHelper:Call(cmd, resp)
+end

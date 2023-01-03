@@ -1,0 +1,190 @@
+
+--Activity_DeadRising_HeroTeamUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+local luaClass_Activity_DeadRising_HeroFightItem = require("ui/view/Activity/DeadRising/Activity_DeadRising_HeroFightItem")
+local luaClass_Activity_DeadRising_ItemFightItem = require("ui/view/Activity/DeadRising/Activity_DeadRising_ItemFightItem")
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+Activity_DeadRising_HeroTeamUI = class(ViewBase)
+
+function Activity_DeadRising_HeroTeamUI:ctor()
+	self.viewID = Constants.ViewName.Activity_DeadRising_HeroTeamUI
+	Activity_DeadRising_HeroTeamUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+	self.topResPanelType = CS.TopPlayerShowType.none
+end
+------------------------------------------------
+
+function Activity_DeadRising_HeroTeamUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn");
+
+	self.stateGroup = contentPane:GetObjByName("stateGroup"):GetComponent("ToggleGroupMarget")
+	self.toggleLinkObjs = contentPane:GetObjByName("toggleLinkObjs"):GetComponent(CS_type_ObjList).objList
+
+	self.objList_fightIcons = contentPane:GetObjByName("objList_fightIcons"):GetComponent(CS_type_ObjList).objList
+	for i = 0, self.objList_fightIcons.Count - 1 do
+
+		local icon = self.objList_fightIcons[i]:GetComponent(CS_type_GUIIcon)
+		if icon ~= nil then
+			icon:SetSprite("","")
+		end
+
+	end
+
+	self.tx_fight = contentPane:GetText("tx_fight")
+
+	self.tx_heroNum = contentPane:GetText("tx_heroNum")
+	self.tx_heroFight = contentPane:GetText("tx_heroFight")
+	self.heroFightItems = {}
+	local objList_heroFight = contentPane:GetObjByName("objList_heroFight"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList_heroFight.Count - 1 do
+
+		local heroFightItem = luaClass_Activity_DeadRising_HeroFightItem.new()
+		heroFightItem:Init(objList_heroFight[i],function ()
+				self:heroFightItemClickHandler()
+			end)
+		self.heroFightItems[#self.heroFightItems + 1] = heroFightItem
+
+	end
+
+	self.tx_itemNum = contentPane:GetText("tx_itemNum")
+	self.tx_itemFight = contentPane:GetText("tx_itemFight")
+	self.itemFightItems = {}
+	local objList_itemFight = contentPane:GetObjByName("objList_itemFight"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList_itemFight.Count - 1 do
+
+		local itemFightItem = luaClass_Activity_DeadRising_ItemFightItem.new()
+		itemFightItem:Init(objList_itemFight[i],function ()
+			self:itemFightItemClickHandler()
+		end)
+		self.itemFightItems[#self.itemFightItems + 1] = itemFightItem
+
+	end
+
+
+
+end
+
+
+function Activity_DeadRising_HeroTeamUI:onInit()
+
+	self:initComp()
+
+	self.index = 0
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:hide()
+		end
+	)
+
+	self.stateGroup.OnSelectedIndexValueChange = function (index)
+		self:onSelectedIndexValueChange(index)
+	end
+
+end
+
+function Activity_DeadRising_HeroTeamUI:onSelectedIndexValueChange(index)
+
+	self.index = index
+
+	CS.AudioManager.inst:PlaySound(11)
+
+	for i = 0,self.toggleLinkObjs.Count - 1 do
+		self.toggleLinkObjs[i]:SetActive(false)
+	end
+
+	self.toggleLinkObjs[index]:SetActive(true)
+
+	self:setState(index)
+
+end
+
+function Activity_DeadRising_HeroTeamUI:setState(index)
+
+	if(index == 0)then -- 您的小队
+
+	elseif index == 1 then -- 公会小队
+
+	else
+
+	end
+
+end
+
+function Activity_DeadRising_HeroTeamUI:setMyTeamData()
+
+	self.tx_fight.text = tostring(Activity_DeadRisingDataProxy.inst.fight_self)
+	self.tx_heroFight.text = tostring(Activity_DeadRisingDataProxy.inst.fight_self_hero)
+	self.tx_itemFight.text = tostring(math.ceil(Activity_DeadRisingDataProxy.inst.fight_self_hero * Activity_DeadRisingDataProxy.inst.fightPoint_self_items / 100))
+	
+	self.tx_heroNum.text = CS_LanguageManagerInst:GetValueByKey("队伍配置") .. " " .. tostring(#Activity_DeadRisingDataProxy.inst.heroFightDatas) .. "/" .. tostring(Activity_DeadRisingDataProxy.inst.heroTeamLimit)
+	self.tx_itemNum.text = CS_LanguageManagerInst:GetValueByKey("道具配置") .. " " .. tostring(#Activity_DeadRisingDataProxy.inst.itemFightDatas) .. "/" .. tostring(Activity_DeadRisingDataProxy.inst.itemTeamLimit)
+	
+	for i = 1, #self.heroFightItems do
+
+		if i <= #Activity_DeadRisingDataProxy.inst.heroFightDatas then
+			self.heroFightItems[i]:SetData(Activity_DeadRisingDataProxy.inst.heroFightDatas[i])
+		else
+			self.heroFightItems[i]:Clear()
+		end
+
+	end
+
+	for i = 1, #self.itemFightItems do
+
+		if i <= #Activity_DeadRisingDataProxy.inst.itemFightDatas then
+			self.itemFightItems[i]:SetData(Activity_DeadRisingDataProxy.inst.itemFightDatas[i])
+		else
+			self.itemFightItems[i]:Clear()
+		end
+
+	end
+
+
+end
+
+
+function Activity_DeadRising_HeroTeamUI:heroFightItemClickHandler()
+	
+	EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_SelectHeroUI)
+	
+end
+
+function Activity_DeadRising_HeroTeamUI:itemFightItemClickHandler()
+	
+	EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_SelectItemUI)
+	
+end
+
+
+function Activity_DeadRising_HeroTeamUI:onShowed()
+
+	self.stateGroup:OnEnableMethod(0)
+	self:setMyTeamData();
+
+end
+
+
+function Activity_DeadRising_HeroTeamUI:onHide()
+
+end
+
+
+
+
+
+

@@ -1,0 +1,88 @@
+--CommonGiftBtnItem
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+
+local button
+local bgIcon
+local icon
+local nameTx
+local countdownTx
+
+local directPurchaseData
+local timerId = 0
+
+function InitComp()
+
+	button = self.transform:GetComponent("Button")
+	bgIcon = self.transform:GetComponent(CS_type_GUIIcon)
+	icon = self:GetObjByName("icon"):GetComponent(CS_type_GUIIcon)
+	nameTx = self:GetObjByName("nameTx"):GetComponent("Text")
+	countdownTx = self:GetObjByName("countdownTx"):GetComponent("Text")
+
+	button:ButtonClickTween(onButtonClick)
+
+end
+
+
+function SetData(giftData)
+
+	self.gameObject:SetActive(true)
+	directPurchaseData = giftData
+
+	bgIcon:SetSprite(giftData.data.atlasIcon,giftData.data.icon1)
+	icon:SetSprite(giftData.btnIconAtlas,giftData.btnIcon)
+	nameTx.text = CS_LanguageManagerInst:GetValueByKey(giftData.data.tag)
+
+	setTimer()
+
+end
+
+function ClearData()
+
+	self.gameObject:SetActive(false)
+
+	if timerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(timerId)
+		timerId = 0
+	end
+
+end
+
+function onDestroy()
+	ClearData()
+end
+
+function setTimer()
+
+	if timerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(timerId)
+		timerId = 0
+	end
+
+	countdownTx.text = ""
+
+	if directPurchaseData.needCountdown then
+
+		countdownTx.text = CS_TimeUtils.timeSpanStrip(directPurchaseData.data.remainTime,true)
+
+		timerId = CS_GameTimerInst:AddTimer(1,function()
+					countdownTx.text = CS_TimeUtils.timeSpanStrip(directPurchaseData.data.remainTime,true)
+			end)
+
+	end
+
+end
+
+
+function onButtonClick()
+
+	directPurchaseData.detailShowType = 0
+	EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,directPurchaseData.data.uid)
+
+end

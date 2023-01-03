@@ -1,0 +1,149 @@
+require("utils/XLuaUtils")
+require "class"
+
+local coroutine_cs = require("coroutine_cs")
+
+local EventDispatcherInst = require("event/EventDispatcher")
+
+local EventState = {
+	idle = 0,
+	runing = 1,
+	await = 2
+}
+
+ExecuteType = {
+	immediately = 0, --立即执行
+	queueup = 1, --排队
+	discard = 2 --事件执行中则丢弃
+}
+
+EventListItem = class()
+
+function EventListItem:ctor()
+	self._eventkey = ""
+	self._type = ""
+	self._data = ""
+	self._gameState = 0 --触发事件场景状态(GameStateManager  kGameState)
+	self.isRunning = false
+end
+
+GameEventListControl = class()
+GameEventListControl.inst = GameEventListControl:new()
+
+function GameEventListControl:InitProxy()
+	--家具场景升级完成相机事件
+	CS.Helper.AddLuaBehaviour(CS.GameTimer.inst.gameObject, "system/GameEventProxy/DesignLevelUp")
+end
+
+--初始化
+function GameEventListControl:Init()
+	self.mStoryEventList = get_csharp_list(CS.System.Object) --事件列表
+	self.state = EventState.idle
+
+	self:InitProxy()
+
+	EventDispatcherInst:addEvent(GameEvent.EventSystem.AddEvent, self, self.Add)
+	EventDispatcherInst:addEvent(GameEvent.EventSystem.EventEnd, self, self.EventEnd)
+
+	--启动时间刷新
+	coroutine_cs.start(
+		function()
+			while true do
+				coroutine_cs.wait(0.5)
+				GameEventListControl.inst:triggerEventUpdate()
+				coroutine_cs.wait(1.5)
+			end
+		end
+	)
+end
+
+--清理事件队列
+function GameEventListControl:Clear()
+	self.mStoryEventList:Clear()
+end
+
+-- eData 为json 字符串  事件回调对应系统内部自己解析
+function GameEventListControl:Add(eKey, eData, etype, eState)
+	if (etype == ExecuteType.immediately) then
+		self:EventStart(eKey, eData)
+	elseif (etype == ExecuteType.queueup) then
+		--end
+		--if self.state == EventState.idle and eState == GameStateManagerInst.mCurrState  then
+		--self:EventStart(eKey, eData)
+		--else
+		local item = EventListItem:new()
+		item._eventkey = eKey
+		item._type = etype
+		item._data = eData
+		item._gameState = eState
+		self.mStoryEventList:Add(item)
+	elseif (etype == ExecuteType.discard) then
+		if self.state == EventState.idle and eState == GameStateManagerInst.mCurrState then
+			self:EventStart(eKey, eData)
+		end
+	end
+end
+
+--开始事件
+function GameEventListControl:EventStart(ekey, edata)
+	self.isRunning = true
+	self.state = EventState.running
+	--lua Event
+	EventDispatcherInst:dispatchEvent(ekey, edata)
+	--c# event
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.String)
+	func(CS.EventController.inst, ekey, edata)
+
+	print("出发了事件" .. ekey)
+end
+
+--事件结束
+function GameEventListControl:EventEnd()
+	self.isRunning = false
+	if self.mStoryEventList.Count > 0 then
+		self.state = EventState.await
+	else
+		self.state = EventState.idle
+	end
+end
+
+function GameEventListControl:Next()
+	local item = nil
+	for i = 0, self.mStoryEventList.Count - 1 do
+		item = self.mStoryEventList[i]
+		if self.state ~= EventState.running and item._gameState == GameStateManagerInst.mCurrState and not CS.ManagerBinder.inst.stateIsChanging then --条件满足，触发事件
+			self:EventStart(item._eventkey, item._data)
+			self.mStoryEventList:Remove(item)
+			break
+		end
+	end
+end
+
+--时间检查循环
+function GameEventListControl:triggerEventUpdate()
+	
+	if CS.GuideManager.inst.isInTriggerGuide then
+		return
+	end
+	
+	if GameEventListControl.inst.mStoryEventList.Count <= 0 or GameEventListControl.inst.state == EventState.runing then
+		return
+	end
+	
+	if CS.ManagerBinder.inst.stateIsChanging then
+		return
+	end
+		
+	local currviewid = GUIManager.inst:CurrWindowViewID()
+	if GameStateManagerInst.mCurrState == kGameState.Shop or GameStateManagerInst.mCurrState == kGameState.Town then
+		if (currviewid == "mainUI" or currviewid == "CityUI") and not CS.ReceiveAwardUIMediator.ismsguishow and not CS.GoOperationManager.inst.isDoing and not GuideTriggerManager.inst.isInTrigger then
+			print("事件队列循环！！")
+			if GameEventListControl.inst.state ~= EventState.runing then
+				if GameEventListControl.inst.mStoryEventList.Count > 0 then
+					GameEventListControl.inst:Next()
+				end
+			end
+		end
+	end
+end

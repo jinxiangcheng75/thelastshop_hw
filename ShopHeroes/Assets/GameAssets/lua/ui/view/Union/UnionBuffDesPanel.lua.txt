@@ -1,0 +1,129 @@
+--UnionBuffDesPanel
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+local CS_type_RectTransform = typeof(CS.UnityEngine.RectTransform)
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+local CS_UnionTaskPopularityConfigManagerInst = CS.UnionTaskPopularityConfigManager.inst
+
+UnionBuffDesPanel = class(ViewBase)
+
+function UnionBuffDesPanel:ctor()
+	self.viewID = Constants.ViewName.UnionBuffDesPanel
+	UnionBuffDesPanel.super.init(self, self.viewID)
+	self.sortingLayerName = "popup_2"
+	self.isShowResPanel = true
+end
+------------------------------------------------
+
+
+function UnionBuffDesPanel:initComp()
+	local contentPane = self.contentPanel
+
+	self.maskBtn =  contentPane:GetButton("maskBtn");
+	self.nameTx = contentPane:GetText("nameTx");
+	self.desTx = contentPane:GetText("desTx")
+	self.countdownTx = contentPane:GetText("countdownTx")
+	self.slider = contentPane:GetObjByName("slider"):GetComponent("Slider")
+	self.fillBgTf = contentPane:GetObjByName("di"):GetComponent(CS_type_RectTransform)
+	self.detailTf = contentPane:GetObjByName("detailTf"):GetComponent(CS_type_RectTransform)
+
+end
+
+
+function UnionBuffDesPanel:onInit()
+
+	self:initComp()
+
+	self.countDownTimer = 0
+
+	self.maskBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+end
+
+
+function UnionBuffDesPanel:onHide()
+	print("UnionBuffDesPanel onHide")
+	self:clearTimer()
+	self.detailTf.gameObject:SetActive(false)
+end
+
+function  UnionBuffDesPanel:onShowed()
+	print("UnionBuffDesPanel onShowed")
+end
+
+function UnionBuffDesPanel:SetData(transform,unionBuffData)
+
+	self.data = unionBuffData
+
+	local v2 = CS.GUIHelper.GetFGuiCameraUIPointByWorldPos(transform.position)
+	
+	local pos = Vector3(v2.x - 50, v2.y + 44, 0);
+	self.detailTf.anchoredPosition3D = pos;
+
+	self.nameTx.text = CS_LanguageManagerInst:GetValueByKey(self.data.config.name)
+	self.desTx.text =  CS_LanguageManagerInst:GetValueByKey(self.data.config.skill_desc,"<color=#4dff6e>"..tostring(self.data.config.add2_num).."</color>")
+	self.fillBgTf.anchorMax = Vector2(self.data.config.now_level / 5.0,1)
+
+	self:setTimer()
+
+	self.detailTf.gameObject:SetActive(true)
+
+end
+
+function UnionBuffDesPanel:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function UnionBuffDesPanel:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function UnionBuffDesPanel:closeBtnClick()
+	self:hide()
+end
+
+function UnionBuffDesPanel:clearTimer()
+	if(self.countDownTimer ~= 0) then
+		CS_GameTimerInst:RemoveTimer(self.countDownTimer)
+		self.countDownTimer = 0
+	end
+end
+
+function UnionBuffDesPanel:setTimer()
+
+	self:clearTimer()
+
+	self:timerMethod()
+	self.countDownTimer = CS_GameTimerInst:AddTimer(1,function()
+
+			if self.data.remainTime > 0 then
+				self:timerMethod()
+			else
+				self:hide()
+			end
+
+		end)
+
+end
+
+function UnionBuffDesPanel:timerMethod()
+	self.countdownTx.text = CS_TimeUtils.timeSpanStrip(self.data.remainTime,true)
+	--self.slider.value = self.data.serverData.time / (self.data.config.skill_time * 60 * self.data.config.now_level) * (self.data.config.now_level / 5.0)
+	self.slider.value = self.data.remainTime / (self.data.config.skill_time * 60.0)
+end
+------------------------------------------------

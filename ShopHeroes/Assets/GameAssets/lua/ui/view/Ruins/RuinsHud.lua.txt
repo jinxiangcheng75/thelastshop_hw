@@ -1,0 +1,60 @@
+local unlockObj
+local lockObj
+local grayImg
+local nameText
+local adoptScheduleText
+local finishObj
+local lockNameText
+
+local csLanguageManagerInst = CS.LanguageManager.inst
+
+--GetObjByName   GetComponent
+function InitComp()
+	unlockObj = self:GetObjByName("unlockObj")
+	lockObj = self:GetObjByName("lockObj")
+	grayImg = self:GetObjByName("grayObj"):GetComponent("Image")
+	nameText = self:GetObjByName("nameText"):GetComponent("Text")
+	adoptScheduleText = self:GetObjByName("adoptScheduleText"):GetComponent("Text")
+	finishObj = self:GetObjByName("finishObj")
+	lockNameText = self:GetObjByName("lockNameText"):GetComponent("Text")
+end
+
+function SetData(houseId)
+	local houseCfg = RuinsConfigManager:GetConfigByHouseId(houseId)
+	local sumNum = RuinsConfigManager:GetNumByHouseId(houseId)
+	local curCfg = RuinsDataProxy.inst.curRuinsCfg
+
+	if(houseCfg ~= nil)then
+		nameText.text = csLanguageManagerInst:GetValueByKey(houseCfg.instance_group_name)
+		if(RuinsDataProxy.inst.curId ~= 9999)then
+			if(curCfg ~= nil)then
+				if(houseCfg.instance_group > curCfg.instance_group)then
+					unlockObj:SetActive(false)
+					lockObj:SetActive(true)
+					lockNameText.text = csLanguageManagerInst:GetValueByKey(houseCfg.instance_group_name)
+				else
+					unlockObj:SetActive(true)
+					lockObj:SetActive(false)
+					if(houseCfg.instance_group == curCfg.instance_group) then
+						nameText.color = CS.GUIHelper.GetColorByColorHex("#FFFFFF")
+						grayImg.enabled = false
+						adoptScheduleText.gameObject:SetActive(true)
+						finishObj:SetActive(false)
+						adoptScheduleText.text = csLanguageManagerInst:GetValueByKey("已通过 {0}",tonumber(curCfg.group_index) - 1 .. "/" .. sumNum)
+					else
+						nameText.color = CS.GUIHelper.GetColorByColorHex("#AFA8A4")
+						grayImg.enabled = true
+						adoptScheduleText.gameObject:SetActive(false)
+						finishObj:SetActive(true)
+					end
+				end
+			end
+		else
+			unlockObj:SetActive(true)
+			grayImg.enabled = false
+			lockObj:SetActive(false)
+			finishObj:SetActive(true)
+			adoptScheduleText.gameObject:SetActive(false)
+		end
+	end
+end

@@ -1,0 +1,289 @@
+
+local CS_MapUtils = CS.MapUtils
+local Vector3Int = CS.UnityEngine.Vector3Int
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+local luaClass_Shopkeeper = require("Role/Shopkeeper/Shopkeeper")
+local EventDispatcherInis = require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+
+ShopkeeperHandler = class(BaseSystem)
+ShopkeeperHandler.inst = ShopkeeperHandler:new()
+
+function ShopkeeperHandler:ctor()
+	self.shopKeeper = nil
+end
+
+function ShopkeeperHandler:AddListeners()
+
+	EventDispatcherInis:addEvent(GameEvent.ShopkeeperComEvent.SPAWNSHOPKEEPER,self,self.SpawnShopkeeper)
+	EventDispatcherInis:addEvent(GameEvent.ShopkeeperComEvent.SHOPKEEPER_ACHEIVEMENTREFRESH,self,self.ShopkeeperAcheivementRefresh)
+	EventDispatcherInis:addEvent(GameEvent.ShopkeeperComEvent.CHANGECLOTHE,self,self.ShkpKeeperChange)
+	EventDispatcherInis:addEvent(GameEvent.ShopkeeperComEvent.ADDROUNDCOUNTERNUM,self,self.AddRoundCounterNum)
+	EventDispatcherInis:addEvent(GameEvent.ShopkeeperComEvent.SUBTRACTROUNDCOUNTERNUM,self,self.SubtractRoundCounterNum)
+	EventDispatcherInis:addEvent(GameEvent.ShopkeeperComEvent.SHOPPEALLNEW,self,self.ShopperAllNew)
+	EventDispatcherInis:addEvent(GameEvent.ShopkeeperComEvent.REFRESHSHOPKEEPERCURCELLPOS,self,self.RefreshCurCellPos)
+	EventDispatcherInis:addEvent(GameEvent.ShopkeeperComEvent.SETSHOPKEEPERACHEIVEMENTSTATE,self,self.SetShopkeeperAcheivementState)
+	EventDispatcherInis:addEvent(GameEvent.ShopkeeperComEvent.FACETOSHOPPER,self,self.FaceToShopper)
+	EventDispatcherInis:addEvent(GameEvent.ShopkeeperComEvent.SETVISIBLE,self,self.SetVisible)
+
+	--新手引导相关逻辑
+	EventDispatcherInis:addEvent(GameEvent.Guide_ShopkeeperEvent.GuideManager_ShopkeeperMoveToCounter,self,self.GuideManager_ShopkeeperMoveToCounter)
+	EventDispatcherInis:addEvent(GameEvent.Guide_ShopkeeperEvent.GuideSystem_CreateShopkeeper,self,self.GuideSystem_CreateShopkeeper)
+	EventDispatcherInis:addEvent(GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperMachineState,self,self.Guide_SetShopkeeperMachineState)
+	EventDispatcherInis:addEvent(GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperObjActive,self,self.Guide_SetShopkeeperObjActive)
+	EventDispatcherInis:addEvent(GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperMove,self,self.Guide_SetShopkeeperMove)
+	EventDispatcherInis:addEvent(GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperDirection,self,self.Guide_SetShopkeeperDirection)
+	
+
+end
+
+function ShopkeeperHandler:RemoveListeners()
+
+	EventDispatcherInis:removeEvent(GameEvent.ShopkeeperComEvent.SPAWNSHOPKEEPER,self.SpawnShopkeeper)
+	EventDispatcherInis:removeEvent(GameEvent.ShopkeeperComEvent.SHOPKEEPER_ACHEIVEMENTREFRESH,self,self.ShopkeeperAcheivementRefresh)
+	EventDispatcherInis:removeEvent(GameEvent.ShopkeeperComEvent.CHANGECLOTHE,self,self.ShkpKeeperChange)
+	EventDispatcherInis:removeEvent(GameEvent.ShopkeeperComEvent.ADDROUNDCOUNTERNUM,self,self.AddRoundCounterNum)
+	EventDispatcherInis:removeEvent(GameEvent.ShopkeeperComEvent.SUBTRACTROUNDCOUNTERNUM,self,self.SubtractRoundCounterNum)
+	EventDispatcherInis:removeEvent(GameEvent.ShopkeeperComEvent.SHOPPEALLNEW,self,self.ShopperAllNew)
+	EventDispatcherInis:removeEvent(GameEvent.ShopkeeperComEvent.REFRESHSHOPKEEPERCURCELLPOS,self,self.RefreshCurCellPos)
+	EventDispatcherInis:removeEvent(GameEvent.ShopkeeperComEvent.SETSHOPKEEPERACHEIVEMENTSTATE,self,self.SetShopkeeperAcheivementState)
+	EventDispatcherInis:removeEvent(GameEvent.ShopkeeperComEvent.FACETOSHOPPER,self,self.FaceToShopper)
+	EventDispatcherInis:removeEvent(GameEvent.ShopkeeperComEvent.SETVISIBLE,self,self.SetVisible)
+
+	--新手引导相关逻辑
+	EventDispatcherInis:removeEvent(GameEvent.Guide_ShopkeeperEvent.GuideManager_ShopkeeperMoveToCounter,self,self.GuideManager_ShopkeeperMoveToCounter)
+	EventDispatcherInis:removeEvent(GameEvent.Guide_ShopkeeperEvent.GuideSystem_CreateShopkeeper,self,self.GuideSystem_CreateShopkeeper)
+	EventDispatcherInis:removeEvent(GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperMachineState,self,self.Guide_SetShopkeeperMachineState)
+	EventDispatcherInis:removeEvent(GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperObjActive,self,self.Guide_SetShopkeeperObjActive)
+	EventDispatcherInis:removeEvent(GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperMove,self,self.Guide_SetShopkeeperMove)
+	EventDispatcherInis:removeEvent(GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperDirection,self,self.Guide_SetShopkeeperDirection)
+	
+end
+
+function ShopkeeperHandler:SpawnShopkeeper()
+
+	if self.shopKeeper ~= nil then
+		--店主已存在
+		return
+	end
+
+	self.shopKeeper = luaClass_Shopkeeper.new()
+	local shopkeeperObj = CS.IndoorMap.inst:CreateShopkeeper()
+
+	self.shopKeeper:Init(shopkeeperObj)
+
+	local luaUpdateMono = shopkeeperObj:GetComponent("LuaUpdateMono")
+	if luaUpdateMono ~= nil then
+		luaUpdateMono:SetUpdateHandler(function ()
+				if self.shopKeeper ~= nil then
+					self.shopKeeper:Update()
+				end
+			end)
+	end
+
+
+	if CS.GuideDataProxy.inst.CurInfo ~= nil then
+
+		if not CS.GuideDataProxy.inst.CurInfo.isAllOver and CS.K_Guide_Type.__CastFrom(CS.GuideDataProxy.inst.CurInfo.m_curCfg.guide_type) == CS.K_Guide_Type.NPCCreat then
+			self.shopKeeper.gameObject:SetActive(false)
+			self.shopKeeper:SetState(MachineShopkeeperState.inGuide)
+		end
+
+	end
+
+	local spKeeperPos = CS.IndoorMap.inst:GetCounterOperationPos()
+	if spKeeperPos ~= Vector3Int(99999,99999,99999) then
+
+		self.shopKeeper:SetCellPos(spKeeperPos)
+		self.shopKeeper:UpdateSortingOrder()
+
+	else
+
+		spKeeperPos = CS_MapUtils.IndoorCellposToMapCellPos(CS.IndoorMap.inst:GetFreeGridPos())
+		self.shopKeeper:SetCellPos(spKeeperPos)
+		self.shopKeeper:UpdateSortingOrder()
+
+	end
+
+	self:ShopkeeperAcheivementRefresh()
+
+end
+
+function ShopkeeperHandler:ShopkeeperAcheivementRefresh()
+
+	local showing = CS.AcheivementDataProxy.inst.NeedRedPoint or (GemMonthCardDataProxy.inst.remainCount > 0 and GemMonthCardDataProxy.inst.flag == 0)
+	self:SetShopkeeperAcheivementState(showing)
+	
+end
+
+function ShopkeeperHandler:SetShopkeeperAcheivementState(showing)
+	
+	if self.shopKeeper == nil then
+		return
+	end
+	
+	if showing then
+		self.shopKeeper:ShowAcheivementBubble()
+	else
+		self.shopKeeper:HideAcheivementBubble()
+	end
+	
+end
+
+function ShopkeeperHandler:ShkpKeeperChange()
+	
+	if self.shopKeeper == nil then
+		return
+	end
+	
+	self.shopKeeper:ChangeClothing()
+	
+end
+
+function ShopkeeperHandler:AddRoundCounterNum()
+	
+	if self.shopKeeper == nil then
+		return
+	end
+	
+	self.shopKeeper:SetRoundCounterShopperNum(self.shopKeeper:GetRoundCounterShopperNum() + 1)
+	
+end
+
+function ShopkeeperHandler:SubtractRoundCounterNum()
+	
+	if self.shopKeeper == nil then
+		return
+	end
+
+	self.shopKeeper:SetRoundCounterShopperNum(self.shopKeeper:GetRoundCounterShopperNum() - 1)
+	
+end
+
+function ShopkeeperHandler:ShopperAllNew()
+	
+	if self.shopKeeper ~= nil and self.shopKeeper:GetCurState() ~= MachineShopkeeperState.inGuide then
+		self.shopKeeper:SetState(MachineShopkeeperState.ramble)
+	end
+	
+end
+
+function ShopkeeperHandler:RefreshCurCellPos()
+	
+	if self.shopKeeper == nil then
+		return
+	end
+	
+	self.shopKeeper:RefreshCurCellPos()
+	
+end
+
+function ShopkeeperHandler:FaceToShopper(pos)
+	
+	if self.shopKeeper == nil then
+		return
+	end
+
+	self.shopKeeper:FaceToShopper(pos)
+	
+end
+
+function ShopkeeperHandler:SetVisible(visible)
+	
+	if self.shopKeeper == nil then
+		return
+	end
+
+	self.shopKeeper:SetVisible(visible)
+	
+end
+
+
+----新手引导
+function ShopkeeperHandler:GuideManager_ShopkeeperMoveToCounter()
+	
+	if self.shopKeeper == nil then
+		return
+	end
+	
+	self.shopKeeper:moveToCounter()
+	self.shopKeeper.onMoveEndCompleteHandler = function()
+		self.shopKeeper:FaceToCounter()
+		self.shopKeeper.onMoveEndCompleteHandler = nil
+	end
+	
+end
+
+function ShopkeeperHandler:GuideSystem_CreateShopkeeper(spX,spY,spDir)
+	
+	if self.shopKeeper == nil then
+		return
+	end
+	
+	self.shopKeeper:SetState(MachineShopkeeperState.inGuide)
+	self.shopKeeper:SetCellPos(Vector3Int(spX,spY,0))
+	self.shopKeeper:UpdateSortingOrder()
+	if self.shopKeeper.character ~= nil then
+		self.shopKeeper.character:SetDirection(spDir)
+	end
+		
+end
+
+function ShopkeeperHandler:Guide_SetShopkeeperDirection(dir)
+	
+	if self.shopKeeper == nil then
+		return
+	end
+	
+	if self.shopKeeper.character ~= nil then
+		self.shopKeeper.character:SetDirection(dir)
+	end
+	
+end
+
+function ShopkeeperHandler:Guide_SetShopkeeperObjActive(active)
+	
+	if self.shopKeeper == nil then
+		return
+	end
+
+	self.shopKeeper.gameObject:SetActive(active)
+	
+end
+
+function ShopkeeperHandler:Guide_SetShopkeeperMachineState(state)
+	
+	if self.shopKeeper == nil then
+		return
+	end
+	
+	self.shopKeeper:SetState(state)
+	
+end
+
+function ShopkeeperHandler:Guide_SetShopkeeperMove(endPos)
+	
+	if self.shopKeeper == nil then
+		return
+	end
+
+	local pathList = CS.IndoorMap.inst:FindPath(self.shopKeeper.currCellPos,endPos)
+	
+	self.shopKeeper:move(pathList)
+	
+end
+
+----
+
+function ShopkeeperHandler:OnExit()
+
+	ShopkeeperHandler.super.OnExit(self)
+	self.shopKeeper = nil
+
+end

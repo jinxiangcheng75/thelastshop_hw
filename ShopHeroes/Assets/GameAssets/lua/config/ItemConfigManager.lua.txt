@@ -1,0 +1,60 @@
+
+-- ItemConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local CS_CSVParser = CS.CSVParser
+
+ItemConfig =
+class({
+		id = 0,
+		amount_cap = 0,
+	})
+
+function ItemConfig:new()
+	
+	local o = o or {}
+	setmetatable(o, self)
+	self.__index = self
+	return o
+	
+end
+
+ItemConfigManager = class()
+--ItemConfigManager.cfgDict = {}
+local csv_name = "item"
+
+function ItemConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = CS_CSVParser.GetCSV(csv_name)
+
+	local cfgs = CSVParser:parseClass(csv, 3, ItemConfig)
+	ItemConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("ItemConfigManager  错误")
+	end
+end
+
+function ItemConfigManager:processConfigs(cfgs)
+
+	for i=1, #cfgs do
+
+		local c = cfgs[i]
+
+		c.id = tonumber(c.id)
+		
+		if c.amount_cap == nil or c.amount_cap == "" then
+			c.amount_cap = 1000000
+		end
+		c.amount_cap = tonumber(c.amount_cap)
+
+		self.cfgDict[tonumber(c.id)] = c
+
+	end
+
+end
+
+function ItemConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

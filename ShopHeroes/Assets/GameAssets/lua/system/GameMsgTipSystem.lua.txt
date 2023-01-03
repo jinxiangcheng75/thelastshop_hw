@@ -1,0 +1,242 @@
+
+
+local coroutine_cs = require("coroutine_cs")
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+
+require("ui/view/TextTip/RaceLampMsgTipUI")
+require("ui/view/TextTip/TipsAgainAffirmUI")
+require("ui/view/TextTip/LuaTextTipUI")
+require("ui/view/TextTip/ProbabilityPublicUI")
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_GuideDataProxyInst = CS.GuideDataProxy.inst
+local EventDispatcherInis = require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_ManagerBinderInst = CS.ManagerBinder.inst
+local CS_WorkerConfigManagerInst = CS.WorkerConfigManager.inst
+local CS_BuildingConfigManagerInst = CS.BuildingConfigManager.inst
+
+
+GameMsgTipSystem = class(BaseSystem)
+GameMsgTipSystem.super = BaseSystem
+
+local dailySignUIView
+
+local raceLampMsgs = {}
+
+function GameMsgTipSystem:ctor()
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	self.func_2 = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+
+	self.textTipLimitDic = {[1] = false,[2] = false} --1 hero 2 worker
+end
+
+function GameMsgTipSystem:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.MsgTipEvent.AddRaceLampTip, self, self.showRaceLamp)
+	EventDispatcherInis:addEvent(GameEvent.MsgTipEvent.GoOnRaceLampTip, self, self.goOnRaceLamp)
+	EventDispatcherInis:addEvent(GameEvent.MsgTipEvent.PauseRaceLampTip, self, self.pauseRaceLamp)
+	EventDispatcherInis:addEvent(GameEvent.MsgTipEvent.RePlayRaceLampTip, self, self.replayRaceLamp)
+	EventDispatcherInis:addEvent(GameEvent.MsgTipEvent.ShowTextMsgTip, self, self.showTextMsgTip)
+	EventDispatcherInis:addEvent(GameEvent.MsgTipEvent.ShowTipsAgainAffirmUI, self, self.showTipsAgainAffirmUI)
+	EventDispatcherInis:addEvent(GameEvent.MsgTipEvent.ShowLuaTextTipUI, self, self.showLuaTextTipUI)
+	EventDispatcherInis:addEvent(GameEvent.MsgTipEvent.TextTip_FullWorkerExpDataList, self, self.getFullWorkerExpDataList)
+	EventDispatcherInis:addEvent(GameEvent.MsgTipEvent.HasMaxLevelHero, self, self.hasMaxLevelHero)
+	EventDispatcherInis:addEvent(GameEvent.MsgTipEvent.ShowProbabilityPublic, self, self.showProbabilityPublic)
+end
+
+function GameMsgTipSystem:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.MsgTipEvent.AddRaceLampTip, self, self.showRaceLamp)
+	EventDispatcherInis:removeEvent(GameEvent.MsgTipEvent.GoOnRaceLampTip, self, self.goOnRaceLamp)
+	EventDispatcherInis:removeEvent(GameEvent.MsgTipEvent.PauseRaceLampTip, self, self.pauseRaceLamp)
+	EventDispatcherInis:removeEvent(GameEvent.MsgTipEvent.RePlayRaceLampTip, self, self.replayRaceLamp)
+	EventDispatcherInis:removeEvent(GameEvent.MsgTipEvent.ShowTextMsgTip, self, self.showTextMsgTip)
+	EventDispatcherInis:removeEvent(GameEvent.MsgTipEvent.ShowTipsAgainAffirmUI, self, self.showTipsAgainAffirmUI)
+	EventDispatcherInis:removeEvent(GameEvent.MsgTipEvent.ShowLuaTextTipUI, self, self.showLuaTextTipUI)
+	EventDispatcherInis:removeEvent(GameEvent.MsgTipEvent.TextTip_FullWorkerExpDataList, self, self.getFullWorkerExpDataList)
+	EventDispatcherInis:removeEvent(GameEvent.MsgTipEvent.HasMaxLevelHero, self, self.hasMaxLevelHero)
+	EventDispatcherInis:removeEvent(GameEvent.MsgTipEvent.ShowProbabilityPublic, self, self.showProbabilityPublic)
+end
+
+function GameMsgTipSystem:OnEnter()
+	GameMsgTipSystem.super.OnEnter(self)
+end
+
+function GameMsgTipSystem:OnExit()
+	GameMsgTipSystem.super.OnExit(self)
+end
+
+function GameMsgTipSystem:showRaceLamp(type, itemId, userName, otherParam)
+	if not CS_GuideDataProxyInst.CurInfo.isAllOver then --新手引导未完成 不加消息
+		return
+	end
+
+	if #raceLampMsgs < 10 then
+		raceLampMsgs[#raceLampMsgs + 1] = {
+			type = type,
+			itemId = itemId,
+			userName = userName,
+			otherParam = otherParam
+		}
+	end
+
+	if CS_ManagerBinderInst.mGameState == CS.kGameState.Battle then --战斗中
+		return
+	end
+
+	local raceLampUI = GUIManager.inst:GetWindow(Constants.ViewName.RaceLampMsgTipUI, false)
+
+	if raceLampUI ~= nil and (raceLampUI.pause or raceLampUI.isMoving) then
+	else
+		self:goOnRaceLamp()
+	end
+end
+
+function GameMsgTipSystem:goOnRaceLamp()
+	local raceLampUI = GUIManager.inst:GetWindow(Constants.ViewName.RaceLampMsgTipUI, false)
+
+	if #raceLampMsgs == 0 then
+		if raceLampUI ~= nil then
+			raceLampUI:AniOverMethod(true)
+		end
+	else
+		if raceLampUI ~= nil and raceLampUI.isShowing then
+			raceLampUI:SetMsgTip(raceLampMsgs[1])
+			table.remove(raceLampMsgs, 1)
+		else
+			GUIManager.inst:OpenView(
+				Constants.ViewName.RaceLampMsgTipUI,
+				function(view)
+					view:SetMsgTip(raceLampMsgs[1])
+					table.remove(raceLampMsgs, 1)
+				end
+			)
+		end
+	end
+end
+
+function GameMsgTipSystem:pauseRaceLamp()
+	local raceLampUI = GUIManager.inst:GetWindow(Constants.ViewName.RaceLampMsgTipUI, false)
+
+	if raceLampUI ~= nil then
+		raceLampUI:Pause()
+	end
+end
+
+function GameMsgTipSystem:replayRaceLamp()
+	local raceLampUI = GUIManager.inst:GetWindow(Constants.ViewName.RaceLampMsgTipUI, false)
+
+	if raceLampUI ~= nil then
+		raceLampUI:Replay()
+		self:goOnRaceLamp()
+	end
+end
+
+function GameMsgTipSystem:showTextMsgTip(msg, colorStr)
+	self.func_2(CS_EventControllerInst, CS_GameEventType.SHOWUI_TEXTMSGTIP, msg, CS.GUIHelper.GetColorByColorHex(colorStr))
+end
+
+
+--二次确认
+function GameMsgTipSystem:showTipsAgainAffirmUI(title,tips,callback,type)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.TipsAgainAffirmUI,
+		function(view)
+			view:SetData(title,tips,callback,type)
+		end
+	)
+
+end
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--上限弹窗
+function GameMsgTipSystem:showLuaTextTipUI(content,color,iconUrl,type)
+
+
+	local showLevel = 20 --默认20级
+	
+	local worldParCfg = CS_WorkerConfigManagerInst:GetConfig(8402)
+	
+	if worldParCfg ~= nil then
+		showLevel = worldParCfg.parameters
+	end
+	
+	
+	if CS_UserDataProxyInst.playerData.level >= showLevel or self.textTipLimitDic[type] == true then
+		return
+	end
+
+	self.textTipLimitDic[type] = true
+
+	local luaTextTipUI = GUIManager.inst:GetWindow(Constants.ViewName.LuaTextTipUI, false)
+
+	if luaTextTipUI ~= nil and luaTextTipUI.isShowing then
+		luaTextTipUI:SetData(content,color,iconUrl,function ()
+				self.textTipLimitDic[type] = false
+			end)
+	else
+		GUIManager.inst:OpenView(
+			Constants.ViewName.LuaTextTipUI,
+			function(view)
+				view:SetData(content,color,iconUrl,function ()
+						self.textTipLimitDic[type] = false
+					end)
+			end
+		)
+	end
+
+end
+
+
+--工匠等级上限列表
+function GameMsgTipSystem:getFullWorkerExpDataList(workerExpDataList)
+
+	--coroutine_cs.start(function ()
+	--for i = 0, workerExpDataList.Count - 1  do
+
+	--local data = workerExpDataList[i]
+	--local workerCfg = CS_WorkerConfigManagerInst:GetConfig(data.id)
+	--local buildingCfg = CS_BuildingConfigManagerInst:GetConfig(workerCfg.connect_build_id)
+
+	--self:showLuaTextTipUI(CS_LanguageManagerInst:GetValueByKey("{0}等级已达上限，需要升级{1}！",CS_LanguageManagerInst:GetValueByKey(workerCfg.profession),CS_LanguageManagerInst:GetValueByKey(buildingCfg.name)),CS.GUIHelper.GetColorByColorHex("#ff2828"),"jianzhu_kexueyuan")
+	--coroutine_cs.wait(0.5)
+
+	--end
+	--end)
+
+	self:showLuaTextTipUI(CS_LanguageManagerInst:GetValueByKey("工匠等级已达上限，需要升级科学院！"),CS.GUIHelper.GetColorByColorHex("#ffffff"),"jianzhu_kexueyuan",2)
+
+end
+
+
+HasMaxLevelHero = false
+
+function GameMsgTipSystem:hasMaxLevelHero()
+
+	HasMaxLevelHero = true
+
+end
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--概率公示
+function GameMsgTipSystem:showProbabilityPublic(type) --0英雄 1转盘
+	
+	GUIManager.inst:OpenView(
+		Constants.ViewName.ProbabilityPublicUI,
+		function(view)
+			view:ShowProbability(type)
+		end
+	)
+	
+end
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

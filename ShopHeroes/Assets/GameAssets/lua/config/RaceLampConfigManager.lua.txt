@@ -1,0 +1,46 @@
+-- RaceLampConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+RaceLampConfig =
+class(
+	{
+		type,
+		player_color,
+		content_color,
+		help_content_des,
+		content_des,
+		goal_color,
+	}
+)
+
+RaceLampConfigManager = class()
+--RaceLampConfigManager.cfgDict = {}
+local csv_name = "race_lamp"
+
+function RaceLampConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+	
+	local cfgs = CSVParser:parseClass(csv, 3, RaceLampConfig)
+	RaceLampConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("RaceLampConfigManager  错误")
+	end
+end
+
+function RaceLampConfigManager:processConfigs(cfgs)
+	
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		self.cfgDict[tonumber(c.type)] = c
+	end
+	
+end
+
+function RaceLampConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

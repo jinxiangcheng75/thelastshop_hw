@@ -1,0 +1,14 @@
+id,name,profession,type,icon,profession_icon,desc,show_level,level,cost_money,cost_diamond,build_id,build_level_id,equipment_id,locked,get_type,lock_des,connect_build_id,pic,model,sale_id
+v:number,v:string,v:string,v:number,v:string,v:string,v:string,v:number,v:number,v:number,v:number,v:number,v:number,list:number,v:number,v:number,v:number,v:number,v:string,v:number,v:number
+员工ID,员工默认名称,员工职业,类别 1-工匠；2-npc,图标,职业图标,员工介绍,显示等级（达到等级即显示对应的工匠）,前提店主等级,雇佣价格(金币),雇佣价格(钻石),前提建筑物id,建筑等级,解锁蓝图,礼包解锁1-是 2-否,解锁方式1-转盘 2-引导 3-雇佣 4-七日 5-建筑 6-礼包,解锁条件描述,关联建筑id,半身像,模型,对应礼包id
+1,威廉,铸造专家,1,gongjiang_weilian,artisan_1,我手中的铁锤，它能敲出坚硬的<Color=#3aff5c>利刃</Color>！,1,1,0,0,0,0,1010,2,2,,2400,gongjiang_weilian,50001,
+2,约翰,木材加工专家,1,gongjiang_yuehan,artisan_2,不要瞧不起木头制作的东西，它可是非常可靠，关键时候能保住你的性命！,3,3,2000,50,0,0,2010,2,3,雇佣约翰,2500,gongjiang_yuehan,50002,
+3,琳,服装设计师,1,gongjiang_lin,artisan_3,各种日常服装我都能制作！,1,1,0,0,0,0,12010:15010,2,2,,2600,gongjiang_lin,50003,
+4,左纳,手工专家,1,gongjiang_zuona,artisan_4,一双灵巧的手说的就是我，不管是武器还是实用的东西记得找我制作！,7,7,60000,300,2600,3,17010,2,5,雇佣左纳,2700,gongjiang_zuona,50004,
+5,艾拉,化学专家,1,gongjiang_ailiya,artisan_5,不想死的话，我给你的东西记得马上丢出去，危险警告！,5,5,10000,150,0,0,20010,2,3,雇佣艾拉,2800,gongjiang_ailiya,50005,
+6,伊利欧斯,枪械装配师,1,gongjiang_yiliousi,artisan_6,想要制作一把常用武器吗？你想要制作什么武器？,10,12,250000,200,2800,4,6010,2,5,雇佣伊利欧斯,2900,gongjiang_yiliousi,50006,
+7,劳伦斯,工程师,1,npc_laolunsi,artisan_7,呃...我会设计帝国大厦，这种小工具难不倒我！,15,20,500000,500,2500,5,21010:22010,2,5,雇佣劳伦斯,3000,npc_laolunsi,50007,
+8,西恩,精密加工专家,1,gongjiang_xien,artisan_8,我拥有一双不会颤抖的手，我制造的武器能打中几千米远的蚊子！你相信我吗？,5,10,-1,-1,0,0,7010,1,6,通过专属礼包获得,3100,gongjiang_xien,50008,20004
+9,阿芙莉亚,首饰设计师,1,gongjiang_ruiya,artisan_9,好向往旧时代的时装秀，我设计的首饰肯定能风靡世界~,9,19,-1,-1,0,0,24010,1,6,通过专属礼包获得,3200,gongjiang_ruiya,50009,20002
+10,亚历山大,工程院士,1,gongjiang_yalishanda,artisan_10,年轻人，我曾经研究的重型武器可以毁灭世界~,7,15,-1,-1,0,0,8010,1,6,通过专属礼包获得,3300,gongjiang_yalishanda,50010,20003
+9999,黑市商人,黑市商人,2,,,,9999,9999,-1,-1,0,0,,2,4,npc,,,60004,

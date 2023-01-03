@@ -1,0 +1,40 @@
+-- 根节点
+list = nil
+-- 在链表头部插入一个值为v的节点
+list = {next = list, value = v}
+-- 遍历链表
+local l = list
+while l do
+	print(l.value)
+	l = l.next
+end
+
+local tbl = {10, 20, 30, 40, 50}
+
+-- 链表
+local linkedList = nil
+for i=1, #tbl do
+	linkedList = {
+		data = tbl[i],
+		next = linkedList
+	}
+end
+
+print(linkedList.data) --50
+print(linkedList.next.data)--40
+print(linkedList.next.next.data)--30
+
+-- 迭代器
+function iterator(tbl, node)
+	if node==nil then
+		return tbl
+	else
+		return node.next
+	end
+end
+function ipairLinkedList(tbl)
+	return iterator, tbl, nil
+end
+for item in ipairLinkedList(tbl) do
+	print(item.data)
+end

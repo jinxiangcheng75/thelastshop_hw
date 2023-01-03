@@ -1,0 +1,253 @@
+--FeedPetUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_ToggleGroupMarget = typeof(CS.ToggleGroupMarget)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_PetDataProxyInst = CS.PetDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+
+
+
+FeedPetUI = class(ViewBase)
+
+function FeedPetUI:ctor()
+	self.viewID = Constants.ViewName.FeedPetUI
+	FeedPetUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.noSetting
+end
+------------------------------------------------
+
+
+function FeedPetUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn =  contentPane:GetButton("closeBtn")
+	self.maskBtn =  contentPane:GetButton("maskBtn")
+
+	self.feedToggleGroup = contentPane:GetObjByName("feedToggleGroup"):GetComponent(CS_type_ToggleGroupMarget)
+
+	self.first_foodIcon = contentPane:GetGUIIcon("first_foodIcon")
+	self.secend_foodIcon = contentPane:GetGUIIcon("secend_foodIcon")
+	self.third_foodIcon = contentPane:GetGUIIcon("third_foodIcon")
+
+	self.first_addExpTx = contentPane:GetText("first_addExpTx")
+	self.secend_addExpTx = contentPane:GetText("secend_addExpTx")
+	self.third_addExpTx = contentPane:GetText("third_addExpTx")
+
+	self.lvTx = contentPane:GetText("lvTx")
+	self.lvUpImgObj = contentPane:GetObjByName("lvUpImg")
+	
+	self.expSlider = contentPane:GetObjByName("expSlider"):GetComponent("Slider")
+	self.sliderTx = contentPane:GetText("sliderTx")
+	self.curSliderFill = contentPane:GetObjByName("curSliderFill"):GetComponent("RectTransform")
+	self.fillTween = contentPane:GetObjByName("fillTween"):GetComponent("RectTransform")
+	self.fillTweenImg = contentPane:GetImage("fillTween")
+
+	self.feedBtnObjs = contentPane:GetObjByName("feedLvBtnObjs"):GetComponent(CS_type_ObjList).objList
+	self.freeFeedBtn = contentPane:GetButton("freeFeedBtn")
+	self.goldFeedBtn = contentPane:GetButton("goldFeedBtn")
+	self.gemFeedBtn = contentPane:GetButton("gemFeedBtn")
+
+	self.costGoldTx = contentPane:GetText("costGoldTx")
+	self.costGemTx = contentPane:GetText("costGemTx")
+
+	self.first_addExpTx.text = "+"..tostring(math.ceil(CS_WorldParConfigManagerInst:GetConfig(172).parameters))
+	self.secend_addExpTx.text = "+"..tostring(math.ceil(CS_WorldParConfigManagerInst:GetConfig(173).parameters))
+	self.third_addExpTx.text = "+"..tostring(math.ceil(CS_WorldParConfigManagerInst:GetConfig(174).parameters))
+
+	self.uiAnimator = contentPane.uiAnimator
+	
+end
+
+
+function FeedPetUI:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end)
+
+	self.maskBtn.onClick:AddListener(
+		function ()
+			self:closeBtnClick()
+		end)
+
+	self.freeFeedBtn:ButtonClickTween(
+		function ()
+			self:feedBtnClick(1)
+		end
+	)
+
+	self.goldFeedBtn:ButtonClickTween(
+		function ()
+			self:feedBtnClick(2)
+		end
+	)
+
+	self.gemFeedBtn:ButtonClickTween(
+		function ()
+			self:feedBtnClick(3)
+		end
+	)
+
+
+	self.feedToggleGroup.OnSelectedIndexValueChange = function (index)
+		self:onSelectedIndexValueChange(index)
+	end
+
+end
+
+
+function FeedPetUI:onHide()
+	print("FeedPetUI onHide")
+
+	CS.DG.Tweening.DOTween.Kill(self.fillTweenImg);
+
+end
+
+function FeedPetUI:onShowed()
+	print("FeedPetUI onShowed")
+
+	self.fillTweenImg:DOFade(0.4, 0.8):From(0):SetLoops(-1, CS.DG.Tweening.LoopType.Yoyo);
+
+end
+
+function FeedPetUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function FeedPetUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+
+
+function FeedPetUI:SetData(petData)
+
+	self.data = petData
+
+	self.curConfig = PetUpdateConfigManager:GetConfig(petData.petInfo.petLevel)
+	self.nextConfig = PetUpdateConfigManager:GetConfig(petData.petInfo.petLevel + 1)
+
+	self.costGoldTx.text = tostring(self.curConfig.feeding_cost_xinbi)
+	self.costGoldTx.color = CS_UserDataProxyInst.playerData.gold < tonumber(self.curConfig.feeding_cost_xinbi) and CS.GUIHelper.GetColorByColorHex("fd4f4f") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+	self.costGemTx.text = tostring(self.curConfig.feeding_cost_bullion)
+	--self.costGemTx.color = CS_UserDataProxyInst.playerData.gem < tonumber(self.curConfig.feeding_cost_bullion) and CS.GUIHelper.GetColorByColorHex("fd4f4f") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+
+	self.lvTx.text = tostring(petData.petInfo.petLevel)
+	self.sliderTx.text = "<color=#40ff4d>"..tostring(petData.petInfo.petExp).."</color>/"..tostring(self.nextConfig.exp)..CS_LanguageManagerInst:GetValueByKey("点数")
+	self.expSlider.value = petData.petInfo.petExp / (self.nextConfig.exp * 1.0)
+	self.curSliderFill.anchorMax = Vector2(self.expSlider.value / self.expSlider.maxValue, 1);
+	self.feedToggleGroup:OnEnableMethod(1)
+
+end
+
+function FeedPetUI:onSelectedIndexValueChange(index)
+	if self.data == nil or self.data.petInfo == nil then
+		self:hide()
+		return
+	end
+
+	local addExp = CS_WorldParConfigManagerInst:GetConfig(172 + index).parameters
+
+	local newExp = math.ceil(self.data.petInfo.petExp + addExp)
+	
+	self.expSlider.value = newExp / (self.nextConfig.exp * 1.0)
+	self.fillTween.anchorMax = Vector2(self.expSlider.value / self.expSlider.maxValue, 1);
+
+	for i = 0, self.feedBtnObjs.Count - 1 do
+		self.feedBtnObjs[i]:SetActive(false)
+	end
+	
+	self.feedBtnObjs[index]:SetActive(true)
+	
+	local canLvUp = (newExp) >= tonumber(self.nextConfig.exp)
+	
+	if canLvUp then
+		
+		self.sliderTx.text =  "<color=#5BFF43>"..tostring(self.nextConfig.exp).."</color>/"..tostring(self.nextConfig.exp)
+		
+	else
+		
+		self.sliderTx.text =  tostring(newExp).."/"..tostring(self.nextConfig.exp)
+		
+	end
+	
+	self.lvUpImgObj:SetActive(canLvUp)
+	self.lvTx.text = tostring(self.data.petInfo.petLevel + (canLvUp and 1 or 0))
+	self.lvTx.color = canLvUp and CS.GUIHelper.GetColorByColorHex("5BFF43") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+	
+end
+
+function FeedPetUI:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function FeedPetUI:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function FeedPetUI:closeBtnClick()
+	self:hide()
+end
+
+function FeedPetUI:feedBtnClick(EPetFeedType)
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func_textMsgTip = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+	
+	if EPetFeedType == 2 and self.costGoldTx.color == CS.GUIHelper.GetColorByColorHex("fd4f4f")  then --gold
+		
+		func_textMsgTip(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("新币不足"), CS.GUIHelper.GetColorByColorHex("FF2828"))
+		return
+		
+	end
+	
+	if EPetFeedType == 3 and CS_UserDataProxyInst.playerData.gem < tonumber(self.curConfig.feeding_cost_bullion)  then --gem
+
+		--func_textMsgTip(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("金条不足"), CS.GUIHelper.GetColorByColorHex("FF2828"))
+		EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,tonumber(self.curConfig.feeding_cost_bullion - CS_UserDataProxyInst.playerData.gem))
+		return
+
+	end
+	
+	EventDispatcher:dispatchEvent(GameEvent.PetEvent.REQUEST_PET_FEED,self.data.petUid,EPetFeedType)
+	
+end
+
+------------------------------------------------

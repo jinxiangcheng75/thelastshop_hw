@@ -1,0 +1,249 @@
+
+local CS_IndoorRoleActionConfigManagerInst = CS.IndoorRoleActionConfigManager.inst
+local CS_MapUtils = CS.MapUtils
+
+require("class")
+
+
+IndoorRole = class()
+
+
+function IndoorRole:ctor()
+
+	self.transform = nil
+	self.character = nil
+	self.aStar = nil
+	self.attacher = nil
+
+	self.currCellPos = nil
+
+	self.lastOrder = -1
+
+	self.isVisible = true
+	
+end
+
+
+function IndoorRole:init(transform,aStarCtrl,attacherCtrl)
+
+	self.transform = transform
+
+	--移动
+	self.aStar = aStarCtrl
+	self.aStar:setOnStartHandler(function ()
+			self:onMoveStart()
+		end)
+	self.aStar:setOnPosChangedHandler(function(pos)
+			self:onPosChgHandler(pos)
+		end);
+	self.aStar:setOnStepCompleteHandler(function (curPos,nextPos)
+			self:onMoveStepComplete(curPos,nextPos)
+		end);
+	self.aStar:setOnMoveEndCompleteHandler(function ()
+			self:onMoveEndComplete()
+		end);
+
+	--谈话气泡
+	self.attacher = attacherCtrl
+
+
+
+end
+
+function IndoorRole:SetCellPos(cellPos)
+
+	local pos = CS_MapUtils.CellPosToCenterPos(cellPos)
+	self:setworldPos(pos);
+	self.transform.position = pos;
+
+end
+
+function IndoorRole:setworldPos(pos)
+
+	self.currCellPos = CS_MapUtils.WorldPosToCellPos(pos);
+
+end
+
+
+function IndoorRole:setOrder(order,sortingLayerName)
+
+	if (self.lastOrder == order) then
+		return
+	end
+
+	if self.character ~= nil then
+
+		self.lastOrder = order
+		self.character:SetSortingAndOrderLayer(sortingLayerName,order)
+
+	end
+
+	local rendererslist = self.transform:GetComponentsInChildren(typeof(CS.UnityEngine.Renderer),true);
+
+	for i = 0, rendererslist.Length - 1 do
+
+		local rander = rendererslist[i]
+
+		local setorderspript = rander.gameObject:GetComponent(typeof(CS.SetRendererOrder))
+		if setorderspript ~= nil then
+			setorderspript:setOrder(order, false);
+		else
+			rander.sortingOrder = order;
+		end
+
+	end
+
+end
+
+function IndoorRole:UpdateSortingOrder()
+
+	self:setOrder(CS_MapUtils.GetTileMapOrder(self.transform.position.y - 0.5, self.transform.position.x, 1, 1),"map_Actor");
+
+end
+
+function IndoorRole:move(pathList)
+
+	if pathList == nil then
+		return
+	end
+
+	self.aStar:moveTo(pathList)
+
+end
+
+function IndoorRole:isMoving()
+
+	return self.aStar:isMoving()
+
+end
+
+
+function IndoorRole:stopMove()
+
+	self.aStar:stopMove()
+
+	if self.character ~= nil then
+		local idleAnimationName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.character.gender, CS.kIndoorRoleActionType.normal_standby);
+		self.character:Play(idleAnimationName, true);
+	end
+
+end
+
+function IndoorRole:onMoveStart()
+
+	if self.character ~= nil then
+		local moveAnimationName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.character.gender, CS.kIndoorRoleActionType.normal_walking);
+		self.character:Play(moveAnimationName, true,self.aStar.MoveSpeed / 0.8 * 1.1);
+	end
+
+end
+
+function IndoorRole:onPosChgHandler(pos)
+
+	self:setworldPos(pos)
+
+end
+
+function IndoorRole:onMoveStepComplete(curPos,nextPos)
+
+	self:setOrder(CS_MapUtils.GetTileMapOrder(self.transform.position.y - 0.2, self.transform.position.x, 1, 1),"map_Actor")
+
+	if self.character ~= nil then
+		self.character:SetDirection(self:getDir(CS_MapUtils.WorldPosToCellPos(curPos), CS_MapUtils.WorldPosToCellPos(nextPos)))
+	end
+
+end
+
+function IndoorRole:onMoveEndComplete()
+
+	self:setOrder(CS_MapUtils.GetTileMapOrder(self.transform.position.y - 0.2, self.transform.position.x, 1, 1),"map_Actor")
+
+	if self.character ~= nil then
+
+		local idleAnimationName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.character.gender, CS.kIndoorRoleActionType.normal_standby);
+		self.character:Play(idleAnimationName, true);
+
+	end
+
+end
+
+function IndoorRole:getDir(from,to)
+
+	local span = to - from;
+	if (span.x > 0 or span.y < 0) then
+
+		return CS.RoleDirectionType.Right;
+
+	else
+
+		return CS.RoleDirectionType.Left;
+
+	end
+
+end
+
+function IndoorRole:SetBubbleClickHandler(onClick)
+
+	self.attacher.onClickHandler= onClick
+
+end
+
+function IndoorRole:SetSpBgIcon(sprite)
+
+	self.attacher:SetSpBgIcon(sprite);
+
+end
+
+function IndoorRole:ShowSpPop(sp,  count,  showCountTx,  outline,  outlineColor,  needTile,  spScale)
+
+	self.attacher:ShowSpIcon(sp, count, showCountTx, outline, outlineColor, needTile, spScale);
+	
+end
+
+function IndoorRole:Talk(msg,callback)
+	
+	self.attacher:Talk(msg,callback)
+	
+end
+
+function IndoorRole:Talk_(msgs,stepCallback,endComplete)
+	
+	self.attacher:Talk(msgs,stepCallback,endComplete)
+	
+end
+
+function IndoorRole:HidePopup(callback)
+	
+	self.attacher:HidePopup(callback)
+	
+end
+
+function IndoorRole:SetTalkSpacing(talkSpacing)
+	
+	if talkSpacing < 0 then
+		return
+	end
+	
+	self.attacher.talkSpacing = talkSpacing 
+	
+end
+
+function IndoorRole:isTalking()
+	
+	return self.attacher.isTalking
+	
+end
+
+function IndoorRole:SetVisible(visible)
+	
+	self.isVisible = visible
+	
+	self.attacher:SetVisible(visible)
+	
+	local endVal = visible and 1 or 0
+	
+	if self.character ~= nil and self.character.skeletonAlpha ~= endVal then
+		self.character:Fade(endVal,0.35)
+	end
+	
+end

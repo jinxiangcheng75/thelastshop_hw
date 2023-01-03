@@ -1,0 +1,180 @@
+
+--Welfare_dailySign
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_TimeUtils = CS.TimeUtils
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Welfare_dailySign = class(luaClass_Welfare_CtrlBase)
+
+function Welfare_dailySign:initComp(luaBehaviour)
+	
+	local contentPane = luaBehaviour
+
+	self.tx_count = contentPane:GetText("countText")
+	self.superList = contentPane:GetObjByName("ItemList"):GetComponent(CS_type_superList)
+	self.btn_sign = contentPane:GetButton("signBtn")
+	self.tx_sign = contentPane:GetText("signText")
+	self.obj_time = contentPane:GetObjByName("timeObj")
+	self.tx_time = contentPane:GetText("timeText")
+	self.tx_prompt = contentPane:GetText("promptText")
+	self.img_lock = contentPane:GetImage("lockImg")
+	self.rtf_horizontal = contentPane:GetObjByName("cumulativeCount"):GetComponent("RectTransform")
+	self.listItemCount = 0
+	
+end
+
+function Welfare_dailySign:Init(luaBehaviour)
+	
+	self:initComp(luaBehaviour)
+	
+	self.timerId = 0
+	
+	self.superList.itemRenderer = function(index, item)
+		self:listItemRenderer(index, item)
+	end
+
+	self.superList.itemUpdateInfo = function(index, item)
+		self:listItemRenderer(index, item)
+	end
+
+	self.btn_sign:ButtonClickTween(
+		function()
+			self:onSignBtnClick()
+		end
+	)
+	
+end
+
+function Welfare_dailySign:listItemRenderer(index,item)
+	
+	local rowNum = CS.FGUI.inst.isLandscape and 7 or 6
+	
+	for i = 1, rowNum do
+		local itemIndex = index * rowNum + i
+		local smallObj = item.buttonList[i - 1].gameObject
+		if (itemIndex > self.listItemCount) then
+			--break
+			smallObj:SetActive(false)
+		else
+			if (itemIndex <= self.listItemCount) then
+				smallObj:SetActive(true)
+				local smallItem = smallObj:GetComponent(CS_type_LuaListItem)
+				smallItem:SetData(itemIndex)
+			else
+				smallObj:SetActive(false)
+			end
+		end
+	end
+	
+end
+
+function Welfare_dailySign:SetListItemTotalCount(count)
+	
+	self.listItemCount = count
+	if (self.listItemCount < 0) then
+		self.listItemCount = 0
+	end
+	
+	local rowNum = CS.FGUI.inst.isLandscape and 7 or 6
+	
+	local count1 = math.floor(self.listItemCount / rowNum)
+	if (self.listItemCount % rowNum > 0) then
+		count1 = count1 + 1
+	end
+	self.superList.totalItemCount = count1
+	
+end
+
+function Welfare_dailySign:SetUIData()
+	
+	local data = DailySignDataProxy.inst.dailyData
+	local countText = data.totalGiftCount
+
+	self.tx_count.text = CS_LanguageManagerInst:GetValueByKey("{0}次", tostring(countText))
+
+	CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.rtf_horizontal)
+	if (data.nextTime > 0) then
+		self.tx_sign.enabled = false
+		self.obj_time:SetActive(true)
+		self.tx_prompt.enabled = true
+		self.img_lock.enabled = true
+	else
+		self.tx_sign.enabled = true
+		self.obj_time:SetActive(false)
+		self.tx_prompt.enabled = false
+		self.img_lock.enabled = false
+	end
+
+	if (self.timerId ~= 0) then
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+
+	self.tx_time.text = CS_TimeUtils.timeSpan3Str(data.nextTime)
+
+	self.timerId =
+	CS_GameTimerInst:AddTimer(
+		1,
+		data.nextTime,
+		function()
+			if data.nextTime > 0 then
+				self:RefreshTimeContent(data.nextTime)
+			else
+				CS_GameTimerInst:RemoveTimer(self.timerId)
+				self.timerId = 0
+			end
+		end
+	)
+	
+end
+
+
+function Welfare_dailySign:RefreshTimeContent(curTime)
+	self.tx_time.text = CS_TimeUtils.timeSpan3Str(curTime)
+end
+
+function Welfare_dailySign:RefreshUIData()
+	
+	if CS.UserDataProxy.inst.isShowDailySignRedPoint then
+		CS.UserDataProxy.inst.isShowDailySignRedPoint = false
+	end
+	self:SetListItemTotalCount(#(DailySignDataProxy.inst.dailyData.rewardList))
+	local targetIndex = math.floor(DailySignDataProxy.inst.dailyData.totalGiftCount / 4)
+	--self.scrollView:scrollByItemIndex(targetIndex)
+	self:SetUIData()
+	
+end
+
+
+function Welfare_dailySign:onSignBtnClick()
+	
+	if (DailySignDataProxy.inst.dailyData.nextTime > 0) then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("冷却中无法签到"),"FF2828")
+	else
+		EventDispatcher:dispatchEvent(GameEvent.DailySignEvent.REQUEST_DAILYGIFTREWARD)
+	end
+	
+end
+
+function Welfare_dailySign:Clear()
+	
+	if (self.timerId ~= 0) then
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+	
+end
+
+return Welfare_dailySign

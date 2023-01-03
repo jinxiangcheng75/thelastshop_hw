@@ -1,0 +1,264 @@
+-- NetworkManager
+
+require("class")
+require("network/NetworkPipeline")
+require("utils/JsonUtils")
+require("network/MsgType")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+
+local csGameObject = CS.GameObject
+local csEventController = CS.EventController
+local csGameEventType = CS.GameEventType
+local type_cs_MonoLateUpdateAttacher = CS.MonoLateUpdateAttacher
+local csHotfixNetworkPackage = CS.HotfixNetworkPackage
+local csHotfixNetworkRequest = CS.HotfixNetworkRequest
+local csNetworkEvent = CS.NetworkEvent
+local csNetworkCommand = CS.NetworkCommand
+
+NetworkManager = class()
+
+NetworkManager.inst = NetworkManager:new()
+
+function NetworkManager:ctor()
+	print("NetworkManager:ctor")
+	self.mRequestHandlerFactory = {}
+	self.mResponseHandlerFactory = {}
+	self.mStreamHandlerFactory = {}
+	self.mEncryptHandler = {}
+	self.mMessageEncodeHandler = {}
+	self.mErrorHandler = {}
+	self.mDispatchHandlerFactory = {}
+	self.mMessageDispatchHandler = {}
+end
+
+function NetworkManager:Init()
+	self:initHotfixAccess()
+	local url = csNetworkCommand.GetUrl(10100)
+	print("NetworkManager:handleSend url:", url)
+end
+
+function NetworkManager:handleSend(req)
+	--local jsonData = JsonUtils:encode(requestTable)
+	print("NetworkManager:handleSend cmd:(" .. req:GetCmd() .. ")")
+	local cmd = req:GetCmd()
+	local jsonData = req:ToEncodeString()
+	--local encodedData = DefaultEncodeHandler:Encode(cmd, jsonData)
+	print("NetworkManager:handleSend encoded:", jsonData)
+	local csReq = csHotfixNetworkRequest(cmd, jsonData)
+	local csPkg = csHotfixNetworkPackage()
+	csPkg:init(cmd, csReq)
+	local cmdNum = tonumber(cmd)
+	local url = csNetworkCommand.GetUrl(cmdNum)
+	csPkg:setUrl(url)
+	print("NetworkManager:handleSend url:", url)
+	csNetworkEvent.SendPackage(csPkg)
+end
+
+function NetworkManager:handleReceiveSuccess(msg)
+	print("NetworkManager:handleReceiveSuccess msg:", msg)
+	--local resp = DefaultDecodeHandler:Decode(msg)
+	if (msg == nil) then
+		--PackageDispatchHandler:handleFailed(resp.cmd, 8)
+		print("NetworkManager:handleReceiveSuccess parse failed")
+	else
+		print("NetworkManager:handleReceiveSuccess resp:", msg)
+		local cmdStr = msg:sub(1, 5)
+		local cmd = tonumber(cmdStr)
+		local content = msg:sub(7)
+		PackageDispatchHandler:handleSuccess(cmd, content)
+	end
+end
+
+function NetworkManager:handleReceiveFailed(pkg, code)
+	local cmd = pkg:getCmd()
+	print("NetworkManager:handleReceiveFailed cmd:", cmd, " code:", code)
+	PackageDispatchHandler:handleFailed(cmd, code)
+	-- dispatch failed
+	-- csEventController.inst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "登录失败!");
+	
+	local platformType = CS.PlatformManager.inst:GetPlatformType()
+	
+	if platformType ~= 0 and code ~= 0 and cmd == 11407 then --不是editor
+		
+		local req = MsgType.Request_Client_Error:New()
+		req.err = "  code: "..tostring(code).."  cmd: "..tostring(cmd).."  pkg.getResponseData: "..tostring(pkg:getResponseData())
+		req.userId = CS.UserDataProxy.inst.playerData == nil and "" or CS.UserDataProxy.inst.playerData.userUid
+		req.ver = CS.GameSettingManager.appVersion
+		req.stackTrack = "NetworkManager handleReceiveFailed osType为PlatformType"
+		req.osType = platformType
+		req:Send()
+		
+	end
+	
+end
+
+-- function NetworkManager:initReceiveHandler()
+--    local go = csGameObject.Find("NetworkManager")
+--    local mono = go:GetComponent(type_cs_MonoLateUpdateAttacher)
+--    mono:setUpdateCallback(function ()
+--       --
+--       NetworkPipeline:HandleReceive()
+--    end)
+-- end
+
+function NetworkManager:initHotfixAccess()
+	--xlua.private_accessible(CS.NetworkManager)
+	print("NetworkManager:initHotfixAccess")
+	local csNetworkMgr = CS.ManagerBinder.inst.mNetworkMgr
+	print("NetworkManager:initHotfixAccess  csMgr:", csNetworkMgr)
+	local csAccessDict = csNetworkMgr.mHotfixResponseDict
+
+	--csAccessDict:Add(MsgType.Request_User_Login_Cmd, false)
+	--csAccessDict:Add(MsgType.Response_User_Login_Cmd, false)
+	--签到
+	--csAccessDict:Add(MsgTypeCmd.Request_Activity_List_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Activity_List_Cmd, true)
+	--csAccessDict:Add(MsgTypeCmd.Request_Activity_DailyGiftReward_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Activity_DailyGiftReward_Cmd, true)
+	--商城
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_StoreList_Cmd, true)
+	--csAccessDict:Add(MsgTypeCmd.Response_Pay_GemStoreList_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_StoreRefresh_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_StoreBuy_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_BuyVIP_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_GeneralPurchase_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_DailySale_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_VIPChange_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_DirectPurchase_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_GuideTask_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_GuideTaskChange_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_GuideTaskReward_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_Detail_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_TriggerGuide_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_CheckTriggerGuide_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_TriggerGuideFurnitureUpgrade_Cmd, true)
+
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_DataCheck_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_ActivityPointChange_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_CoinChange_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_Check_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_UpdateInfo_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_CheckReward_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_Reward_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_RewardChange_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_CheckExchange_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_Exchange_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_UpdateExchange_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_EquipMakeInfo_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_OperatingActivityPurchase_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_DailyCoin_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity_UnionRankList_Cmd, true)
+
+	csAccessDict:Add(MsgTypeCmd.Response_User_OnlineRewardList_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_OnlineRewardListReward_Cmd, true)
+	
+	csAccessDict:Add(MsgTypeCmd.Response_User_ProsperityRankList_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_ProsperityLevelUp_Cmd, true)
+	
+	csAccessDict:Add(MsgTypeCmd.Response_User_ShopperLevelPurchaseReward_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_ShopperLevelPurchase_Cmd,true)
+	
+	csAccessDict:Add(MsgTypeCmd.Response_User_DailyBoxInfo_Cmd, true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_DailyBoxReward_Cmd,true)
+	
+	csAccessDict:Add(MsgTypeCmd.Response_Tower_Info_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Tower_ExploreStart_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Tower_ExploreEnd_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Tower_Reward_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Tower_ExploreImmediately_Cmd,true)
+	
+	csAccessDict:Add(MsgTypeCmd.Response_User_RankList_Cmd,true)
+	
+	csAccessDict:Add(MsgTypeCmd.Response_User_ExchangeCodeReward_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_User_SearchHeroInfo_Cmd,true)
+	
+	csAccessDict:Add(MsgTypeCmd.Response_Union_Impeach_Cmd,true)
+	
+	csAccessDict:Add(MsgTypeCmd.Response_Activity_Data_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Activity_Battle_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Hero_UseHeroStatusItem_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_GoldVip_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_GoldVipReward_Cmd,true)
+	
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_AmountCheck_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_AmountReward_Cmd,true)
+	
+	csAccessDict:Add(MsgTypeCmd.Response_Hero_WorkerChange_Cmd,false)
+	
+	
+	--副本
+	csAccessDict:Add(MsgTypeCmd.Response_Explore_End_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Explore_Refresh_Cmd,true)
+	
+	--夺宝奇兵(黄金城)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity2_DataCheck_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity2_CheckReward_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity2_Reward_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity2_ActivityPointChange_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity2_RewardChange_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity2_DailyReward_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity2_UnionRankList_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity2_ExploreStart_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity2_ExploreEnd_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_OperatingActivity2_ExploreImmediately_Cmd,true)
+	
+	--积分活动
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity_CheckData_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity_CheckExchange_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity_CheckExchange2_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_Pay_PointActivityPurchase_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity_Reward_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity_Exchange_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity_TaskChange_Cmd,true)
+	
+	--勇气挑战活动	
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity2_CheckData_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity2_TaskChange_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity2_TaskReward_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity2_CheckReward_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity2_Reward_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity2_RewardChange_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity2_ActivityPointChange_Cmd,true)
+	csAccessDict:Add(MsgTypeCmd.Response_PointActivity2_UnionRankList_Cmd,true)
+	
+	--丧尸围城活动
+	
+	
+	--心跳
+	csAccessDict:Add(MsgTypeCmd.Response_Heartbeat2_Cmd,true)
+	
+	
+end
+
+DefaultDecodeHandler = class()
+
+function DefaultDecodeHandler:Decode(msg)
+	local cmdStr = msg:sub(1, 5)
+	local cmd = tonumber(cmdStr)
+	local content = msg:sub(7)
+	--local resp = csLuaNetworkResponse(cmd, content)
+	--local resp = CreateResponse(cmd, content)
+	--print("DefaultDecodeHandler:Decode resp:", resp)
+	---if (resp == nil) then
+	--	return nil
+	--end
+	return content
+end
+
+DefaultEncodeHandler = class()
+
+function DefaultEncodeHandler:Encode(cmd, data)
+	local body = cmd .. "|" .. data
+	return body
+end
+
+PackageDispatchHandler = class()
+
+function PackageDispatchHandler:handleSuccess(cmd, resp)
+	NetworkEvent:OnSuccess(cmd, resp)
+end
+
+function PackageDispatchHandler:handleFailed(cmd, resp)
+	NetworkEvent:OnFailed(cmd, resp)
+end

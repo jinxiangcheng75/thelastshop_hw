@@ -1,0 +1,410 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("utils/XLuaUtils")
+
+require("ui/view/Union/UnionAidUIView")
+require("ui/view/Union/UnionAidMemberByGemUIView")
+require("ui/view/Union/UnionTaskUIView")
+require("ui/view/Union/UnionRenownDetailUI")
+require("ui/view/Union/UnionTaskCheckView")
+require("ui/view/Union/UnionWealUI")
+require("ui/view/Union/UnionWealUpDetailUI")
+require("ui/view/Union/UnionBuffDesPanel")
+require("ui/view/Union/UnionSelfTaskDetailUI")
+
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+---@class UnionSystem
+
+UnionSystem = class(BaseSystem)
+UnionSystem.super = BaseSystem
+
+function UnionSystem:ctor()
+end
+
+function UnionSystem:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.ShowUI_UnionAidUIView, self, self.openUnionAidUIView)
+	EventDispatcherInis:addEvent(
+		GameEvent.UnionEvent.ShowUI_UnionAidMemberByGemUIView,
+		self,
+		self.openUnionAidMemberByGemUIView
+	)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.UNION_MEMBERHELPLISTREFRESH, self, self.onMemberHelpLsitRefresh)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.ShowUI_UnionTaskUIView, self, self.showUnionTaskUIView)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.ShowUI_UnionRenownDetailUI, self, self.showUnionRenownDetailUI)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.ShowUI_UnionTaskCheckView, self, self.showUnionTaskCheckView)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.TurnPage_UnionTaskCheckView, self, self.turnPageUnionTaskCheckView)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.ShowUI_UnionWealUIView, self, self.showUnionWealUIView)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.ShowUI_UnionWealUpDetailUI, self, self.showUnionWealUpDetailUI)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.ShowUI_UnionBuffDesPanel, self, self.showUnionBuffDesPanel)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.ShowUI_UnionSelfTaskDetailUI, self, self.showUnionSelfTaskDetailUI)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.HideUI_UnionSelfTaskDetailUI, self, self.hideUnionSelfTaskDetailUI)
+	EventDispatcherInis:addEvent(
+		GameEvent.UnionEvent.ShowTips_UnionTaskItemOtherInfo,
+		self,
+		self.showTipsUnionTaskItemOtherInfo
+	)
+	EventDispatcherInis:addEvent(
+		GameEvent.UnionEvent.ShowTips_UnionWealUpDataItemInfo,
+		self,
+		self.showTipsUnionWealUpDataItemInfo
+	)
+
+	-----------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.Request_UnionHelpMember, self, self.Request_UnionHelpMember)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.RefreshUnionTaskCheckView, self, self.refreshUnionTaskCheckView)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.GetUnionStartUnionTaskData, self, self.getUnionStartUnionTaskData)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.OnUnionTaskDataChanged, self, self.onUnionTaskDataChanged)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.OnUnionScienceDataChanged, self, self.onUnionScienceDataChanged)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.GetUnionRenownRankList, self, self.getUnionRenownRankList)
+	EventDispatcherInis:addEvent(GameEvent.UnionEvent.Request_ImpeachPresident, self, self.request_ImpeachPresident)
+	
+end
+
+function UnionSystem:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.ShowUI_UnionAidUIView, self, self.openUnionAidUIView)
+	EventDispatcherInis:removeEvent(
+		GameEvent.UnionEvent.ShowUI_UnionAidMemberByGemUIView,
+		self,
+		self.openUnionAidMemberByGemUIView
+	)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.UNION_MEMBERHELPLISTREFRESH, self, self.onMemberHelpLsitRefresh)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.ShowUI_UnionTaskUIView, self, self.showUnionTaskUIView)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.ShowUI_UnionRenownDetailUI, self, self.showUnionRenownDetailUI)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.ShowUI_UnionTaskCheckView, self, self.showUnionTaskCheckView)
+	EventDispatcherInis:removeEvent(
+		GameEvent.UnionEvent.TurnPage_UnionTaskCheckView,
+		self,
+		self.turnPageUnionTaskCheckView
+	)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.GetUnionStartUnionTaskData, self, self.getUnionStartUnionTaskData)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.ShowUI_UnionWealUIView, self, self.showUnionWealUIView)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.ShowUI_UnionWealUpDetailUI, self, self.showUnionWealUpDetailUI)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.ShowUI_UnionBuffDesPanel, self, self.showUnionBuffDesPanel)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.ShowUI_UnionSelfTaskDetailUI, self, self.showUnionSelfTaskDetailUI)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.HideUI_UnionSelfTaskDetailUI, self, self.hideUnionSelfTaskDetailUI)
+	EventDispatcherInis:removeEvent(
+		GameEvent.UnionEvent.ShowTips_UnionTaskItemOtherInfo,
+		self,
+		self.showTipsUnionTaskItemOtherInfo
+	)
+	EventDispatcherInis:removeEvent(
+		GameEvent.UnionEvent.ShowTips_UnionWealUpDataItemInfo,
+		self,
+		self.showTipsUnionWealUpDataItemInfo
+	)
+
+	-----------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.Request_UnionHelpMember, self, self.Request_UnionHelpMember)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.RefreshUnionTaskCheckView, self, self.refreshUnionTaskCheckView)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.OnUnionTaskDataChanged, self, self.onUnionTaskDataChanged)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.OnUnionScienceDataChanged, self, self.onUnionScienceDataChanged)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.GetUnionRenownRankList, self, self.getUnionRenownRankList)
+	EventDispatcherInis:removeEvent(GameEvent.UnionEvent.Request_ImpeachPresident, self, self.request_ImpeachPresident)
+	
+end
+
+function UnionSystem:OnInit()
+	
+	NetworkEvent:SetCallback(MsgTypeCmd.Response_Union_Impeach_Cmd,
+		function (resp)
+			print("Response_Union_Impeach success",resp)
+			self:getUnionImpeachData(resp)
+		end,
+		function (code)
+			print("Response_Union_Impeach fail --- code",code)
+		end
+	)
+	
+end
+
+function UnionSystem:openUnionAidUIView()
+	GUIManager.inst:OpenView(Constants.ViewName.UnionAidUIView)
+end
+
+function UnionSystem:openUnionAidMemberByGemUIView(data)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.UnionAidMemberByGemUIView,
+		function(view)
+			view:SetData(data)
+		end
+	)
+end
+
+function UnionSystem:Request_UnionHelpMember(furnitureUid, userUid, useGem, helpAll)
+	local req = MsgType.Request_Union_HelpMember:New()
+	req.furnitureUid = furnitureUid
+	req.userId = userUid
+	req.helpAll = helpAll
+	req.useGem = useGem
+	req:Send()
+
+	--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua4")
+	--local func = funcGeneric(CS.System.Int32,CS.System.String,CS.System.Int32,CS.System.Int32)
+
+	--func(csEventControllerInst,csGameEventType.UnionEvent.UNION_REQUEST_HELPMEMBER,furnitureUid,userUid,useGem,helpAll)
+end
+
+function UnionSystem:onMemberHelpLsitRefresh()
+	local aidUIView = GUIManager.inst:GetWindow(Constants.ViewName.UnionAidUIView, false)
+
+	if aidUIView ~= nil and aidUIView.isShowing == true then
+		aidUIView:SetData()
+	end
+
+	local aidMemberByGemUIView = GUIManager.inst:GetWindow(Constants.ViewName.UnionAidMemberByGemUIView, false)
+
+	if aidMemberByGemUIView ~= nil and aidMemberByGemUIView.isShowing == true then
+		aidMemberByGemUIView:OnMemberHelpListChanged()
+	end
+end
+
+function UnionSystem:showUnionTaskUIView()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.UnionTaskUIView,
+		function(view)
+		end
+	)
+end
+
+function UnionSystem:showUnionRenownDetailUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.UnionRenownDetailUI,
+		function(view)
+		end
+	)
+end
+
+function UnionSystem:showUnionTaskCheckView(data)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.UnionTaskCheckView,
+		function(view)
+			view:SetData(data)
+		end
+	)
+end
+
+function UnionSystem:turnPageUnionTaskCheckView(isLeft, data)
+	local Data = CS_UserDataProxyInst:GetCheckTurnPageData(isLeft, data)
+
+	local checkView = GUIManager.inst:GetWindow(Constants.ViewName.UnionTaskCheckView, false)
+
+	if checkView ~= nil and checkView.isShowing == true then
+		checkView:SetData(Data)
+	end
+end
+
+function UnionSystem:refreshUnionTaskCheckView(serverData)
+	local checkView = GUIManager.inst:GetWindow(Constants.ViewName.UnionTaskCheckView, false)
+
+	if checkView ~= nil and checkView.isShowing == true then
+		checkView:GetServerData(serverData)
+	end
+end
+
+function UnionSystem:getUnionStartUnionTaskData()
+	
+	GUIManager.inst:HideViewCS(typeof(CS.UnionTaskResetUI))
+	GUIManager.inst:HideView(Constants.ViewName.UnionTaskCheckView)
+	self:onUnionTaskDataChanged()
+	
+	if CS.ManagerBinder.inst.mGameState == CS.kGameState.Shop then
+		GUIManager.inst:HideView(Constants.ViewName.UnionTaskUIView)
+	end
+	
+	local taskPanelView = GUIManager.inst:GetWindowCs(typeof(CS.TaskPanelView))
+
+	if taskPanelView ~= nil and taskPanelView.isShowing == true then
+		taskPanelView:RefreshUnionTaskMess()
+	end
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+
+	if CS_UserDataProxyInst.selfUnionTask == nil or CS_UserDataProxyInst.selfUnionTask:IsNull() == true then
+		func(
+			csEventControllerInst,
+			csGameEventType.SHOWUI_TEXTMSGTIP,
+			CS_LanguageManagerInst:GetValueByKey("该悬赏已被其他盟友接取"),
+			CS.GUIHelper.GetColorByColorHex("FF2828")
+		)
+	else
+		func(
+			csEventControllerInst,
+			csGameEventType.SHOWUI_TEXTMSGTIP,
+			CS_LanguageManagerInst:GetValueByKey("已接受悬赏！"),
+			CS.GUIHelper.GetColorByColorHex("FFFFFF")
+		)
+	end
+end
+
+function UnionSystem:onUnionTaskDataChanged()
+
+	local unionTaskUI = GUIManager.inst:GetWindow(Constants.ViewName.UnionTaskUIView, false)
+
+	if unionTaskUI ~= nil and unionTaskUI.isShowing == true then
+		unionTaskUI:SetData()
+	end
+	
+end
+
+function UnionSystem:showTipsUnionTaskItemOtherInfo(uiTf, otherLv, otherName)
+	local unionTaskUI = GUIManager.inst:GetWindow(Constants.ViewName.UnionTaskUIView, false)
+
+	if unionTaskUI ~= nil and unionTaskUI.isShowing == true then
+		unionTaskUI:SetItemOtherInfo(uiTf, otherLv, otherName)
+	end
+end
+
+function UnionSystem:showUnionWealUIView()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.UnionWealUI,
+		function(view)
+		end
+	)
+end
+
+function UnionSystem:showUnionWealUpDetailUI(data)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.UnionWealUpDetailUI,
+		function(view)
+			view:SetData(data)
+		end
+	)
+end
+
+function UnionSystem:showTipsUnionWealUpDataItemInfo(uiTf, UnionTechnologyConfig)
+	local unionWealUpDetailUI = GUIManager.inst:GetWindow(Constants.ViewName.UnionWealUpDetailUI, false)
+
+	if unionWealUpDetailUI ~= nil and unionWealUpDetailUI.isShowing == true then
+		unionWealUpDetailUI:showTipsUnionWealUpDataItemInfo(uiTf, UnionTechnologyConfig)
+	end
+end
+
+function UnionSystem:onUnionScienceDataChanged()
+	local unionWealUpDetailUI = GUIManager.inst:GetWindow(Constants.ViewName.UnionWealUpDetailUI, false)
+
+	if unionWealUpDetailUI ~= nil and unionWealUpDetailUI.isShowing == true then
+		unionWealUpDetailUI:RefreshData()
+	end
+
+	local wealUI = GUIManager.inst:GetWindow(Constants.ViewName.UnionWealUI, false)
+
+	if wealUI ~= nil and wealUI.isShowing == true then
+		wealUI:SetData()
+	end
+end
+
+function UnionSystem:getUnionRenownRankList(rankList)
+	local unionRenownDetailUIwealUI = GUIManager.inst:GetWindow(Constants.ViewName.UnionRenownDetailUI, false)
+
+	if unionRenownDetailUIwealUI ~= nil and unionRenownDetailUIwealUI.isShowing == true then
+		unionRenownDetailUIwealUI:getMemberRankList(rankList)
+	end
+end
+
+function UnionSystem:showUnionBuffDesPanel(uiTf, unionBuffData)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.UnionBuffDesPanel,
+		function(view)
+			view:SetData(uiTf, unionBuffData)
+		end
+	)
+end
+
+function UnionSystem:showUnionSelfTaskDetailUI(selfUnionTask)
+	
+	GUIManager.inst:OpenView(
+		Constants.ViewName.UnionSelfTaskDetailUI,
+		function(view)
+			view:SetData(selfUnionTask)
+		end
+	)
+	
+end
+
+function UnionSystem:hideUnionSelfTaskDetailUI()
+	
+	GUIManager.inst:HideView(Constants.ViewName.UnionSelfTaskDetailUI)
+	
+end
+
+function UnionSystem:request_ImpeachPresident(presidentUserId)
+
+	local rep = MsgType.Request_Union_Impeach:New()
+	rep.userId = presidentUserId
+	rep:Send()
+	
+end
+
+function UnionSystem:getUnionImpeachData(respData)
+	
+	local data = MsgType.Response_Union_Impeach:New(respData)
+	
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then --弹劾失败 
+		
+		if data.errorCode == MsgType.EErrorCode.EEC_Union_AlreadyImpeach then --会长已被弹劾了
+			
+			EventDispatcherInis:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("会长已被弹劾！"),"FF2828")
+			
+		elseif data.errorCode == MsgType.EErrorCode.EEC_Union_ImpeachNotEnough then --金条不足
+			
+			EventDispatcherInis:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("金条不足"),"FF2828")
+			
+		elseif data.errorCode == MsgType.EErrorCode.EEC_Union_ImpeachFail then --会长离线时间不满足
+			
+			local impeachPresidentTime = 72 * 60 * 60 --默认72小时
+			local worldParConfig = CS_WorldParConfigManagerInst:GetConfig(351)
+			if worldParConfig ~= nil then
+				impeachPresidentTime = tonumber(worldParConfig.parameters)
+			end
+			
+			EventDispatcherInis:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("会长离线时间超过{0}小时方可弹劾",tostring(math.ceil(impeachPresidentTime / 60 / 60))),"FF2828")
+			
+		end
+		
+	else
+		
+		EventDispatcherInis:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("弹劾成功！您已成为会长！"),"FFD907")
+		
+	end
+	
+	local unionDetailDataJson = data.unionDetailData:ToEncodeString()
+	local contentObj = CS.JsonMapper.ToObject(unionDetailDataJson);
+	local unionDetailData = CS.UnionDetailData()
+	unionDetailData:Decode(contentObj)
+	
+	CS_UserDataProxyInst.unionDetailInfo:SetInfo(unionDetailData)
+	
+	--if CS.UnionMap.inst ~= nil then
+		--CS.UnionMap.inst:RefreshRoles()
+	--end
+	
+	local infoUI = GUIManager.inst:GetWindowCs(typeof(CS.UnionInfoUI))
+	if infoUI ~= nil and infoUI.isShowing then
+		infoUI:SetData(CS_UserDataProxyInst.unionDetailInfo)
+	end
+	
+	local roleInfoUI = GUIManager.inst:GetWindowCs(typeof(CS.PlayerInfoPanelView))
+	if roleInfoUI ~= nil and roleInfoUI.isShowing then
+		
+		if roleInfoUI.curUserId == data.userId then
+			
+			local rep = MsgType.Request_Union_SearchUserData:New()
+			rep.userId = data.userId
+			rep:Send()
+			
+		end
+		
+	end
+	
+	
+end

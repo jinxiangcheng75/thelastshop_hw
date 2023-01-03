@@ -1,0 +1,27 @@
+--NetworkPackage
+
+require("class")
+
+local NetworkPackage = {}
+
+NetworkPackage = class()
+
+function NetworkPackage:ctor()
+
+end
+
+function NetworkPackage:init(cmd, request, successCallback, failedCallback)
+	self.mCmd = cmd
+	self.mUrl = NetworkCommand:GetUrl(cmd)
+	self.mRequest = request
+end
+
+function NetworkPackage:serialize()
+
+end
+
+function NetworkPackage:deserialize()
+
+end
+
+return NetworkPackage

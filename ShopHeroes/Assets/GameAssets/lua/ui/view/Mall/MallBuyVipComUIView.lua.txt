@@ -1,0 +1,87 @@
+--MallBuyVipComUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/MallDataProxy")
+require("utils/XLuaUtils")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEVIPType = CS.EVIPType
+
+local data
+
+MallBuyVipComUIView = class(ViewBase)
+
+function MallBuyVipComUIView:ctor()
+	self.showType = 0
+	self.viewID = Constants.ViewName.MallBuyVipComUIView
+	MallBuyVipComUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = true
+end
+
+function MallBuyVipComUIView:initComp()
+	local contentPane = self.contentPanel
+
+    self.titleText = contentPane:GetText("titleText")
+    self.promptText = contentPane:GetText("promptText")
+    self.continueBtn = contentPane:GetButton("continueBtn")
+	self.icon = contentPane:GetGUIIcon("icon")
+end
+
+function MallBuyVipComUIView:onInit()
+
+	self:initComp()
+
+
+	self.continueBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+end
+
+
+function MallBuyVipComUIView:onHide()
+	--print("MallBuyVipComUIView onHide")
+	csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON);
+end
+
+function  MallBuyVipComUIView:onShowed()
+	--print("MallBuyVipComUIView onShowed")
+	--self:SetRefreshData()
+	CS.AudioManager.inst:PlaySound(132)
+end
+
+function MallBuyVipComUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function MallBuyVipComUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function MallBuyVipComUIView:closeBtnClick()
+	self:hide()
+end
+
+function MallBuyVipComUIView:setUIData(vipType)
+    -- 月卡年卡逻辑
+	--self.icon:SetSprite("mallItem_atlas","shangcheng_tequan")
+    --if(csEVIPType.__CastFrom(vipType) == csEVIPType.Month)then
+        --self.promptText.text = cs_LanguageManagerInst:GetValueByKey("恭喜您成功开启特权1个月")
+    --else
+        --self.promptText.text = cs_LanguageManagerInst:GetValueByKey("恭喜您成功开启特权1年")
+    --end
+end
+
+function MallBuyVipComUIView:setOtherUIData(pic1,pic2,desc)
+	self.icon:SetSprite(pic1,pic2)
+	self.promptText.text = cs_LanguageManagerInst:GetValueByKey(desc)
+end
+------------------------------------------------

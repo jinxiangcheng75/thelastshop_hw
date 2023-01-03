@@ -1,0 +1,424 @@
+--GiftDetailUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_UnityUtils = CS.UnityUtils
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_PayInst = CS.GamePay.inst
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+
+
+
+GiftDetailUI = class(ViewBase)
+
+function GiftDetailUI:ctor()
+	self.viewID = Constants.ViewName.GiftDetailUI
+	GiftDetailUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.none
+end
+------------------------------------------------
+
+function GiftDetailUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.maskBtn = contentPane:GetButton("maskBtn")
+	self.toggle_setAutoShow = contentPane:GetObjByName("toggle_setAutoShow"):GetComponent("Toggle")
+
+	self.icon_frame = contentPane:GetObjByName("icon_frame"):GetComponent(CS_type_GUIIcon)
+	self.icon_bg1 = contentPane:GetObjByName("icon_bg1"):GetComponent(CS_type_GUIIcon)
+	self.icon_bg2 = contentPane:GetObjByName("icon_bg2"):GetComponent(CS_type_GUIIcon)
+	self.tf_role = contentPane:GetObjByName("tf_role").transform
+	--self.icon_roleImg = contentPane:GetObjByName("icon_roleImg"):GetComponent(CS_type_GUIIcon)
+	self.tx_talk = contentPane:GetText("tx_talk")
+	self.anim_talkBubble = contentPane:GetObjByName("anim_talkBubble"):GetComponent("Animator")
+	self.tx_discounts = contentPane:GetText("tx_discounts")
+
+	self.tx_name = contentPane:GetText("tx_name")
+
+	self.goods_1Tf = contentPane:GetObjByName("objs_goods_1"):GetComponent("RectTransform")
+	self.goods_2Tf = contentPane:GetObjByName("objs_goods_2"):GetComponent("RectTransform")
+
+	self.accessories = {}
+	local objList = contentPane:GetObjByName("objs_goods_1"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList.Count - 1 do
+		self.accessories[#self.accessories + 1] = objList[i].transform:GetComponent(CS_type_LuaListItem)
+	end
+
+	objList = contentPane:GetObjByName("objs_goods_2"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList.Count - 1 do
+		self.accessories[#self.accessories + 1] = objList[i].transform:GetComponent(CS_type_LuaListItem)
+	end
+
+	self.obj_countdown = contentPane:GetObjByName("obj_countdown")
+	self.tx_countdown = contentPane:GetText("tx_countdown")
+	self.tx_buyBtnPrice = contentPane:GetText("tx_buyBtnPrice")
+	self.btn_buy = contentPane:GetButton("btn_buy")
+
+	self.obj_giftItem = contentPane:GetObjByName("obj_giftItem")
+	self.obj_commonGiftItem = contentPane:GetObjByName("obj_commonGiftItem")
+	self.commonGiftCtrl = self.obj_commonGiftItem:GetComponent(CS_type_LuaListItem)
+
+	self.obj_commonCountdown = contentPane:GetObjByName("obj_commonCountdown")
+	self.tx_commonCountdown = contentPane:GetText("tx_commonCountdown")
+
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+function GiftDetailUI:onInit()
+
+	self:initComp()
+	self.directPurchaseData = nil
+	self.needShowToggle = false
+	self.timerId = false
+	self.talkBubbleTimerId = 0
+	self.talkBubbleAnimOnOff = false
+	self.talkBubbleCountTime = 0
+	self.graphicCharacter = nil
+
+	self.maskBtn.onClick:AddListener(
+		function()
+			self:hide()
+		end
+	)
+
+	self.toggle_setAutoShow.onValueChanged:AddListener(
+		function(isOn)
+			
+			if self.directPurchaseData == nil or self.directPurchaseData.detailShowType == 0 then
+				return
+			end
+			
+			local dateTime = CS_TimeUtils.getDateTimeBySecs(CS_GameTimerInst.serverNow)
+			
+			local key = self.directPurchaseData.detailShowType == 2 and CS_AccountDataProxyInst.account .."_Directpurchase_" .. tostring(dateTime.Year) .. tostring(dateTime.Month) .. tostring(dateTime.Day) or CS_AccountDataProxyInst.account .. "_Directpurchase_" .. tostring(dateTime.Year) .. tostring(dateTime.Month) .. tostring(dateTime.Day) .."_"..self.directPurchaseData.data.uid
+			
+			CS_PlayerPrefs.SetString(key,isOn and "1" or "-1")
+		end
+	)
+
+	self.btn_buy:ButtonClickTween(function ()
+			self:onBuyBtnClick()
+		end)
+
+end
+
+function GiftDetailUI:Refresh()
+	if self.directPurchaseData == nil then
+		self:hide()
+		return
+	end
+
+	local data = DirectPurchaseProxy.inst:GetDirectPurchaseDataByUid(self.directPurchaseData.data.uid)
+
+	if data == nil then
+		self:hide()
+	else
+		self:SetData(data, self.needShowToggle)
+	end
+end
+
+function GiftDetailUI:SetData(giftData, needShowToggle)
+
+	self.directPurchaseData = giftData
+	self.needShowToggle = needShowToggle or false
+
+	self.toggle_setAutoShow.gameObject:SetActive(self.needShowToggle)
+
+	if self.directPurchaseData.detailShowType ~= 0 then
+		local dateTime = CS_TimeUtils.getDateTimeBySecs(CS_GameTimerInst.serverNow)
+		local key = self.directPurchaseData.detailShowType == 2 and CS_AccountDataProxyInst.account .."_Directpurchase_" .. tostring(dateTime.Year) .. tostring(dateTime.Month) .. tostring(dateTime.Day) or CS_AccountDataProxyInst.account .. "_Directpurchase_" .. tostring(dateTime.Year) .. tostring(dateTime.Month) .. tostring(dateTime.Day) .."_"..self.directPurchaseData.data.uid
+		if CS_PlayerPrefs.GetString(key,"-1") == "-1" then
+			self.toggle_setAutoShow.isOn = true
+		else
+			self.toggle_setAutoShow.isOn = true
+		end
+	end
+
+	if self.directPurchaseData.data.quickOn == 1 then --是主界面按钮会显示的 special
+
+		self.obj_giftItem:SetActive(true)
+		self.obj_commonGiftItem:SetActive(false)
+		self:setSpecialData()
+
+	else
+
+		self.obj_giftItem:SetActive(false)
+		self.obj_commonGiftItem:SetActive(true)
+		self.commonGiftCtrl:SetData({obj = self.obj_commonGiftItem, giftData = self.directPurchaseData})
+
+	end
+
+
+	if giftData.needCountdown then
+		self:SetTimer()
+	else
+		
+		self.obj_commonCountdown:SetActive(false)
+		self.obj_countdown:SetActive(false)
+		self:ClearTimer()
+		
+	end
+
+end
+
+function GiftDetailUI:onBuyBtnClick()
+
+	print("礼包的购买按钮被点击——————")
+
+	CS_PayInst:Pay(
+		self.directPurchaseData.data.payProduct.priceId,
+		self.directPurchaseData.data.payProduct.productId,
+		self.directPurchaseData.data.payProduct.payActivityType,
+		self.directPurchaseData.data.payProduct.payActivityId,
+		function(isSuccess)
+			if (isSuccess) then
+				--print("充值成功")
+			end
+		end
+	)
+
+end
+
+function GiftDetailUI:SetTimer()
+
+	self:ClearTimer()
+
+	local countdownObj = self.directPurchaseData.data.quickOn == 1 and self.obj_countdown or self.obj_commonCountdown
+	local countdownTx = self.directPurchaseData.data.quickOn == 1 and self.tx_countdown or self.tx_commonCountdown
+
+	local remainTime = self.directPurchaseData.endTime - CS_GameTimerInst.serverNow
+	countdownObj:SetActive(true)
+	countdownTx.text = CS_TimeUtils.timeSpanStrip(remainTime, true)
+
+	self.timerId = CS_GameTimerInst:AddLoopTimerComp(countdownObj,1,function()
+			local _remainTime = self.directPurchaseData.endTime - CS_GameTimerInst.serverNow
+			countdownTx.text = CS_TimeUtils.timeSpanStrip(_remainTime, true)
+		end)
+	
+end
+
+function GiftDetailUI:ClearTimer()
+
+	if self.timerId then
+		CS_GameTimerInst:removeLoopTimer(self.timerId)
+		self.timerId = false
+	end
+
+end
+
+function GiftDetailUI:talkBubbleTimerMethod()
+
+	self.talkBubbleCountTime = self.talkBubbleCountTime + 1
+	print("talkBubbleCountDownTime  "..tostring(self.talkBubbleCountTime))
+
+	if self.talkBubbleAnimOnOff then
+
+		if self.talkBubbleCountTime >= 5 + 1 then
+
+			self.anim_talkBubble:CrossFade("show", 0)
+			self.anim_talkBubble:Update(0)
+			self.anim_talkBubble:Play("show")
+
+			self.tx_talk.text = ""
+
+			local animLength = self.anim_talkBubble:GetClipLength("anim_talkBubble")
+			CS_GameTimerInst:AddTimer(
+				animLength,
+				1,
+				function()
+					self.tx_talk:DOText(CS_LanguageManagerInst:GetValueByKey(self.directPurchaseData.data.slogan),0.5)
+				end)
+
+			self.talkBubbleCountTime = 0
+			self.talkBubbleAnimOnOff = false
+
+		end
+
+	else
+
+		if self.talkBubbleCountTime >= 5 + 1 then
+
+			self.anim_talkBubble:CrossFade("hide", 0)
+			self.anim_talkBubble:Update(0)
+			self.anim_talkBubble:Play("hide")
+
+			self.talkBubbleCountTime = 0
+			self.talkBubbleAnimOnOff = true
+
+		end
+
+	end
+
+end
+
+
+function GiftDetailUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+
+end
+
+function GiftDetailUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end)
+
+end
+
+function GiftDetailUI:setSpecialData()
+
+	self.tx_name.text = CS_LanguageManagerInst:GetValueByKey(self.directPurchaseData.data.name)
+	self.tx_talk.text = CS_LanguageManagerInst:GetValueByKey(self.directPurchaseData.data.slogan)
+	self.icon_bg1:SetSpriteURL(self.directPurchaseData.data.pic3)
+	self.icon_frame:SetSpriteURL(self.directPurchaseData.data.pic4)
+	self.icon_bg2:SetSpriteURL(self.directPurchaseData.data.pic5)
+	--self.icon_roleImg:SetSprite(self.directPurchaseData.data.roleImgAtlas,self.directPurchaseData.data.roleImgIcon,"",false,true)
+
+	if self.graphicCharacter == nil then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		func(CS_CharacterManagerInst,self.directPurchaseData.data.roleImgIcon,nil,CS.EGender.Male,0.14,false,function (system)
+				self.graphicCharacter = system
+				system.transform:SetParent(self.tf_role)
+				system.transform.localScale = Vector3.one * 0.8
+				system.transform.localPosition = Vector3.zero
+
+				self.graphicCharacter:Play("idle",true)
+
+			end,nil)
+	else
+		CS_CharacterManagerInst:ReSetCharacter(self.graphicCharacter,self.directPurchaseData.data.roleImgIcon,nil,CS.EGender.Male,false)
+		self.graphicCharacter:Play("idle",true)
+		self.graphicCharacter.transform.localScale = Vector3.one * 0.8
+	end
+
+	local salePriceStr = CS_PayInst:GetProductPrice(self.directPurchaseData.data.payProduct.productId)
+	local splitIndex = 1
+	for i = 1, #salePriceStr do
+		if(tonumber(string.sub(salePriceStr,i,i)) ~= nil)then
+			splitIndex = i
+			break
+		end
+	end
+	local monetaryUnit = string.sub(salePriceStr, 1, splitIndex - 1)
+	local salePrice = tonumber(string.sub(salePriceStr, splitIndex, -1))
+	--local originalPrice = ""  --原价
+	--if salePrice ~= nil then
+	--originalPrice = monetaryUnit .. (salePrice * self.directPurchaseData.data.value / 100)
+	--end
+
+	self.tx_buyBtnPrice.text = salePriceStr
+
+	local discounts = math.ceil(self.directPurchaseData.data.value / 100)  --tostring(math.ceil(100 - 100 / self.directPurchaseData.data.value * 100))
+	self.tx_discounts.text = CS_LanguageManagerInst:GetValueByKey("收益")..discounts.."%!"
+
+
+	if #self.directPurchaseData.data.itemList > 3 then
+		--两排
+		self.goods_2Tf.gameObject:SetActive(true)
+
+		self.goods_1Tf.anchoredPosition = Vector2(62, 76)
+		self.goods_2Tf.anchoredPosition = Vector2(20, -126)
+	else
+		--一排
+		self.goods_2Tf.gameObject:SetActive(false)
+		self.goods_1Tf.anchoredPosition = Vector2(62, 0)
+	end
+
+	for i = 1, #self.accessories do
+		if (i <= #self.directPurchaseData.accessories) then
+			self.accessories[i].gameObject:SetActive(true)
+			self.accessories[i]:SetData(self.directPurchaseData.accessories[i])
+		else
+			self.accessories[i].gameObject:SetActive(false)
+		end
+	end
+
+
+	self:setSpecialAnim()
+
+end
+
+
+function GiftDetailUI:setSpecialAnim()
+
+	self.anim_talkBubble:CrossFade("show", 0)
+	self.anim_talkBubble:Update(0)
+	self.anim_talkBubble:Play("show")
+
+	self.tx_talk.text = ""
+
+	self.talkBubbleAnimOnOff = false
+
+	local animLength = self.anim_talkBubble:GetClipLength("anim_talkBubble")
+	CS_GameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.tx_talk:DOText(CS_LanguageManagerInst:GetValueByKey(self.directPurchaseData.data.slogan),0.5)
+		end)
+
+	self.talkBubbleTimerId = CS_GameTimerInst:AddTimer(
+		1,
+		function()
+			self:talkBubbleTimerMethod()
+		end)
+
+end
+
+
+function GiftDetailUI:onHide()
+
+	self.toggle_setAutoShow.gameObject:SetActive(false)
+	self:ClearTimer()
+
+	if self.talkBubbleTimerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.talkBubbleTimerId)
+		self.talkBubbleTimerId = 0
+	end
+
+	self.talkBubbleCountTime = 0
+
+
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.ReceiveEvent.GO_ON)
+
+end
+
+------------------------------------------------

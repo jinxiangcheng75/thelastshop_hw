@@ -1,0 +1,466 @@
+
+--Mall_store
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+local Color = CS.UnityEngine.Color
+local CS_GameObject = CS.UnityEngine.GameObject
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_PayInst = CS.GamePay.inst
+
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Mall_store = class(luaClass_Welfare_CtrlBase)
+
+function Mall_store:initComp(luaBehaviour)
+
+	local contentPane = luaBehaviour
+
+	self.tf_content = contentPane:GetObjByName("tf_content"):GetComponent("RectTransform")
+
+	self.obj_vipCard = contentPane:GetObjByName("obj_vipCard")
+	self.icon_vipBg = contentPane:GetGUIIcon("icon_vipBg")
+	self.icon_vipBanner = contentPane:GetGUIIcon("icon_vipBanner")
+	self.tx_vipBanner = contentPane:GetText("tx_vipBanner")
+	self.tf_vipRole = contentPane:GetObjByName("tf_vipRole"):GetComponent("RectTransform")
+	self.btn_vipInfo = contentPane:GetButton("btn_vipInfo")
+	self.icon_vipPrivilege1 = contentPane:GetGUIIcon("icon_vipPrivilege1")
+	self.icon_vipPrivilege2 = contentPane:GetGUIIcon("icon_vipPrivilege2")
+	self.icon_vipPrivilege3 = contentPane:GetGUIIcon("icon_vipPrivilege3")
+	self.icon_vipPrivilege4 = contentPane:GetGUIIcon("icon_vipPrivilege4")
+	self.tx_vipSmallTitle = contentPane:GetText("tx_vipSmallTitle")
+	self.obj_vipCountdown = contentPane:GetObjByName("obj_vipCountdown")
+	self.tx_vipCountdown = contentPane:GetText("tx_vipCountdown")
+	self.tx_vipPriceBuyVip = contentPane:GetText("tx_vipPriceBuyVip")
+	self.tx_vipGemBuyVip = contentPane:GetText("tx_vipGemBuyVip")
+	self.btn_vipBuyVip = contentPane:GetButton("btn_vipBuyVip")
+	self.tx_vipAlreadyBuy = contentPane:GetText("tx_vipAlreadyBuy")
+
+	self.obj_recharge = contentPane:GetObjByName("obj_recharge")
+	self.rtf_recharg = self.obj_recharge:GetComponent("RectTransform")
+	self.tf_rechargeParent = contentPane:GetObjByName("tf_rechargeParent"):GetComponent("RectTransform")
+	self.pfb_rechargeItem = contentPane:GetObjByName("pfb_rechargeItem")
+
+
+	--金条月卡
+	self.obj_gemMonthCard = contentPane:GetObjByName("obj_gemMonthCard")
+	self.tx_gemMonthBanner = contentPane:GetText("tx_gemMonthBanner")
+	self.tf_gemMonthRole = contentPane:GetObjByName("tf_gemMonthRole"):GetComponent("RectTransform")
+	self.tx_gemMonthGetTips = contentPane:GetText("tx_gemMonthGetTips")
+	self.tx_gemMonthImmediatelyGetTips = contentPane:GetText("tx_gemMonthImmediatelyGetTips")
+	self.tx_gemMonthPeriodGetTips = contentPane:GetText("tx_gemMonthPeriodGetTips")
+	self.obj_gemMonthCountdown = contentPane:GetObjByName("obj_gemMonthCountdown")
+	self.tx_gemMonthCountdown = contentPane:GetText("tx_gemMonthCountdown")
+	self.btn_gemMonthBuy = contentPane:GetButton("btn_gemMonthBuy")
+	self.tx_priceBuyGemMonth = contentPane:GetText("tx_priceBuyGemMonth")
+	self.obj_gemMonthDiscounts = contentPane:GetObjByName("obj_gemMonthDiscounts")
+	self.tx_gemMonthDiscounts = contentPane:GetText("tx_gemMonthDiscounts")
+	self.icon_gemMonthAward_1 = contentPane:GetGUIIcon("icon_gemMonthAward_1")
+	self.icon_gemMonthAward_2 = contentPane:GetGUIIcon("icon_gemMonthAward_2")
+
+end
+
+function Mall_store:Init(luaBehaviour)
+
+	self:initComp(luaBehaviour)
+
+	self.vipGraphicCharacter = nil
+	self.gemMonthGraphicCharacter = nil
+	self.vipTimer = false
+	self.gemMonthTimer = false
+	self.gemMonthRoleTimerId = 0
+	self.layoutTimer = 0
+	self.allRecharges = {}
+	--self.gemMOnthRoleAnimNames = {"idle_02","idle_03"}
+
+	self.btn_vipBuyVip:ButtonClickTween(function ()
+			self:onBtnVipClick()
+		end)
+
+	self.btn_vipInfo:ButtonClickTween(function ()
+			self:onBtnVipClick()
+		end)
+
+	self.btn_gemMonthBuy:ButtonClickTween(function ()
+			self:onGemMonthBuyBtnClick()
+		end)
+
+
+end
+
+function Mall_store:onBtnVipClick()
+
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_BuyVipUI,1)
+
+end
+
+function Mall_store:onGemMonthBuyBtnClick()
+
+	print("点击了金条月卡的购买按钮")
+	CS_PayInst:Pay(
+		GemMonthCardDataProxy.inst.payProduct.priceId,
+		GemMonthCardDataProxy.inst.payProduct.productId,
+		GemMonthCardDataProxy.inst.payProduct.payActivityType,
+		GemMonthCardDataProxy.inst.payProduct.payActivityId,
+		function(isSuccess)
+			if (isSuccess) then
+				--print("充值成功")
+
+			end
+		end
+	)
+
+
+	--test
+	--local storyNpcCfg =  StoryNpcConfigManager:GetConfig(4,-1)
+
+	--if storyNpcCfg ~= nil then
+
+		--EventDispatcher:dispatchEvent(GameEvent.EventSystem.AddEvent,GameEvent.StoryRoleEvent.AddStoryRole,{storyType = 4,parame = -1,callback = function()
+
+					--EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallUI,3)
+					--CS.GoOperationManager.inst.isDoing = false
+					--CS.FGUI.inst:SetAllUIInteractable(true)
+					--CS.FGUI.inst:SetAllUIAlpha(1)
+					--EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+					--EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+
+				--end},ExecuteType.queueup,kGameState.Shop)
+
+	--end
+
+end
+
+function Mall_store:SetVipData()
+
+	local mallDataProxyInst = MallDataProxy.inst
+	local vipData = mallDataProxyInst.vipData
+
+	local cfg = mallDataProxyInst.vipPayData
+
+	--self.icon_vipBg:SetSprite(cfg.pic1,cfg.pic2)
+	--self.icon_vipBanner:SetSprite("","")
+	self.tx_vipBanner.text = CS_LanguageManagerInst:GetValueByKey(cfg.name)
+
+	if self.vipGraphicCharacter == nil then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		func(CS_CharacterManagerInst,cfg.roleImgIcon,nil,CS.EGender.Male,0.14,false,function (system)
+				self.vipGraphicCharacter = system
+				system.transform:SetParent(self.tf_vipRole)
+				system.transform.localScale = Vector3.one * 0.6
+				system.transform.localPosition = Vector3.zero
+
+				self.vipGraphicCharacter:Play("idle",true)
+
+			end,nil)
+	else
+		CS_CharacterManagerInst:ReSetCharacter(self.vipGraphicCharacter,cfg.roleImgIcon,nil,CS.EGender.Male,false)
+		self.vipGraphicCharacter:Play("idle",true)
+	end
+
+
+	if(cfg.atlasIcon ~= "-1")then
+		if(cfg.icon1 ~= "-1")then
+			self.icon_vipPrivilege1:SetSprite(cfg.atlasIcon,cfg.icon1)
+		end
+		if(cfg.icon2 ~= "-1")then
+			self.icon_vipPrivilege2:SetSprite(cfg.atlasIcon,cfg.icon2)
+		end
+		if(cfg.icon3 ~= "-1")then
+			self.icon_vipPrivilege3:SetSprite(cfg.atlasIcon,cfg.icon3)
+		end
+		if(cfg.icon4 ~= "-1")then
+			self.icon_vipPrivilege4:SetSprite(cfg.atlasIcon,cfg.icon4)
+		end
+	end
+
+	if(vipData.state == 1 and vipData.remainTime > 0)then
+		self:setVipTimer()
+	else
+
+		self:clearVipTimer();
+		self.obj_vipCountdown:SetActive(false)
+		self.tx_vipAlreadyBuy.gameObject:SetActive(false)
+		self.btn_vipBuyVip.gameObject:SetActive(true)
+
+
+		if(CS_WorldParConfigManagerInst:GetConfig(8007).parameters == 1)then
+
+			print("月卡的费用是"..CS_PayInst:GetProductPrice(cfg.payProduct.productId))
+
+			self.tx_vipGemBuyVip.gameObject:SetActive(false)
+			self.tx_vipPriceBuyVip.gameObject:SetActive(true)
+			self.tx_vipPriceBuyVip.text = CS_PayInst:GetProductPrice(cfg.payProduct.productId) .. "/" .. CS_LanguageManagerInst:GetValueByKey("月")
+
+		elseif CS_WorldParConfigManagerInst:GetConfig(8007).parameters == 2 then
+
+			self.tx_vipGemBuyVip.gameObject:SetActive(true)
+			self.tx_vipPriceBuyVip.gameObject:SetActive(false)
+
+			self.tx_vipGemBuyVip.text = math.floor(CS_WorldParConfigManagerInst:GetConfig(8008).parameters) .. "/" .. CS_LanguageManagerInst:GetValueByKey("月")
+			if(CS_UserDataProxyInst.playerData.gem >= CS_WorldParConfigManagerInst:GetConfig(8008).parameters)then
+				self.tx_vipGemBuyVip.color = Color.white
+			else
+				self.tx_vipGemBuyVip.color = Color.red
+			end
+		end
+
+	end
+
+end
+
+function Mall_store:setVipTimer()
+
+	self:clearVipTimer()
+
+	local vipData = MallDataProxy.inst.vipData
+
+	self.obj_vipCountdown:SetActive(true)
+	self.tx_vipAlreadyBuy.gameObject:SetActive(true)
+	self.btn_vipBuyVip.gameObject:SetActive(false)
+	self.tx_vipCountdown.text = CS_TimeUtils.timeSpanStrip(vipData.remainTime)
+	if vipData.remainTime <= CS.WorldParConfigManager.inst:GetConfig(8001).parameters then -- 三天
+		self.tx_vipCountdown.color = Color.red
+	else
+		self.tx_vipCountdown.color = Color.white
+	end
+
+	self.vipTimer = CS_GameTimerInst:AddLoopTimerComp(self.tx_vipCountdown.gameObject, 1, function()
+
+			if vipData.remainTime <= CS.WorldParConfigManager.inst:GetConfig(8001).parameters then -- 三天
+				self.tx_vipCountdown.color = Color.red
+			else
+				self.tx_vipCountdown.color = Color.white
+			end
+
+			if vipData.remainTime <= 0 then
+
+				self.tx_vipCountdown.text = CS_TimeUtils.timeSpanStrip(1)
+				CS_GameTimerInst:removeLoopTimer(self.vipTimer)
+				self.vipTimer = false
+
+			else
+				self.tx_vipCountdown.text = CS_TimeUtils.timeSpanStrip(vipData.remainTime)
+			end
+
+		end)
+
+end
+
+function Mall_store:clearVipTimer()
+
+	if self.vipTimer then
+		CS_GameTimerInst:removeLoopTimer(self.vipTimer)
+		self.vipTimer = false
+	end
+
+end
+
+function Mall_store:SetGemMonthCardData()
+
+	local worldparCfg = CS_WorldParConfigManagerInst:GetConfig(363)
+	if worldparCfg ~= nil and worldparCfg.parameters > CS_UserDataProxyInst.playerData.level then
+
+		self:clearGemMonthTimer()
+		self.obj_gemMonthCard:SetActive(false)
+
+	else
+
+		self.obj_gemMonthCard:SetActive(true)
+		if self.gemMonthGraphicCharacter == nil then
+			local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+			local func = funcGeneric(CS.GraphicDressUpSystem)
+			func(CS_CharacterManagerInst,GemMonthCardDataProxy.inst.roleImgIcon,nil,CS.EGender.Male,0.14,false,function (system)
+
+					self.gemMonthGraphicCharacter = system
+					system.transform:SetParent(self.tf_gemMonthRole)
+					system.transform.localScale = Vector3.one * 0.5
+					system.transform.localPosition = Vector3.zero
+
+					self.gemMonthGraphicCharacter:SetDirection(CS.RoleDirectionType.Right)
+					self.gemMonthGraphicCharacter:Play("idle_1",true)
+
+				end,nil)
+		else
+			CS_CharacterManagerInst:ReSetCharacter(self.gemMonthGraphicCharacter,GemMonthCardDataProxy.inst.roleImgIcon,nil,CS.EGender.Male,false)
+			self.gemMonthGraphicCharacter:Play("idle_1",true)
+		end
+
+		local num = 1650
+		local worldparCfg = CS_WorldParConfigManagerInst:GetConfig(361)
+		if worldparCfg ~= nil then
+			num = worldparCfg.parameters
+		end
+		
+		self.tx_gemMonthBanner.text = CS_LanguageManagerInst:GetValueByKey(GemMonthCardDataProxy.inst.name)
+		self.tx_gemMonthGetTips.text = CS_LanguageManagerInst:GetValueByKey("累计获得 <color=#36ff6f><size=46>{0}</size></color> 金条！",tostring(math.ceil(num)))
+		self.tx_gemMonthImmediatelyGetTips.text = "x"..tostring(GemMonthCardDataProxy.inst.rewardItem.count)
+
+		if GemMonthCardDataProxy.inst.rewardItemAtlas ~= "-1" then
+
+			self.icon_gemMonthAward_1:SetSprite(GemMonthCardDataProxy.inst.rewardItemAtlas,GemMonthCardDataProxy.inst.rewardItemIcon)
+			self.icon_gemMonthAward_2:SetSprite(GemMonthCardDataProxy.inst.rewardItemAtlas,GemMonthCardDataProxy.inst.rewardItemIcon)
+
+		end
+
+		local num = 50
+		local worldparCfg = CS_WorldParConfigManagerInst:GetConfig(362)
+		if worldparCfg ~= nil then
+			num = worldparCfg.parameters
+		end
+		self.tx_gemMonthPeriodGetTips.text = "x"..tostring(math.ceil(num))
+
+		self.tx_priceBuyGemMonth.text = CS_PayInst:GetProductPrice(GemMonthCardDataProxy.inst.payProduct.productId) .. "/" .. CS_LanguageManagerInst:GetValueByKey("月")
+		self.tx_gemMonthDiscounts.text = CS_LanguageManagerInst:GetValueByKey("收益").."\n"..math.ceil(tonumber(GemMonthCardDataProxy.inst.value) / 100).."%"
+
+		self:setGemMonthTimer()
+
+	end
+
+end
+
+function Mall_store:setGemMonthTimer()
+
+	self:clearGemMonthTimer()
+
+	self.gemMonthRoleTimerId = CS_GameTimerInst:AddTimer(6,function()
+
+			self.gemMonthGraphicCharacter:Play("idle_03",false,1,0,function (t) --self.gemMOnthRoleAnimNames[math.random(1,2)]
+					self.gemMonthGraphicCharacter:Play("idle_1",true)
+				end)
+
+		end)
+
+	if GemMonthCardDataProxy.inst.remainCount > 0 then --有可领取次数
+		self.tx_gemMonthCountdown.text = CS_LanguageManagerInst:GetValueByKey("领取次数：{0}次",tostring(GemMonthCardDataProxy.inst.remainCount))
+	else
+		self.tx_gemMonthCountdown.text = CS_LanguageManagerInst:GetValueByKey("未购买")
+	end
+
+	--if GemMonthCardDataProxy.inst.gemMonthCardEndTime > CS_GameTimerInst.serverNow then --有倒计时 生效中
+
+	--self.obj_gemMonthCountdown:SetActive(true)
+	--self.tx_gemMonthCountdown.text = CS_TimeUtils.timeSpanStrip(GemMonthCardDataProxy.inst.gemMonthCardEndTime - CS_GameTimerInst.serverNow)
+	----self.tx_gemMonthCountdown.text = tostring(math.ceil((GemMonthCardDataProxy.inst.gemMonthCardEndTime - CS_GameTimerInst.serverNow) / (3600 * 24)))..CS_LanguageManagerInst:GetValueByKey("天")
+
+	--self.gemMonthTimer = CS_GameTimerInst:AddLoopTimerComp(self.tx_gemMonthCountdown.gameObject, 1, function()
+
+	--if GemMonthCardDataProxy.inst.gemMonthCardEndTime > CS_GameTimerInst.serverNow then
+	----self.tx_gemMonthCountdown.text = tostring(math.ceil((GemMonthCardDataProxy.inst.gemMonthCardEndTime - CS_GameTimerInst.serverNow) / (3600 * 24)))..CS_LanguageManagerInst:GetValueByKey("天")
+	--self.tx_gemMonthCountdown.text = CS_TimeUtils.timeSpanStrip(GemMonthCardDataProxy.inst.gemMonthCardEndTime - CS_GameTimerInst.serverNow)
+	--else
+
+	--self.tx_gemMonthCountdown.text = "1"..CS_LanguageManagerInst:GetValueByKey("天")
+	--CS_GameTimerInst:removeLoopTimer(self.gemMonthTimer)
+	--self.gemMonthTimer = false
+
+	--end
+
+	--end)
+
+	--else
+
+	--self.obj_gemMonthCountdown:SetActive(false)
+
+	--end
+
+end
+
+function Mall_store:clearGemMonthTimer()
+
+	if self.gemMonthRoleTimerId ~= 0 then
+
+		CS_GameTimerInst:RemoveTimer(self.gemMonthRoleTimerId)
+		self.gemMonthRoleTimerId = 0
+
+	end
+
+	--if self.gemMonthTimer then
+	--CS_GameTimerInst:removeLoopTimer(self.gemMonthTimer)
+	--self.gemMonthTimer = false
+	--end
+
+end
+
+
+function Mall_store:SetRechargeItemData()
+
+	local allRechargeDatas = MallDataProxy.inst.generalPurchaseList.purchaseList
+
+	for i = 1, #self.allRecharges do
+		CS_GameObject.Destroy(self.allRecharges[i].gameObject)
+	end
+
+	self.allRecharges = {}
+
+	for i = 1, #allRechargeDatas do
+
+		local rechargeItem = CS_GameObject.Instantiate(self.pfb_rechargeItem,self.tf_rechargeParent,true)
+		rechargeItem:SetActive(true)
+		local itemLuaListItem = rechargeItem:GetComponent(CS_type_LuaListItem)
+
+		itemLuaListItem:SetData(allRechargeDatas[i])
+		self.allRecharges[#self.allRecharges + 1] = itemLuaListItem
+	end
+
+end
+
+
+function Mall_store:RefreshUIData()
+
+	self:SetVipData()
+	self:SetGemMonthCardData()
+	self:SetRechargeItemData()
+
+	local vipData = MallDataProxy.inst.vipData
+
+	if vipData.state == 1 and vipData.remainTime > 0 then --如果vip未到期
+		self.obj_vipCard.transform:SetAsLastSibling() --将它放到下面
+	end
+
+	if self.layoutTimer ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.layoutTimer)
+		self.layoutTimer = 0
+	end
+
+	self.layoutTimer = CS_GameTimerInst:AddTimerFrame(2,1,function ()
+
+			local isLandscape = CS.FGUI.inst.isLandscape
+			CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.tf_rechargeParent)
+			self.rtf_recharg.sizeDelta = Vector2(self.tf_rechargeParent.sizeDelta.x + (isLandscape and 100 or 0),self.tf_rechargeParent.sizeDelta.y + (isLandscape and 0 or 130))
+			CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.rtf_recharg)
+			CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.tf_content)
+			self.layoutTimer = 0
+
+		end)
+
+end
+
+function Mall_store:Clear()
+
+	self:clearVipTimer()
+	self:clearGemMonthTimer()
+
+end
+
+return Mall_store

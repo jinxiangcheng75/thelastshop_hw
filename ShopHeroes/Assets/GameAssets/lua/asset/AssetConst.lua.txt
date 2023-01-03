@@ -1,0 +1,58 @@
+--AssetConst
+require("utils/LuaUtils")
+
+kAssetExtractType = class({
+		None = 0,
+		Text = 1,
+		Binary = 2
+	})
+table_read_only(kAssetExtractType)
+
+kAssetDownloadType = class({
+		Web = 0,
+		Addressable = 1,
+		Catalog = 2,
+		ExtraCatalog = 3
+	})
+table_read_only(kAssetDownloadType)
+
+kAssetHandlerType = {
+	Channel = 0,
+	Patch = 1,
+	UIDependency = 2,
+	Configs = 3,
+	Lua = 4,
+	Addressable = 5,
+	AddressablePack = 6
+}
+table_read_only(kAssetHandlerType)
+
+kAssetType = {
+	Channel = 0,
+	Patch = 1,
+	UIDependency = 2,
+	Configs = 3,
+	Lua = 4,
+	Shader = 5,
+	Material = 6,
+	Texture = 7,
+	Prefab = 8,
+	Text =  9,
+	Binary = 10
+}
+table_read_only(kAssetType)
+
+kAssetLocation = {
+	None = 0,
+	Persistent =  1,
+	Streaming = 2,
+	Remote = 3
+}
+table_read_only(kAssetLocation)
+
+kDownloadHandlerState = {
+	Loading = 0,
+	Complete = 1,
+	Error = 2
+}
+table_read_only(kDownloadHandlerState)

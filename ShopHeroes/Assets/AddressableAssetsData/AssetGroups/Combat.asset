@@ -1,0 +1,610 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Combat
+  m_EditorClassIdentifier: 
+  m_GroupName: Combat
+  m_Data:
+    m_SerializedData: []
+  m_GUID: 419f77d78163c84488a17ff28fb7737f
+  m_SerializeEntries:
+  - m_GUID: 96301bc9f58675b46b8cbfef9a802f05
+    m_Address: blade_002
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: a76b3107e83a73b46924a659990923c8
+    m_Address: FX_Sleep_B
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: fd785702c2228de4f951ad750b2e3117
+    m_Address: FX_DU_B
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: e4645c0f84c0b984ca1d6db5c81f554a
+    m_Address: FX_Firer_B
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 8d0601457e5888d45b2fa889ba3e08d6
+    m_Address: FX_Stun_B
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 2a63b1787fb0a1540bf1b009bb16e767
+    m_Address: FX_SpeedUp_B
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: dfc93dcb2850dda4bb3d89ae5b4069f0
+    m_Address: Fx_jscc_h
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: a2067b162e0838145a6cb65f1d6a1ee3
+    m_Address: FX_QuSan_B
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: c31a2bc0ecb46f7429afd6a406a92df9
+    m_Address: FX_BladeHit_B
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: dd11b1682bc15a34ab3c43205fde49c7
+    m_Address: FX_Blade_02
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 3eea860caa7da68478ff75b150776b75
+    m_Address: FX_Blade_03
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 7a072a98b07597840a62a66cded65196
+    m_Address: FX_Blade_04
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: b738e3bd461fd724fa33c3b658d36393
+    m_Address: Fx_B_heal
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: a927bbd4afbf99f43b2967e53acd7b98
+    m_Address: Fx_B_heal_hit
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 4c3d5954bf7cb3941926ea1ac4320b00
+    m_Address: blade_004
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: f4f84f79825e5cf498b5f1a9bca17c0a
+    m_Address: blade_005
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 3e908db45bce2c343a3fab10a0582714
+    m_Address: blade_hit_001Variant
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: b3022d5763f701749a7fec5686e327b7
+    m_Address: Fx_a_h_fire
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 40ee7d6fcf3de62408047ea7f0a9603b
+    m_Address: FX_atkUp_B
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 0f2bd0080c478a441b1b5fdf6d1f0523
+    m_Address: Fx_B_fshd
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: db0d07c891877ad409eb4c4625026de0
+    m_Address: Fx_B_hd
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: e744d9f0e7a0b614897fb1cae879db87
+    m_Address: Fx_B_liuxue
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 40bfc78dab2a73142a8e0c424895b28b
+    m_Address: Fx_B_qianghua
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 89ad011fea9e95848b7582949476a831
+    m_Address: Fx_bullet_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 1b4f9141624715045a1fe344820bc1d3
+    m_Address: Fx_bullet_001hit
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 05a63303785ecb747a66059654888fed
+    m_Address: Fx_bullet_002
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: f160bf297601d5a4db8251db2ce69b28
+    m_Address: Fx_bullet_004
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 2535094a12d90d84a9a97255b6010950
+    m_Address: Fx_bullet_005
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: b6518b27f93c48541997a18b7d21c3f6
+    m_Address: Fx_bullet_006
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 9981c743b0921f744a7f4fb68289e840
+    m_Address: blade_003
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 74d33cd011fb45d41a98a2eb5ed075df
+    m_Address: Fx_bullet_007
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: dda9ddc58f86988438c92a84094c2ff5
+    m_Address: Fx_bullet_aoe
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 2c350de921a410d4193d13658b7ae884
+    m_Address: Fx_bullet_h_ice
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: a67a27c7114b8cf46bb5e6a8ea222981
+    m_Address: Fx_bullet_ice
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 52cfd255c59b4a74da163937f1f8e9ea
+    m_Address: Fx_claw
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 37ab897f173477043aa8fd7487d5286b
+    m_Address: Fx_dilei_warning
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 480fced3788d53a4f84eddd7ff7edfa6
+    m_Address: Fx_explor_002
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 3be03a90331f4634f87347664b8d5c34
+    m_Address: Fx_fire
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 0ecdc9611b6a5a840ae39d042d846799
+    m_Address: Fx_fsfb
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: f7398897cc528e14283dfbad86cddbe1
+    m_Address: Fx_fuhuo_B
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 56e4792f9e13cb64a9534631895a92ce
+    m_Address: Fx_gunflash_002
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 3f41b20d00b98f7409a07017083d79d0
+    m_Address: Fx_ice
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 7020c63e5c01939409808c9fa0485074
+    m_Address: Fx_B_defup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: fb62fdcd05092a64687fe1232fbd0622
+    m_Address: Fx_gunhit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 267e8ab76da9afe42b07043adbb315ec
+    m_Address: FX_Wudi_B
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 55a87bdc56238594487a9683b588b1aa
+    m_Address: Fx_crack
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: d1a5c6cd61162374bb9a2d6b5e8890a1
+    m_Address: Fx_eplor
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 398306f929e49b743a4f88e555115b40
+    m_Address: Fx_fzyt
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: bc89a63f845e7d94982f3a3cd13ebee7
+    m_Address: Fx_hxfb
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 06b95872dd931fa43a83620d4e92070e
+    m_Address: Fx_jiban
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: cdd7fe1e99259714a913ebb67e1a7a1d
+    m_Address: Fx_jsbl
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: dbef72b6a5f460d4b94ff70ba666e3b1
+    m_Address: Fx_jscc
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: ce36d8c9f325c8747904a7e31c2ed74b
+    m_Address: Fx_mabi
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 98ce6cec8de0f584f8df561cc19d1ba6
+    m_Address: Fx_scb
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: fb8281ee982505e4cb92ffc353a1133d
+    m_Address: Fx_shenfa
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 7080809837fb4184b8eb56aaa9d203d7
+    m_Address: Fx_sxkh
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: bcf691fbae4f87844a38933a3f97760a
+    m_Address: Fx_wave
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: c4d6ff948711b2c4d9e21cc226971746
+    m_Address: Fx_zhuoshao
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: aa2b6e4f60078e84fa35e14d00d9a21a
+    m_Address: Fx_arrow_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: b44964dd7399fa64da3ca031f8e9652d
+    m_Address: Fx_arrow_002
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 85b3b8301b2560b4782f625b05f840d1
+    m_Address: Fx_arrow_003
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 822c8ba71d0b73d4e868ef8d58b8efa2
+    m_Address: Fx_arrow_004
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 615824a36b4c38e4d9ce122e05873da4
+    m_Address: Fx_arrow_005
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: c8c2b4928559b674b9eca95ded821f18
+    m_Address: Fx_arrow_006
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 2fcc261cb353c7b4a947af2f9d0db4ef
+    m_Address: Fx_buller_bio
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 8a553ba8b7a8f4342939b6e3fb32f97f
+    m_Address: Fx_bullet_common
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 85196d21c9b74fb4c90a9099b40f020c
+    m_Address: Fx_bullet_common_ice
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: a75f655af820c1b42b8ccfdb0418fe87
+    m_Address: Fx_bullet_m001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 45ee8f262aa8a5c4d907d02b84d9d161
+    m_Address: Fx_bullet_m_ice
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: d7eb1da16cc91a64abdb4be362e55a9c
+    m_Address: Fx_missile
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 8672bc6cf8511b149aeb86a906515eb9
+    m_Address: Line_lazer_01
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: a7c73da5923700f49b37a43600984538
+    m_Address: Fx_blade_orange_m
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: b134b7e1d141b994ca4d456fd557b7b1
+    m_Address: Fx_blade_blue_m
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: cf62fec14b5a4784ea16351701fefd0a
+    m_Address: Fx_bullet_005_white
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 0ca3987e6bf7c60419d0b060695ca726
+    m_Address: blade_002_red
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 7d8f315590db83543ac130111842b1ac
+    m_Address: blade_003_red
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: fa9dfc2a8780c204495b4597202d65aa
+    m_Address: blade_002_blue
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: b748cd792781d6d40b07aee2056f7c02
+    m_Address: blade_003_blue
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: e8a6e120424cc6940bd534e674cb4258
+    m_Address: blade_hit_001Variant_orange
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 00f2c914e7054ed42a4339b73a81895d
+    m_Address: blade_hit_001Variant_red
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 5c492146d38856c478af8c2898d3a674
+    m_Address: MagicChargeGreen
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 1f971ac0d24bee44785aaf4fe1fdf8fb
+    m_Address: MagicChargeYellow
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: c0dee09e4714da244ac983eb9fe77a39
+    m_Address: MagicChargeBlue
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 25350527a537b344cac0157f25997d6f
+    m_Address: blade_hit_001Variant_purple
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 02e8106b69300514a91bb55335e80aa0
+    m_Address: blade_003_purple
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: b05c42cd4c1a7a6419ca801b285180a6
+    m_Address: Fx_jsbl_yellow
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 87c30ec0867a12f48ac18e44a4db6f20
+    m_Address: Fx_jsbl_green
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 754030afe33e04e41add56584969b41d
+    m_Address: Fx_B_qianghua_red
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: ba3310c35dcecb8448c5ccbf69ca0729
+    m_Address: Fx_B_qusan_blue
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: be5b94bd892f89148a9163f6f8168490
+    m_Address: Fx_B_qusan_green
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 2ddda15b6c67d914a8978b4f261aa220
+    m_Address: Fx_B_qusan_yellow
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 6393fc01a6b4f8b42a27159b28bd4a43
+    m_Address: FX_atk_down
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 2d5e5004f2af85c40bd7a674353615f7
+    m_Address: Fx_B_defdown
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: dd125937c2fabc44794a973f53b1a779
+    m_Address: Fx_jiban_red
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: a6e1aba6fb45361429abed3d0dca5684
+    m_Address: Fx_v_bowhit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 3ba26b6513628b747aee9de2e22dd33f
+    m_Address: Fx_v_clew_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: a4a9a267fde538b4d9e7e5f66c18c615
+    m_Address: Fx_v_clew_002
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: bfe2d75a7a52ea847afa0be31399e57a
+    m_Address: Fx_v_clew_hit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 94753c63ca168a14a94ec31fd9362435
+    m_Address: Fx_v_gunzi_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 0b44c4f4bb449b342b84074d0697eaa6
+    m_Address: Fx_v_gunzihit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 3fe7cf93204b86b41a95e2d11c33b7ab
+    m_Address: Fx_v_machinetgun_hit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 4bb62b12216596447a424e6188893919
+    m_Address: Fx_v_posion_hit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: f8af198df5a0fce45aded5570e05f0e4
+    m_Address: Fx_v_posionsmoke_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: d887255ec66380045b6c595c9dbc1c8b
+    m_Address: Fx_v_Punch_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: b492a24fba34548498476859842bb68c
+    m_Address: Fx_v_PunchHit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 8944b164fd8b02c4a8964ac811d9ce16
+    m_Address: Fx_v_ShootGun_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: f9ffd45e673aa654b943aa4a2385dafd
+    m_Address: Fx_v_shootgun_hit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 0e76f363518a9f840a19454946cfb577
+    m_Address: Fx_v_snipergun_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 97c9704b5ffb08740b2132d0088d1929
+    m_Address: Fx_v_snipergun_hit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 522eb30c5659a5f42a9417c3137fe68b
+    m_Address: Fx_v_bloodhit _001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 8173129d93551db4d8c3fe4b75289dad
+    m_Address: Fx_v_gunfire_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 651fb8279e10ac84581ebfa2708c2e26
+    m_Address: Fx_v_bladehit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 70f9b472daec9f24db05a24fa7cd5891
+    m_Address: Fx_v_machinegun_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 645da9a2ff872b1498967f1a051fa5e3
+    m_Address: Fx_v_blade_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 8f3ce7087b612d24284784e866b1d771
+    m_Address: Fx_v_ bow_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: 8c601de05b619c448b586b21c5a886da
+    m_Address: Fx_v_handgun_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  - m_GUID: b167246c47869df4f8fb2772fdb7ee69
+    m_Address: Fx_v_handgun_hit_001
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - VFX
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 226dcfeb7442b9d45bfc5e45022dd1c0, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 8abf15f6d55b137449357d4a176c3331, type: 2}
+    - {fileID: 11400000, guid: 13e4f6fcd43eb9d4c9b53c5d34f41c53, type: 2}

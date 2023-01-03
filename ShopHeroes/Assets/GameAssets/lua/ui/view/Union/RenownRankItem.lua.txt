@@ -1,0 +1,76 @@
+---------------------------------------------------------------------
+
+require("utils/XLuaUtils")
+
+local Vector3 = CS.UnityEngine.Vector3
+
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local csGameTimerInst = CS.GameTimer.inst
+local EventDispatcher = require("event/EventDispatcher")
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_UnionTaskPopularityConfigManagerInst = CS.UnionTaskPopularityConfigManager.inst
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+--RenownRankItem
+
+local bgImg
+local headBgIcon
+local headTf
+local nickNameTx
+local scoreNumTx
+
+local headGraphicSystem = nil
+----
+
+function InitComp()
+
+	bgImg = self.transform:Find("bg"):GetComponent("Image")
+	headBgIcon = self.transform:Find("playerIconBg"):GetComponent(CS_type_GUIIcon)
+	headTf = self.transform:Find("playerIconBg/headIconTf")
+	nickNameTx = self.transform:Find("nameTx"):GetComponent("Text")
+	scoreNumTx = self.transform:Find("scoreTx"):GetComponent("Text")
+
+end
+
+function SetData(data)
+
+	bgImg.enabled = self.index % 2 == 1
+	nickNameTx.text = CS_LanguageManagerInst:GetValueByKey(data.name)
+
+	if self.index == 0 then
+		headBgIcon:SetSprite("union_atlas","renwu_mingwangtxk","",false,true)
+	else
+		headBgIcon:SetSprite("union_atlas","renwu_mingwangtxk1","",false,true)
+	end
+
+	if data.userId == CS_UserDataProxyInst.playerData.userUid then
+		nickNameTx.color = CS.GUIHelper.GetColorByColorHex("4af46a")
+	else
+		nickNameTx.color = CS.GUIHelper.GetColorByColorHex("FFFFFF")
+	end
+
+	scoreNumTx.text = tostring(data.point)
+
+
+	if headGraphicSystem == nil or headGraphicSystem:IsNull() == true then
+
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+
+		func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(data.gender),CS_SpineUtils.RoleDressToHeadDressIdList(data.userDress),CS.EGender.__CastFrom(data.gender),1.4,true,function (system)
+				headGraphicSystem = system
+				system.transform:SetParent(headTf);
+				system.transform.localScale = Vector3.one * 0.3;
+				system.transform.localPosition = Vector3.down * 186;
+				system:SetDirection(CS.RoleDirectionType.Right);
+			end)
+
+	else
+		CS_CharacterManagerInst:ReSetCharacter(headGraphicSystem,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(data.gender),CS_SpineUtils.RoleDressToHeadDressIdList(data.userDress),CS.EGender.__CastFrom(data.gender))
+	end
+
+end

@@ -1,0 +1,329 @@
+
+
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+local CS_GUIHelper = CS.GUIHelper
+local Vector3 = CS.UnityEngine.Vector3
+
+
+local LuaClass_ChatListItem = require("ui/view/ChatView/ChatListItem")
+
+
+-- ChatItem
+
+local selfItem
+local otherItem
+local sysMsgItem
+
+local _data
+local chattime = -1;
+local systemchattime = -1;
+
+
+function InitComp()
+
+	selfItem = LuaClass_ChatListItem.new()
+	selfItem:initComp(self:GetObjByName("selfItem"))
+
+	otherItem = LuaClass_ChatListItem.new()
+	otherItem:initComp(self:GetObjByName("otherItem"))
+
+	sysMsgItem = LuaClass_ChatListItem.new()
+	sysMsgItem:initComp(self:GetObjByName("sysMsgItem"))
+
+	init()
+
+end
+
+
+function init()
+
+	selfItem.button.onClick:AddListener(function ()
+			onSelfBtnClick()
+		end);
+	
+	selfItem.button_2.onClick:AddListener(function ()
+			onSelfBtnClick()
+		end);
+
+	otherItem.button.onClick:AddListener(function ()
+			onOtherBtnClick()
+		end);
+	
+	otherItem.button_2.onClick:AddListener(function ()
+			onOtherBtnClick()
+		end);
+
+end
+
+function setInputChatMsgData(item)
+	
+	item.obj_msg:SetActive(true)
+	item.obj_emoji:SetActive(false)
+
+	item.timeText.text = CS.TimeUtils.pasttimeSpanStrip(CS.GameTimer.inst.serverNow - _data.chatTime);
+
+	chattime = _data.chatTime;
+	item.msgText.text = _data.content;
+	item.levelText.text = tostring(_data.level)
+	
+end
+
+function setVIPShow(item)
+	
+	local strs = split(_data.nickName,ChatDataProxy.inst.vipSplitKey)
+	
+	local nickName = #strs > 0 and strs[1] or ""
+	local vipType = #strs > 1 and tonumber(strs[2]) or 1 --1月卡 2年卡
+	local vipLv = #strs > 2 and tonumber(strs[3]) or 0 --VIP等级 --vip等级0则为无VIP
+	if vipLv > 12 then vipLv = 12 end --限制一下VIP等级显示 最高12级
+	
+	item.obj_headVip:SetActive(vipLv > 0)
+	item.tx_headVipLv.text = tostring(vipLv)
+	item.headIcon:SetSprite("chat_atlas",vipLv > 0 and "zhizuo_touxiangkuang_jin" or "zhizuo_touxiangkuang")
+	
+	
+	item.nameText.text = CS.LanguageManager.inst:GetValueByKey(nickName);
+	item.tx_emojiName.text = CS.LanguageManager.inst:GetValueByKey(nickName);
+	
+	if not _data.isSelf then --不是自己
+		
+		local nameStrColor = "FFFFFF"
+		
+		if vipLv > 0 then
+			nameStrColor = vipLv < 12 and "F7E47E" or "FFB400"
+		end
+		
+		item.nameText.color = CS_GUIHelper.GetColorByColorHex(nameStrColor);
+		item.tx_emojiName.color = CS_GUIHelper.GetColorByColorHex(nameStrColor);
+		
+	end
+	
+end
+
+
+function SetData(param)
+
+	_data = param.data
+	local currindex = param.currindex
+
+	if currindex == 0 or currindex == 2 then
+
+		systemchattime = -1;
+		local item = nil
+		if _data.isSelf then
+
+			item = selfItem
+
+		else
+
+			item = otherItem
+
+		end
+		
+		local strs_split = split(_data.content,ChatDataProxy.inst.emojiKey)
+		
+		if strs_split ~= nil and #strs_split > 1 then --emoji
+			
+			local emojiCfg = ChatEmojiConfigManager:GetConfig(tonumber(strs_split[2]))
+			
+			if emojiCfg ~= nil and emojiCfg.isShow then
+				
+				item.obj_msg:SetActive(false)
+				item.obj_emoji:SetActive(true)
+				item.tx_emojiLv.text = tostring(_data.level)
+				item.tx_emojiName.text = CS.LanguageManager.inst:GetValueByKey(_data.nickName);
+				item.tx_emojiTime.text = CS.TimeUtils.pasttimeSpanStrip(CS.GameTimer.inst.serverNow - _data.chatTime);
+				item.icon_emoji:SetSprite(emojiCfg.atlas,emojiCfg.icon)
+			
+			else
+				
+				setInputChatMsgData(item)	
+				
+			end
+			
+		else
+			
+			setInputChatMsgData(item)
+			
+		end
+		
+		setVIPShow(item)
+		
+		selfItem.gameObject:SetActive(_data.isSelf);
+		otherItem.gameObject:SetActive(not _data.isSelf);
+		sysMsgItem.gameObject:SetActive(false);
+
+		if item.headGraphicSystem ~= nil and item.headGraphicSystem.transform.parent == item.headIconParent then
+
+			item.headGraphicSystem.transform:SetParent(CS.FGUI.inst.heroGraphicCacheParent)
+			item.headGraphicSystem.transform.localPosition = Vector3.zero
+			item.headGraphicSystem = nil
+
+		end
+
+		ChatDataProxy.inst:GetGraphicDressByIndexAndChannel(_data.index, currindex,function (chatIndex, channel, system)
+
+				if _data.index == chatIndex and currindex == channel then
+					
+					item.headGraphicSystem = system
+					system.transform:SetParent(item.headIconParent);
+					system.transform.localScale = Vector3.one * 0.25;
+					system.transform.localPosition = Vector3.down * 156;
+					system:SetDirection(_data.isSelf and CS.RoleDirectionType.Left or CS.RoleDirectionType.Right);
+					
+				else
+					
+					--print("白色 高跟鞋")
+					
+				end
+
+			end)
+
+	else
+
+		chattime = -1;
+		sysMsgItem.timeText.text = CS.TimeUtils.pasttimeSpanStrip(CS.GameTimer.inst.serverNow - _data.chatTime);
+		if (systemchattime == _data.chatTime) then
+			return
+		end
+		systemchattime = _data.chatTime;
+
+		selfItem.gameObject:SetActive(false);
+		otherItem.gameObject:SetActive(false);
+		sysMsgItem.gameObject:SetActive(true);
+
+
+		if _data.content ~= nil then
+
+			local infos = split(_data.content,'|');
+
+			if infos ~= nil and #infos > 0 then
+
+				local msgType = tonumber(infos[1])
+
+				if msgType == 1 then
+
+					sysMsgItem.msgText.text = CS_LanguageManagerInst:GetValueByKey("{0}加入公会", CS_LanguageManagerInst:GetValueByKey(_data.nickName));
+
+				elseif msgType == 2 then
+
+					sysMsgItem.msgText.text = CS_LanguageManagerInst:GetValueByKey("{0}退出公会", CS_LanguageManagerInst:GetValueByKey(_data.nickName));
+
+				elseif msgType == 3 then
+
+					if #infos > 2 then
+
+						if infos[2] == CS.UserDataProxy.inst.playerData.userUid then
+
+							sysMsgItem.msgText.text = CS_LanguageManagerInst:GetValueByKey("{0}帮助了我", CS_LanguageManagerInst:GetValueByKey(_data.nickName));
+
+						else
+
+							sysMsgItem.msgText.text = CS_LanguageManagerInst:GetValueByKey("{0}帮助了{1}", CS_LanguageManagerInst:GetValueByKey(_data.nickName),CS_LanguageManagerInst:GetValueByKey(infos[3]));
+
+						end
+
+					else
+
+						sysMsgItem.gameObject:SetActive(false)
+
+					end
+
+				elseif msgType == 4 then
+
+					if #infos > 2 then
+
+						local buildId = tonumber(infos[2])
+						local buildCfg = CS.BuildingConfigManager.inst:GetConfig(buildId);
+
+						if buildCfg ~= nil then
+							sysMsgItem.msgText.text = CS_LanguageManagerInst:GetValueByKey("{0}投资了{1}{2}新币", CS_LanguageManagerInst:GetValueByKey(_data.nickName),CS_LanguageManagerInst:GetValueByKey(buildCfg.name),infos[3]);
+						else
+							sysMsgItem.gameObject:SetActive(false)
+						end
+
+					else
+
+						sysMsgItem.gameObject:SetActive(false)
+
+					end
+
+				elseif msgType == 5 then
+
+					if #infos > 2 then
+
+						local equipId = tonumber(infos[2])
+						local equipCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(equipId);
+
+						if equipCfg ~= nil then
+							sysMsgItem.msgText.text = CS_LanguageManagerInst:GetValueByKey("{0}向黑市商人售出{1}装备获得{2}新币", CS_LanguageManagerInst:GetValueByKey(_data.nickName),CS_LanguageManagerInst:GetValueByKey(equipCfg.quality_name),infos[3]);
+						else
+							sysMsgItem.gameObject:SetActive(false)
+						end
+
+					else
+
+						sysMsgItem.gameObject:SetActive(false)
+
+					end
+
+
+				elseif msgType == 6 then
+
+					if #infos > 1 then
+
+						local equipDrawingId = tonumber(infos[2])
+						local equipCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(equipDrawingId);
+
+						if equipCfg ~= nil then
+							sysMsgItem.msgText.text = CS_LanguageManagerInst:GetValueByKey("{0}精通了{1}图纸", CS_LanguageManagerInst:GetValueByKey(_data.nickName),CS_LanguageManagerInst:GetValueByKey(equipCfg.name));
+						else
+							sysMsgItem.gameObject:SetActive(false)
+						end
+
+					else
+
+						sysMsgItem.gameObject:SetActive(false)
+
+					end
+
+				end
+
+
+			end
+
+		else
+			sysMsgItem.gameObject:SetActive(false);
+		end
+
+	end
+
+
+end
+
+
+function onSelfBtnClick()
+
+end
+
+function onOtherBtnClick()
+	
+	EventDispatcher:dispatchEvent(GameEvent.ChatEvent.OpenOtherSubSettingPanel, _data, otherItem.levelText.transform.position)
+	
+end
+
+function ClearData()
+	
+	selfItem.headGraphicSystem = nil
+	otherItem.headGraphicSystem = nil
+	
+end	

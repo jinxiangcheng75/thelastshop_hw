@@ -1,0 +1,186 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/GuideTask/GuideTaskUIView")
+require("data/GuideTaskDataProxy")
+require("ui/view/GuideTask/GuideTaskInfoUIView")
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+
+GuideTaskSystem = class(BaseSystem)
+GuideTaskSystem.super = BaseSystem
+
+local guideTaskUIView
+local guideTaskInfoUIView
+
+function GuideTaskSystem:ctor()
+end
+
+function GuideTaskSystem:AddListeners()
+	--EventDispatcherInis:addEvent(GameEvent.DailySignEvent.ShowUI_DailySignUI,self,self.openDailySignUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.REQUEST_GuideTask,self,self.requestGuideTask)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.REQUEST_GuideTaskReward,self,self.requestGuideTaskReward)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.ShowUI_GuideTaskInfo,self,self.openGuideTaskInfoUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.ShowUI_GuideTask,self,self.openGuideTaskUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.RefreshUI_GuideTask,self,self.refreshGuideTaskUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.RefreshShowUI_GuideTask,self,self.refreshShowGuideTaskUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.RefreshUI_EndGuideTask,self,self.refreshEndGuideTaskUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.RefreshUI_GuideTaskInfo,self,self.refreshGuideTaskInfoUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.HideUI_GuideTask,self,self.hideGuideTaskUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.HideUI_GuideTaskInfo,self,self.hideGuideTaskInfoUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTask.DoOperation_TimeFalse,self,self.doOperationGuideTimeFalse)
+
+	EventDispatcherInis:addEvent(GameEvent.UIUnlock.View_OnShow,self,self.viewOnShown)
+
+	CS.LanguageManager.inst:ChangeLangeuageEvent(
+		"+",
+		function ()
+			self:refreshEndGuideTaskUI()
+		end
+	)
+	--newToggle:onClickHandle(
+	--"+",
+	--function(index)
+	--self:OnToggleClick(index)
+	--end
+	--)
+end
+
+function GuideTaskSystem:RemoveListeners()
+	--EventDispatcherInis:removeEvent(GameEvent.DailySignEvent.ShowUI_DailySignUI,self.openDailySignUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.REQUEST_GuideTask,self.requestGuideTask)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.REQUEST_GuideTaskReward,self.requestGuideTaskReward)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.ShowUI_GuideTaskInfo,self.openGuideTaskInfoUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.ShowUI_GuideTask,self.openGuideTaskUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.RefreshUI_GuideTask,self.refreshGuideTaskUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.RefreshShowUI_GuideTask,self.refreshShowGuideTaskUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.RefreshUI_EndGuideTask,self.refreshEndGuideTaskUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.RefreshUI_GuideTaskInfo,self.refreshGuideTaskInfoUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.HideUI_GuideTask,self.hideGuideTaskUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.HideUI_GuideTaskInfo,self.hideGuideTaskInfoUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTask.DoOperation_TimeFalse,self.doOperationGuideTimeFalse)
+
+	EventDispatcherInis:removeEvent(GameEvent.UIUnlock.View_OnShow,self.viewOnShown)
+
+	CS.LanguageManager.inst:ChangeLangeuageEvent(
+		"-",
+		function ()
+			self:refreshEndGuideTaskUI()
+		end
+	)
+end
+
+function GuideTaskSystem:viewOnShown(viewID)
+	--print("输出 当前的界面名称是",viewID)
+	if(viewID ~= "TextTip" and viewID ~= "TopPlayerInfoPanel")then
+		GuideTaskDataProxy.inst.curWindowName = viewID
+	end
+end
+
+function GuideTaskSystem:refreshEndGuideTaskUI()
+	if CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver then return end
+	local data = GuideTaskDataProxy.inst.curData
+	if(data == nil or GuideTaskDataProxy.inst.guideTaskFlag == 1)then return end
+	local guideTaskUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTaskUIView, false)
+	if(guideTaskUIView ~= nil and guideTaskUIView.isShowing)then
+		guideTaskUIView:SetUIData()
+	end
+end
+
+function GuideTaskSystem:doOperationGuideTimeFalse()
+	local guideTaskUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTaskUIView, false)
+	if(guideTaskUIView ~= nil and guideTaskUIView.isShowing)then
+		guideTaskUIView:DestroyFinger()
+	end
+end
+
+function GuideTaskSystem:hideGuideTaskInfoUI()
+	GUIManager.inst:HideView(Constants.ViewName.GuideTaskInfoUIView)
+end
+
+function GuideTaskSystem:hideGuideTaskUI()
+	GUIManager.inst:HideView(Constants.ViewName.GuideTaskUIView)
+end
+
+function GuideTaskSystem:refreshGuideTaskInfoUI()
+	guideTaskInfoUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTaskInfoUIView, false)
+	if(guideTaskInfoUIView ~= nil and guideTaskInfoUIView.isShowing)then
+		guideTaskInfoUIView:SetUIData()
+	end
+end
+
+function GuideTaskSystem:refreshGuideTaskUI()
+	if CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver then return end
+	local data = GuideTaskDataProxy.inst.curData
+	if(data == nil or GuideTaskDataProxy.inst.guideTaskFlag == 1)then return end
+	local guideTaskUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTaskUIView, false)
+	if(guideTaskUIView ~= nil and guideTaskUIView.isShowing)then
+		guideTaskUIView:RefreshUIData()
+	end
+end
+
+function GuideTaskSystem:openGuideTaskUI()
+	if CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver then return end
+	local data = GuideTaskDataProxy.inst.curData
+	if(data == nil or GuideTaskDataProxy.inst.guideTaskFlag == 1)then return end
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GuideTaskUIView,
+		function(view)
+			guideTaskUIView = view
+		end
+	)
+end
+
+function GuideTaskSystem:refreshShowGuideTaskUI()
+	if CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver then return end
+	local data = GuideTaskDataProxy.inst.curData
+	if(data == nil or GuideTaskDataProxy.inst.guideTaskFlag == 1)then return end
+	local guideTaskUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTaskUIView, false)
+	if(guideTaskUIView ~= nil and guideTaskUIView.isShowing)then
+		guideTaskUIView:SetUIData()
+	else
+		GUIManager.inst:OpenView(
+			Constants.ViewName.GuideTaskUIView,
+			function(view)
+				guideTaskUIView = view
+			end
+		)
+	end
+	--GUIManager.inst:OpenView(
+	--Constants.ViewName.GuideTaskUIView,
+	--function(view)
+	--guideTaskUIView = view
+	--end
+	--)
+end
+
+function GuideTaskSystem:openGuideTaskInfoUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GuideTaskInfoUIView,
+		function(view)
+			guideTaskInfoUIView = view
+		end
+	)
+end
+
+function GuideTaskSystem:requestGuideTask()
+	local rep = MsgType.Request_User_GuideTask:New()
+	rep:Send()
+end
+
+function GuideTaskSystem:requestGuideTaskReward()
+	local rep = MsgType.Request_User_GuideTaskReward:New()
+	rep:Send()
+end
+
+
+function GuideTaskSystem:OnEnter()
+	GuideTaskSystem.super.OnEnter(self)
+end
+
+function GuideTaskSystem:OnExit()
+	GuideTaskSystem.super.OnExit(self)
+end

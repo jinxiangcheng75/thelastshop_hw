@@ -1,0 +1,122 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/OnlineReward/OnlineInfoUIView")
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_Type_LuaListItem = typeof(CS.LuaListItem)
+local CS_GameObject = CS.UnityEngine.GameObject
+
+OnlineRewardSystem = class(BaseSystem)
+OnlineRewardSystem.super = BaseSystem
+
+local onlineInfoUIView
+
+function OnlineRewardSystem:ctor()
+end
+
+function OnlineRewardSystem:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.OnlineRewardEvent.ShowUI_OnlineInfo,self,self.openOnlineInfoUI)
+	EventDispatcherInis:addEvent(GameEvent.OnlineRewardEvent.HideUI_OnlineInfo,self,self.hideOnlineInfoUI)
+	EventDispatcherInis:addEvent(GameEvent.OnlineRewardEvent.RefreshUI_OnlineInfo,self,self.refreshOnlineInfoUI)
+	EventDispatcherInis:addEvent(GameEvent.OnlineRewardEvent.Refresh_OnlineBtn,self,self.refreshMainUIOnlineBtn)
+	EventDispatcherInis:addEvent(GameEvent.OnlineRewardEvent.Clear_OnlineBtn,self,self.clearMainUIOnlineBtns)
+	EventDispatcherInis:addEvent(GameEvent.OnlineRewardEvent.Request_OnlineList,self,self.requestOnlineList)
+	EventDispatcherInis:addEvent(GameEvent.OnlineRewardEvent.Request_OnlineReward,self,self.requestOnlineReward)
+
+end
+
+function OnlineRewardSystem:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.OnlineRewardEvent.ShowUI_OnlineInfo,self.openOnlineInfoUI)
+	EventDispatcherInis:removeEvent(GameEvent.OnlineRewardEvent.HideUI_OnlineInfo,self.hideOnlineInfoUI)
+	EventDispatcherInis:removeEvent(GameEvent.OnlineRewardEvent.RefreshUI_OnlineInfo,self.refreshOnlineInfoUI)
+	EventDispatcherInis:removeEvent(GameEvent.OnlineRewardEvent.Refresh_OnlineBtn,self.refreshMainUIOnlineBtn)
+	EventDispatcherInis:removeEvent(GameEvent.OnlineRewardEvent.Clear_OnlineBtn,self.clearMainUIOnlineBtns)
+	EventDispatcherInis:removeEvent(GameEvent.OnlineRewardEvent.Request_OnlineList,self.requestOnlineList)
+	EventDispatcherInis:removeEvent(GameEvent.OnlineRewardEvent.Request_OnlineReward,self.requestOnlineReward)
+
+end
+
+local mainUIOnlineObj = {}
+mainUIOnlineObj.commonOnlineBtnItems = {}
+
+function OnlineRewardSystem:clearMainUIOnlineBtns()
+	for i = 1, #mainUIOnlineObj.commonOnlineBtnItems do
+		mainUIOnlineObj.commonOnlineBtnItems[i]:ClearData()
+	end
+end
+
+function OnlineRewardSystem:refreshMainUIOnlineBtn(parentTf)
+	mainUIOnlineObj.commonOnlineBtnItemPfb = parentTf:GetObjByName("onlineRewardPfb")
+	mainUIOnlineObj.commonOnlineBtnTf = parentTf.transform
+	mainUIOnlineObj.commonOnlineBtnItems = {}
+
+	for i = 1, #mainUIOnlineObj.commonOnlineBtnItems do
+		mainUIOnlineObj.commonOnlineBtnItems[i]:ClearData()
+	end
+
+	local list = OnlineRewardDataProxy.inst.onlineDataList
+	
+	if(#list > 0)then
+		parentTf.gameObject:SetActive(true)
+	else
+		parentTf.gameObject:SetActive(false)
+	end
+
+	for i = 1, #list do
+		if i <= #mainUIOnlineObj.commonOnlineBtnItems then
+			mainUIOnlineObj.commonOnlineBtnItems[i]:SetData(list[i])
+		else
+			local pfb = CS_GameObject.Instantiate(mainUIOnlineObj.commonOnlineBtnItemPfb,mainUIOnlineObj.commonOnlineBtnTf)
+			pfb:SetActive(true)
+			local item = pfb:GetComponent(CS_Type_LuaListItem)
+			item:SetData(list[i])
+			mainUIOnlineObj.commonOnlineBtnItems[#mainUIOnlineObj.commonOnlineBtnItems + 1] = item
+		end
+	end
+end
+
+
+function OnlineRewardSystem:hideOnlineInfoUI()
+	GUIManager.inst:HideView(Constants.ViewName.OnlineInfoUIView)
+end
+
+function OnlineRewardSystem:openOnlineInfoUI(data)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.OnlineInfoUIView,
+		function(view)
+			onlineInfoUIView = view
+			onlineInfoUIView:SetUIData(data)
+		end
+	)
+end
+
+function OnlineRewardSystem:refreshOnlineInfoUI()
+	local onlineInfoUIView = GUIManager.inst:GetWindow(Constants.ViewName.OnlineInfoUIView, false)
+	if(onlineInfoUIView ~= nil and onlineInfoUIView.isShowing)then
+		onlineInfoUIView:RefreshData()
+	end
+end
+
+function OnlineRewardSystem:requestOnlineList()
+	local rep = MsgType.Request_User_OnlineRewardList:New()
+	rep:Send()
+end
+
+function OnlineRewardSystem:requestOnlineReward(index)
+	local rep = MsgType.Request_User_OnlineRewardListReward:New()
+	rep.rewardIndex = index
+	rep:Send()
+end
+
+function OnlineRewardSystem:OnEnter()
+	OnlineRewardSystem.super.OnEnter(self)
+end
+
+function OnlineRewardSystem:OnExit()
+	OnlineRewardSystem.super.OnExit(self)
+end

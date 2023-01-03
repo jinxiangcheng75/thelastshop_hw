@@ -1,0 +1,127 @@
+local doorIcon
+local levelText
+local nameText
+local normalIconBg
+local normalIcon
+local descObj1
+local descObj2
+local descObj3
+local descText1
+local descText2
+local descText3
+local bossImg
+local grayImg
+local normalRewardItem1
+local normalRewardItem2
+local BossRewardObj
+local normalRewardItem3
+local normalRewardObj
+local normalGouImg
+local bossGouImg
+
+require("data/RefugeTowerDataProxy")
+require("utils/LuaUtils")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+
+local data
+
+local str = {}
+
+function InitComp()
+	doorIcon = self:GetObjByName("doorIcon"):GetComponent("GUIIcon")
+	levelText = self:GetObjByName("levelText"):GetComponent("Text")
+	nameText = self:GetObjByName("nameText"):GetComponent("Text")
+	normalIconBg = self:GetObjByName("normalIconBg")
+	normalIcon = self:GetObjByName("normalIcon"):GetComponent("GUIIcon")
+	descObj1 = self:GetObjByName("descObj1")
+	descObj2 = self:GetObjByName("descObj2")
+	descObj3 = self:GetObjByName("descObj3")
+	descText1 = self:GetObjByName("descText1"):GetComponent("Text")
+	descText2 = self:GetObjByName("descText2"):GetComponent("Text")
+	descText3 = self:GetObjByName("descText3"):GetComponent("Text")
+	bossImg = self:GetObjByName("bossImg"):GetComponent("Image")
+	grayImg = self:GetObjByName("grayImg"):GetComponent("Image")
+	normalRewardItem1 = self:GetObjByName("normalRewardItem1"):GetComponent("LuaListItem")
+	normalRewardItem2 = self:GetObjByName("normalRewardItem2"):GetComponent("LuaListItem")
+	normalRewardItem3 = self:GetObjByName("normalRewardItem3"):GetComponent("LuaListItem")
+	BossRewardObj = self:GetObjByName("BossRewardObj")
+	normalRewardObj = self:GetObjByName("normalRewardObj")
+	normalGouImg = self:GetObjByName("normalGou"):GetComponent("Image")
+	bossGouImg = self:GetObjByName("bossGou"):GetComponent("Image")
+end
+
+function SetData(_data)
+	data = _data
+	local iconName = ""
+	if(data.normalState > 1 and data.vipState > 1)then
+		grayImg.enabled = true
+		iconName = "pata_dianti1"
+	else
+		grayImg.enabled = false
+		iconName = "pata_dianti2"
+	end
+	doorIcon:SetSprite("refuge_atlas",iconName)
+	levelText.text = data.index
+	nameText.text = cs_LanguageManagerInst:GetValueByKey(data.configData.floor_name)
+	local translateStr = cs_LanguageManagerInst:GetValueByKey(data.configData.dec)
+	str = split(translateStr,"|")
+	if(tonumber(data.index) == tonumber(RefugeTowerDataProxy.inst.maxTowerFloor))then
+		normalIconBg:SetActive(false)
+		bossImg.gameObject:SetActive(true)
+		bossGouImg.enabled = data.normalState > 1 and data.vipState > 1
+	else
+		normalIconBg:SetActive(true)
+		bossImg.gameObject:SetActive(false)
+		normalGouImg.enabled = data.normalState > 1 and data.vipState > 1
+		SetNormalData()
+	end
+
+	SetRewardData()
+end
+
+function SetNormalData()
+	descObj1:SetActive(#str >= 1)
+	descObj2:SetActive(#str >= 2)
+	descObj3:SetActive(#str >= 3)
+
+	if(#str >= 1)then
+		descText1.text = str[1]
+	end
+	if(#str >= 2)then
+		descText2.text = str[2]
+	end
+	if(#str >= 3)then
+		descText3.text = str[3]
+	end
+
+	normalIcon:SetSprite(data.configData.atlas,data.configData.icon)
+end
+
+function SetRewardData()
+	local sum = 0
+
+	if(data.configData.reward1_id ~= "" and tonumber(data.configData.reward1_id) ~= 0)then
+		sum = sum + 1
+	end
+
+	if(data.configData.reward2_id ~= "" and tonumber(data.configData.reward2_id) ~= 0)then
+		sum = sum + 1
+	end
+	
+	local itemData = RefugeRewardData:new()
+
+	if(sum > 1)then
+		normalRewardObj:SetActive(true)
+		BossRewardObj:SetActive(false)
+		itemData:InitData(data.configData.reward1_id,data.configData.reward1_num,data.normalState,false,data.id)
+		normalRewardItem1:SetData(itemData)
+		itemData:InitData(data.configData.reward2_id,data.configData.reward2_num,data.vipState,true,data.id)
+		normalRewardItem2:SetData(itemData)
+	else
+		normalRewardObj:SetActive(false)
+		BossRewardObj:SetActive(true)
+		itemData:InitData(data.configData.reward1_id,data.configData.reward1_num,data.normalState,false,data.id)
+		normalRewardItem3:SetData(itemData)
+	end
+end

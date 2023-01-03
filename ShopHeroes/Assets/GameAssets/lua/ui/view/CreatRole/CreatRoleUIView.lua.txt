@@ -1,0 +1,278 @@
+--CreatRoleUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+
+local csVector3 = CS.UnityEngine.Vector3
+local csTime = CS.UnityEngine.Time
+
+--------------------------------------------
+local luaClass_Typewriter = require("ui/view/Typewriter/Typewriter")
+
+CreatRoleUIView = class(ViewBase)
+
+local canMove = true
+
+function CreatRoleUIView:ctor()
+	self.viewID = Constants.ViewName.CreatRoleUIView
+	CreatRoleUIView.super.init(self, self.viewID)
+	self.showType = 0
+	self.sortingLayerName = "window"
+end
+local maskmovetimer = 0
+function CreatRoleUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.sexGroup = contentPane:GetObjByName("sexGroup"):GetComponent("ToggleGroupMarget")
+	self.startBtn = contentPane:GetButton("startBtn")
+	self.rolePos = contentPane:GetObjByName("rolePos").transform
+	-- self.mask1 = contentPane:GetObjByName("mask1"):GetComponent("LuaListItem")
+	-- self.mask2 = contentPane:GetObjByName("mask2"):GetComponent("LuaListItem")
+	-- self.mask3 = contentPane:GetObjByName("mask3"):GetComponent("LuaListItem")
+	-- self.mask4 = contentPane:GetObjByName("mask4"):GetComponent("LuaListItem")
+
+	self.typewriter = luaClass_Typewriter.new()
+	self.typewriter:init(contentPane:GetObjByName("luaBehaviour_typewriterUI"))
+
+	self.sexGroup.OnSelectedIndexValueChange = function(index)
+		self:ToggleSelectChange(index)
+	end
+
+	self.dressUp = nil
+	self.wDressUp = nil
+	self.npcDressUp = nil
+	self.sex = 0
+	self.manDress = nil
+	self.womanDress = nil
+	self.npcDress = nil
+
+	self.manDress = CS.CharacterModelConfigManager.inst:GetConfig(10001):ToRoleDress()
+	self.womanDress = CS.CharacterModelConfigManager.inst:GetConfig(20001):ToRoleDress()
+	self.npcDress = CS.CharacterModelConfigManager.inst:GetConfig(60000):ToRoleDress()
+end
+
+function CreatRoleUIView:ToggleSelectChange(index) -- 0 - man 1 - woman
+	if (self.sex == index + 1) then
+		return
+	end
+	CS.AudioManager.inst:PlaySound(8)
+	self.sex = index + 1
+	self:ChangeSex()
+end
+
+function CreatRoleUIView:onInit()
+	self:initComp()
+
+	self.startBtn:ButtonClickTween(
+		function()
+			self.sexGroup.gameObject:SetActive(false)
+			self.startBtn.gameObject:SetActive(false)
+
+			CS.GameTimer.inst:AddTimer(
+				0.3,
+				1,
+				function()
+					local curTempDress = nil
+					if (self.sex == 1) then
+						curTempDress = self.manDress
+					else
+						curTempDress = self.womanDress
+					end
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.System.Int32, CS.RoleDress)
+					func(csEventControllerInst, csGameEventType.REQUESTUSERCUSTOM, self.sex, curTempDress)
+
+					--dressUp:Play("idle_1",true)
+					--if(npcDressUp ~= nil)then
+					--npcDressUp.transform:DOLocalMove(csVector3(409,-214,0),2):OnComplete(function ()
+					--npcDressUp:Play("idle_1",true)
+					--EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.CheckGuideTrigger, 20, 0)
+					--end)
+					--end
+					CS.FGUI.inst:SetBlackMaskFade(
+						1,
+						1,
+						function()
+							CS.PlatformManager.inst:GameHandleEventLog("Enter_Game", "")
+							EventDispatcher:dispatchEvent(GameEvent.CreatRoleEvent.HideUI_CreatRoleUI)
+							local tempData = CS.StateTransition(CS.kGameState.Shop, false)
+							EventDispatcher:dispatchEvent(GameEvent.CSEvent.Change_State, tempData)
+						end
+					)
+				end
+			)
+		end
+	)
+end
+
+function CreatRoleUIView:DoShowAnimation()
+	self:onShowed()
+end
+
+function CreatRoleUIView:DoHideAnimation()
+	self:HideView()
+end
+
+function CreatRoleUIView:onHide()
+	if (maskmovetimer >= 0) then
+		CS.GameTimer.inst:RemoveTimer(maskmovetimer)
+		maskmovetimer = 0
+	end
+	--print("CreatRoleUIView onHide")
+	CS.AudioManager.inst:PlaySound(9)
+end
+
+function CreatRoleUIView:onShowed()
+	self:TypewriterTween()
+end
+
+function CreatRoleUIView:TypewriterTween()
+	self.typewriter:StartStringTween()
+
+	self:CreatModel()
+	--self:CreatNPCModel()
+end
+
+function CreatRoleUIView:CreatModel()
+	if (self.sex == 0) then
+		self.sex = 1 -- 1 - man 2 - woman
+	end
+	--local curDress = nil
+	--if(sex == 1)then curDress = manDress else curDress = womanDress end
+	local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+	local func = funcGeneric(CS.DressUpSystem)
+
+	func(
+		CS.CharacterManager.inst,
+		CS.CharacterManager.inst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(1)),
+		CS.SpineUtils.RoleDressToUintList(self.manDress),
+		CS.EGender.__CastFrom(1),
+		1.4,
+		true,
+		function(dressUpSystem)
+			self.dressUp = dressUpSystem
+			self.dressUp.transform:SetParent(self.rolePos)
+			self.dressUp.transform.localPosition = csVector3.zero
+			self.dressUp.transform.localScale = csVector3(-60, 60, 60)
+			self.dressUp:Play("walk", true)
+			self.dressUp:SetSortingAndOrderLayer("popup", 999)
+		end,
+		function(dressUpSystem)
+			dressUpSystem:Repacked("")
+		end
+	)
+
+	func(
+		CS.CharacterManager.inst,
+		CS.CharacterManager.inst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(2)),
+		CS.SpineUtils.RoleDressToUintList(self.womanDress),
+		CS.EGender.__CastFrom(2),
+		1.4,
+		true,
+		function(dressUpSystem)
+			self.wDressUp = dressUpSystem
+			self.wDressUp.transform:SetParent(self.rolePos)
+			self.wDressUp.transform.localPosition = csVector3.zero
+			self.wDressUp.transform.localScale = csVector3(-60, 60, 60)
+			self.wDressUp:Play("walk", true)
+			self.wDressUp:SetSortingAndOrderLayer("popup", 999)
+		end,
+		function(dressUpSystem)
+			dressUpSystem:Repacked("")
+		end
+	)
+
+	CS.GameTimer.inst:AddTimer(
+		0.5,
+		1,
+		function()
+			self:ChangeSex()
+		end
+	)
+
+	--if dressUp == nil then
+	--func(CS.CharacterManager.inst,CS.CharacterManager.inst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(sex)),CS.SpineUtils.RoleDressToUintList(curDress),CS.EGender.__CastFrom(sex),1.4,true,function (dressUpSystem)
+	--dressUp = dressUpSystem
+	--dressUp.transform:SetParent(self.rolePos)
+	--dressUp.transform.localPosition = csVector3.zero
+	--dressUp.transform.localScale = csVector3(-60,60,60)
+	--dressUp:Play("walk",true)
+	--dressUp:SetSortingAndOrderLayer("popup",999)
+	--end,function (dressUpSystem)
+	--dressUpSystem:Repacked("")
+	--end)
+	--else
+	--CS.CharacterManager.inst:ReSetCharacter(dressUp,CS.CharacterManager.inst:GetPeopleShapeNudeSpinePath(sex),CS.SpineUtils.RoleDressToUintList(curDress),CS.EGender.__CastFrom(sex),true,function (dressUpSystem)
+	--dressUpSystem:Repacked("")
+	--dressUpSystem:SetSortingAndOrderLayer("popup",999)
+	--end)
+	--end
+end
+
+function CreatRoleUIView:ChangeSex()
+
+	--if dressUp ~= nil and CS.UnityUtils.EqualsNull(dressUp.gameObject) == false then
+	--dressUp.gameObject:SetActive(sex == 1)
+	--end
+
+	--if wDressUp ~= nil and CS.UnityUtils.EqualsNull(wDressUp.gameObject) == false then
+	--wDressUp.gameObject:SetActive(sex == 2)
+	--end
+
+	if(self.sex == 1)then
+		if self.dressUp ~= nil and CS.UnityUtils.EqualsNull(self.dressUp.gameObject) == false then
+			self.dressUp.transform.localPosition = csVector3(0,0,0)
+		end
+		if self.wDressUp ~= nil and CS.UnityUtils.EqualsNull(self.wDressUp.gameObject) == false then
+			self.wDressUp.transform.localPosition = csVector3(6000,0,0)
+		end
+	else
+		if self.dressUp ~= nil and CS.UnityUtils.EqualsNull(self.dressUp.gameObject) == false then
+			self.dressUp.transform.localPosition = csVector3(6000,0,0)
+		end
+		if self.wDressUp ~= nil and CS.UnityUtils.EqualsNull(self.wDressUp.gameObject) == false then
+			self.wDressUp.transform.localPosition = csVector3(0,0,0)
+		end
+	end
+
+end
+
+function CreatRoleUIView:CreatNPCModel()
+	local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+	local func = funcGeneric(CS.DressUpSystem)
+
+	func(
+		CS.CharacterManager.inst,
+		CS.CharacterManager.inst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(2)),
+		CS.SpineUtils.RoleDressToUintList(self.npcDress),
+		CS.EGender.__CastFrom(2),
+		1.4,
+		true,
+		function(dressUpSystem)
+			self.npcDressUp = dressUpSystem
+			self.npcDressUp.transform:SetParent(self.rolePos)
+			self.npcDressUp.transform.localPosition = csVector3(849, -443, 0)
+			self.npcDressUp.transform.localScale = csVector3(60, 60, 60)
+			self.npcDressUp:Play("walk", true)
+			self.npcDressUp:SetSortingAndOrderLayer("popup", 999)
+		end,
+		function(dressUpSystem)
+			dressUpSystem:Repacked("")
+		end
+	)
+end
+
+function CreatRoleUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function CreatRoleUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+------------------------------------------------

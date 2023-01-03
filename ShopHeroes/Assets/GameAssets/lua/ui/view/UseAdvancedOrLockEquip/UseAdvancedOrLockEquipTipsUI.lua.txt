@@ -1,0 +1,136 @@
+
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_StaticConstants = CS.StaticConstants
+local CS_GUIHelper = CS.GUIHelper
+local CS_GameTimerInst = CS.GameTimer.inst
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+--UseAdvancedOrLockEquipTipsUI
+
+
+--使用高级或锁定装备二级确认面板
+UseAdvancedOrLockEquipTipsUI = class(ViewBase)
+
+function UseAdvancedOrLockEquipTipsUI:ctor()
+	self.viewID = Constants.ViewName.UseAdvancedOrLockEquipTipsUI
+	UseAdvancedOrLockEquipTipsUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = false
+	self.topResPanelType = CS.TopPlayerShowType.ignore
+end
+------------------------------------------------
+
+
+function UseAdvancedOrLockEquipTipsUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.btn_ok = contentPane:GetButton("btn_ok")
+	self.btn_cancel = contentPane:GetButton("btn_cancel")
+	self.btn_close = contentPane:GetButton("btn_close")
+	self.icon_equip = contentPane:GetGUIIcon("icon_equip")
+	self.icon_equipQuality = contentPane:GetGUIIcon("icon_equipQuality")
+	self.tx_title = contentPane:GetText("tx_title")
+	self.tx_equipQuality = contentPane:GetText("tx_equipQuality")
+	self.tx_equipName = contentPane:GetText("tx_equipName")
+	self.tx_content = contentPane:GetText("tx_content")
+	self.img_lock = contentPane:GetImage("img_lock")
+	
+	self.btn_ok.onClick:AddListener(function ()
+		self:onOkBtnClick()
+	end)
+
+	self.btn_cancel.onClick:AddListener(function ()
+		self:onCancelBtnClick()
+	end)
+	
+	self.btn_close.onClick:AddListener(function ()
+			self:onCancelBtnClick()
+		end)
+	
+	self.uiAnimator = contentPane.uiAnimator
+	
+end
+
+
+function UseAdvancedOrLockEquipTipsUI:onInit()
+
+	self:initComp()
+
+end
+
+function UseAdvancedOrLockEquipTipsUI:SetData(data) --data:{type: 0 --锁 1 --高品质 , equipId : number , title : string , content : string }
+
+	local equipCfg = CS_EquipConfigManagerInst:GetEquipInfoConfig(data.equipId)
+	if equipCfg ~= nil then
+	
+		self.tx_equipName.text = equipCfg.quality_name
+		local quality = equipCfg.equipQualityConfig.quality
+		self.tx_equipQuality.text = CS_LanguageManagerInst:GetValueByKey(CS_StaticConstants.qualityNames[quality - 1])
+		self.tx_equipQuality.color = CS_GUIHelper.GetColorByColorHex(CS_StaticConstants.qualityTxtColor[quality - 1])
+		self.icon_equipQuality:SetSprite("StaticIcon",CS_StaticConstants.qualityColorSprict[quality - 1])
+		CS_GUIHelper.showQualiyIcon(self.icon_equipQuality:GetComponent("RectTransform"),quality)
+		self.icon_equip:SetSprite(equipCfg.equipDrawingsConfig.atlas, equipCfg.equipDrawingsConfig.icon,CS_StaticConstants.qualityTxtColor[quality - 1])
+		
+	end
+	
+	self.tx_title.text = data.title
+	self.tx_content.text = data.content
+	
+	if data.type == 0 then
+		self.img_lock.enabled = true
+	else
+		self.img_lock.enabled = false
+	end
+
+end
+
+function UseAdvancedOrLockEquipTipsUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+
+end
+
+function UseAdvancedOrLockEquipTipsUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end
+	)
+
+end
+
+function UseAdvancedOrLockEquipTipsUI:onShowed()
+	CS.AudioManager.inst:PlaySound(10);
+end
+
+function UseAdvancedOrLockEquipTipsUI:onHide()
+	CS.AudioManager.inst:PlaySound(11);
+end
+
+function UseAdvancedOrLockEquipTipsUI:onOkBtnClick()
+	EventDispatcher:dispatchEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquipTipsUIBtnClickBackHandler,true)
+end
+
+function UseAdvancedOrLockEquipTipsUI:onCancelBtnClick()
+	EventDispatcher:dispatchEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquipTipsUIBtnClickBackHandler,false)
+end
+

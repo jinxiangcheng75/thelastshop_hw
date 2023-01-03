@@ -1,0 +1,75 @@
+---------------------------------------------------------------------
+
+local Vector3 = CS.UnityEngine.Vector3
+
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local csGameTimerInst = CS.GameTimer.inst
+local EventDispatcher = require("event/EventDispatcher")
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_UnionTaskPopularityConfigManagerInst = CS.UnionTaskPopularityConfigManager.inst
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+--RenownAwardItem
+
+local lvTx_1
+local lvTx_2
+local curLvBg
+local needNumTx
+local stateTx
+local awardNumTx
+local maskObj
+
+----
+
+
+function InitComp()
+
+	lvTx_1 = self.transform:Find("LvBg/lvTx_1"):GetComponent("Text")
+	lvTx_2 = self.transform:Find("lvTx_2"):GetComponent("Text")
+	curLvBg = self.transform:Find("curLvBg").gameObject
+	needNumTx = self.transform:Find("needNumTx"):GetComponent("Text")
+	stateTx = self.transform:Find("stateTx"):GetComponent("Text")
+	awardNumTx = self.transform:Find("awardNumTx"):GetComponent("Text")
+	maskObj = self.transform:Find("mask").gameObject
+
+end
+
+function SetData(renownLevel)
+
+	local unionTaskLevel = CS_UserDataProxyInst.unionTaskLevel
+
+	local config = CS_UnionTaskPopularityConfigManagerInst:GetConfig(renownLevel)
+
+	local nextConfig = CS_UnionTaskPopularityConfigManagerInst:GetConfig(renownLevel + 1)
+
+
+	lvTx_1.text = tostring(config.id)
+	lvTx_2.text = CS_LanguageManagerInst:GetValueByKey("等级{0}",tostring(config.id))
+	needNumTx.text = (nextConfig == nil or nextConfig:IsNull() == true) and tostring(config.need_point_num).."+" or config.need_point_num.."-"..(nextConfig.need_point_num - 1)
+	awardNumTx.text = tostring(config.reward_point_num)
+
+	if renownLevel < unionTaskLevel then
+		stateTx.color = CS.GUIHelper.GetColorByColorHex("94ff59")
+		stateTx.text = CS_LanguageManagerInst:GetValueByKey("已完成")
+		maskObj:SetActive(false)
+		curLvBg:SetActive(false)
+	elseif renownLevel == unionTaskLevel then
+		stateTx.color = CS.GUIHelper.GetColorByColorHex("ffffff")
+		stateTx.text = CS_LanguageManagerInst:GetValueByKey("当前奖励")
+		maskObj:SetActive(false)
+		curLvBg:SetActive(true)
+	elseif renownLevel == unionTaskLevel + 1 then
+		stateTx.color = CS.GUIHelper.GetColorByColorHex("ffa6a6")
+		stateTx.text = CS_LanguageManagerInst:GetValueByKey("下一奖励")
+		curLvBg:SetActive(false)
+		maskObj:SetActive(true)
+	else
+		stateTx.text = ""
+		maskObj:SetActive(true)
+		curLvBg:SetActive(false)
+	end
+
+end

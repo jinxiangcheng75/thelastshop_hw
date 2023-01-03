@@ -1,0 +1,435 @@
+--UnionWealUpDetailUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local CS_type_RectTransform = typeof(CS.UnityEngine.RectTransform)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+
+UnionWealUpDetailUI = class(ViewBase)
+
+function UnionWealUpDetailUI:ctor()
+	self.viewID = Constants.ViewName.UnionWealUpDetailUI
+	UnionWealUpDetailUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.noSettingAndEnergy
+end
+------------------------------------------------
+
+function UnionWealUpDetailUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.wealLvTx = contentPane:GetText("lvTx")
+	self.wealIcon = contentPane:GetObjByName("wealIcon"):GetComponent(CS_type_GUIIcon)
+	self.specialIconObj =contentPane:GetObjByName("specialIconObj").gameObject
+	self.shichang_lvObj =contentPane:GetObjByName("shichang_lvObj").gameObject
+	self.shichang_lanObj = contentPane:GetObjByName("shichang_lanObj").gameObject
+	self.nameTx = contentPane:GetText("nameTx")
+	self.upDesTx = contentPane:GetText("upDesTx")
+
+	self.top_ValuesContentTf = contentPane:GetObjByName("ValuesContent"):GetComponent(CS_type_RectTransform)
+	self.top_valueObj = contentPane:GetObjByName("valueObj").gameObject
+	self.top_lockObj = contentPane:GetObjByName("lockObj").gameObject
+	self.top_oldValueTx = contentPane:GetText("oldValue")
+	self.top_newValueTx = contentPane:GetText("newValue")
+	self.top_maxLvTx = contentPane:GetText("maxLvTx")
+
+	self.middle_commonObj = contentPane:GetObjByName("commonObj").gameObject
+	self.middle_commonDesTx = contentPane:GetText("commonDesTx")
+	self.middle_commonArrowObj = contentPane:GetObjByName("commonArrowObj")
+	self.middle_commonNextLvDesTx = contentPane:GetText("commonNextLvDes")
+	self.middle_commonMaxLvDexTx = contentPane:GetText("maxLv_desTx")
+
+
+	self.middle_unionLv = contentPane:GetObjByName("unionLv").gameObject
+	self.middle_unionLvItems = {}
+	local unionLvItemObjs = contentPane:GetObjByName("unoinLvItems"):GetComponent(CS_type_ObjList).objList
+	for i = 0,unionLvItemObjs.Count - 1 do
+		self.middle_unionLvItems[i + 1] = unionLvItemObjs[i].transform:GetComponent(CS_type_LuaListItem)
+	end
+
+	self.middle_unionBuff = contentPane:GetObjByName("unionBuff").gameObject
+	self.middle_unionBuffMaxLvTx = contentPane:GetText("unionBuffMaxLvTx")
+	self.middle_unionBuffMaxLvChgedObj = contentPane:GetObjByName("unionBuffMaxLvChgedObj")
+	self.middle_unionBuffMaxCurLvTx = contentPane:GetText("unionBuffMaxCurLvTx")
+	self.middle_unionBuffMaxNextLvTx = contentPane:GetText("unionBuffMaxNextLvTx")
+	--
+	self.middle_unionBuffDurationTimeTx = contentPane:GetText("unionBuffDurationTimeTx")
+	self.middle_unionBuffDurationTimeChangedObj = contentPane:GetObjByName("unionBuffDurationTimeChangedObj")
+	self.middle_unionBuffDurationCurTimeTx = contentPane:GetText("unionBuffDurationCurTimeTx")
+	self.middle_unionBuffDurationNextTimeTx = contentPane:GetText("unionBuffDurationNextTimeTx")
+
+
+	self.bottom_buttonUnLockObj = contentPane:GetObjByName("buttonUnLockObj").gameObject
+	self.bottom_buttonUnLockLvTx = contentPane:GetText("buttonUnLockLvTx")
+	self.bottom_buttonUpTipsTx = contentPane:GetText("buttonUpTipsTx")
+	self.bottom_wealButton = contentPane:GetButton("wealButton")
+	self.bottom_scoreTx = contentPane:GetText("scoreTx")
+	self.bottom_maxTipsObj = contentPane:GetObjByName("maxTipsObj").gameObject
+
+	self.tips_unionlvItemInfoObj = contentPane:GetObjByName("unionlvItemInfoObj")
+	self.tips_itemInfoNameTx = contentPane:GetText("itemInfoNameTx")
+	self.tips_unionlvItemInfoBtn = contentPane:GetButton("unionlvItemInfoBtn")
+
+	
+	self.uiAnimator = contentPane.uiAnimator
+	
+end
+
+
+function UnionWealUpDetailUI:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.bottom_wealButton:ButtonClickTween(
+		function ()
+			self:wealButtonClick()
+		end
+	)
+
+
+	self.tips_unionlvItemInfoBtn.onClick:AddListener(
+
+		function ()
+			self:onTips_unionlvItemInfoBtnClick()
+		end
+	)
+
+
+end
+
+function UnionWealUpDetailUI:RefreshData()
+	
+	if self.data == nil then
+		
+		self:hide()
+		
+	else
+		local newData = CS_UserDataProxyInst:getUnionScienceDataByType(self.data.serverData.type)
+		
+		if newData == nil then
+			
+			self:hide()
+			
+		elseif newData.serverData.level ~= self.data.serverData.level then
+			
+			EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("联盟科技数据发生变化"),"FFFFFF")
+			--self:SetData(newData) 重新刷新此界面
+			self:hide()
+			
+		end
+		
+	end
+	
+end
+
+function UnionWealUpDetailUI:SetData(data)
+
+	self.data = data  --UnionScienceData
+	self.isMax = (self.data.nextLvCfg == nil or self.data.nextLvCfg:IsNull() == true) and (self.data.unionNextLvCfg == nil or self.data.unionNextLvCfg:IsNull() == true)
+
+
+	self.specialIconObj:SetActive(false)
+	self.shichang_lvObj:SetActive(false)
+	self.shichang_lanObj:SetActive(false)
+
+
+	self.top_maxLvTx.gameObject:SetActive(false)
+	self.top_valueObj:SetActive(false)
+	self.top_lockObj:SetActive(false)
+
+
+
+	if (self.isMax) then
+
+		self.top_maxLvTx.gameObject:SetActive(true)
+		self.top_maxLvTx.text = tostring(self.data.serverData.level)
+		self.top_ValuesContentTf.sizeDelta = Vector2(80,80)
+
+	elseif data.serverData.level == 0 then --未解锁
+
+		self.top_lockObj:SetActive(true)
+		self.top_ValuesContentTf.sizeDelta = Vector2(80,80)
+
+	else
+
+		self.top_valueObj:SetActive(true)
+		self.top_ValuesContentTf.sizeDelta = Vector2(286,80)
+
+		self.top_oldValueTx.text = tostring(math.max(1,self.data.serverData.level))
+		self.top_newValueTx.text = tostring(math.max(self.data.serverData.level,1) + 1)
+
+	end
+
+
+	self:setMiddleInfo()
+
+	if 	data.serverData.type == 21 then --公会等级升级
+
+		self.wealIcon:SetSprite(data.unionLvCfg.atlas,data.unionLvCfg.icon)
+		self.wealLvTx.text =  tostring(data.unionLvCfg.level)
+		self.nameTx.text = CS_LanguageManagerInst:GetValueByKey(data.unionLvCfg.name,tostring(data.unionLvCfg.level))
+		self.upDesTx.text = CS_LanguageManagerInst:GetValueByKey(data.unionLvCfg.item_compare_des)
+
+		self.bottom_scoreTx.text = tostring(data.unionLvCfg.next_level_point)
+		self.bottom_scoreTx.color = CS_UserDataProxyInst.Union_uCoin < data.unionLvCfg.next_level_point and CS.GUIHelper.GetColorByColorHex("FF4040") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+
+	else --other
+
+		self.wealIcon:SetSprite(data.config.atlas,data.config.icon)
+
+		if data.serverData.type == 16 then --市场请求
+
+			self.shichang_lanObj:SetActive(true)
+
+		elseif data.serverData.type == 17 then --市场报价
+
+			self.shichang_lvObj:SetActive(true)
+
+		elseif data.serverData.type == 18 or data.serverData.type == 19 or data.serverData.type == 20 then --资源类
+
+			self.specialIconObj:SetActive(true)
+
+		end
+
+		self.wealLvTx.text = tostring(data.config.technology_level)
+		self.nameTx.text = CS_LanguageManagerInst:GetValueByKey(data.config.name)
+		self.upDesTx.text = CS_LanguageManagerInst:GetValueByKey(data.config.item_compare_des)
+
+
+		if not self.isMax then
+			self.bottom_scoreTx.text = tostring(data.nextLvCfg.need_point)
+			self.bottom_scoreTx.color = CS_UserDataProxyInst.Union_uCoin < data.nextLvCfg.need_point and CS.GUIHelper.GetColorByColorHex("FF4040") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+		end
+	end
+
+	self:setBottomInfo()
+
+end
+
+
+function UnionWealUpDetailUI:setMiddleInfo()
+
+
+	self.middle_commonObj:SetActive(false)
+	self.middle_unionLv:SetActive(false)
+	self.middle_unionBuff:SetActive(false)
+
+	if 	self.data.serverData.type == 21 then --公会等级升级
+
+		--if(self.isMax) then
+			--return
+		--end
+
+		self.middle_unionLv:SetActive(true)
+
+		local list = self.isMax and self.data.unionLvCfg:GetShowItemTechnologyIds() or self.data.unionNextLvCfg:GetShowItemTechnologyIds()
+
+		for i = 1, #self.middle_unionLvItems do
+
+			if 	i <= list.Count then
+
+				self.middle_unionLvItems[i]:SetData(list[i - 1])
+
+			else
+				self.middle_unionLvItems[i].gameObject:SetActive(false)
+			end
+
+		end
+
+
+
+	elseif self.data.serverData.type == 12 or self.data.serverData.type == 13 or self.data.serverData.type == 14 or self.data.serverData.type == 15 then
+
+		self.middle_unionBuff:SetActive(true)
+
+		self.middle_unionBuffMaxLvChgedObj:SetActive((self.data.config.now_level ~= self.data.config.behind_level) and self.data.serverData.level ~= 0)
+		self.middle_unionBuffMaxLvTx.gameObject:SetActive((self.data.config.now_level == self.data.config.behind_level) or self.data.serverData.level == 0)
+		self.middle_unionBuffMaxLvTx.text = tostring(self.data.config.now_level)
+		self.middle_unionBuffMaxCurLvTx.text  = tostring(self.data.config.now_level)
+		self.middle_unionBuffMaxNextLvTx.text = tostring(self.data.config.behind_level)
+
+		self.middle_unionBuffDurationTimeChangedObj:SetActive((self.data.config.skill_time ~= self.data.config.behind_skill_time) and self.data.serverData.level ~= 0)
+		self.middle_unionBuffDurationTimeTx.gameObject:SetActive((self.data.config.skill_time == self.data.config.behind_skill_time) or self.data.serverData.level == 0)
+		self.middle_unionBuffDurationTimeTx.text = CS_TimeUtils.timeSpanStrip(self.data.config.skill_time * 60,false)
+		self.middle_unionBuffDurationCurTimeTx.text = CS_TimeUtils.timeSpanStrip(self.data.config.skill_time * 60,false)
+		self.middle_unionBuffDurationNextTimeTx.text  = CS_TimeUtils.timeSpanStrip(self.data.config.behind_skill_time * 60,false)
+
+
+	else --common
+
+		self.middle_commonObj:SetActive(true)
+		self.middle_commonMaxLvDexTx.gameObject:SetActive(self.isMax)
+		self.middle_commonDesTx.gameObject:SetActive(not self.isMax)
+
+		if 	self.isMax then
+
+			self.middle_commonMaxLvDexTx.text = CS_LanguageManagerInst:GetValueByKey(self.data.config.item_des).." +"..self.data.config.add_num
+			return
+		end
+
+		self.middle_commonDesTx.text = CS_LanguageManagerInst:GetValueByKey(self.data.config.item_des).." +"..self.data.config.add_num
+		self.middle_commonNextLvDesTx.text = "+"..tostring(self.data.nextLvCfg.add_num)
+		self.middle_commonArrowObj:SetActive(self.data.serverData.level ~= 0)
+		self.middle_commonDesTx.transform:setLocalX(self.data.serverData.level ~= 0 and -60 or 0)
+
+	end
+
+end
+
+
+function  UnionWealUpDetailUI:setBottomInfo()
+
+	self.bottom_wealButton.gameObject:SetActive(not self.isMax)
+	self.bottom_maxTipsObj:SetActive(self.isMax)
+
+	if(self.isMax) then
+		return
+	end
+
+	if 	self.data.state == 0 or self.data.state == 2 then --未解锁 不可升级
+
+		self.bottom_buttonUpTipsTx.gameObject:SetActive(false)
+		self.bottom_buttonUnLockObj:SetActive(true)
+		self.bottom_buttonUnLockLvTx.text = tostring(self.data.nextLvCfg.need_level)
+		self.bottom_buttonUnLockLvTx.color = CS_UserDataProxyInst.UnionLevel < self.data.nextLvCfg.need_level and CS.GUIHelper.GetColorByColorHex("FF4040") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+		CS.GUIHelper.SetSingleUIGray(self.bottom_wealButton.transform,true)
+		self.bottom_wealButton.enabled = false
+
+	elseif self.data.state == 1 then --可解锁
+
+		self.bottom_buttonUpTipsTx.gameObject:SetActive(true)
+		self.bottom_buttonUnLockObj:SetActive(false)
+		self.bottom_buttonUpTipsTx.text = CS_LanguageManagerInst:GetValueByKey("解锁")
+		CS.GUIHelper.SetSingleUIGray(self.bottom_wealButton.transform,false)
+		self.bottom_wealButton.enabled = true
+
+	elseif self.data.state == 3 then --可升级
+
+		self.bottom_buttonUpTipsTx.gameObject:SetActive(true)
+		self.bottom_buttonUnLockObj:SetActive(false)
+		self.bottom_buttonUpTipsTx.text = CS_LanguageManagerInst:GetValueByKey("升级")
+		CS.GUIHelper.SetUIGray(self.bottom_wealButton.transform,false)
+		self.bottom_wealButton.enabled = true
+
+	end
+
+end
+
+
+function UnionWealUpDetailUI:onHide()
+	print("UnionWealUpDetailUI onHide")
+end
+
+function  UnionWealUpDetailUI:onShowed()
+	print("UnionWealUpDetailUI onShowed")
+end
+
+function UnionWealUpDetailUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function UnionWealUpDetailUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+function UnionWealUpDetailUI:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function UnionWealUpDetailUI:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function UnionWealUpDetailUI:showTipsUnionWealUpDataItemInfo(uiTf,UnionTechnologyConfig)
+
+	if self.data.serverData.type == 21 then
+
+		self.tips_unionlvItemInfoObj.transform.position = Vector3(uiTf.position.x,uiTf.position.y + 0.8)
+		self.tips_unionlvItemInfoObj:SetActive(true)
+		self.tips_itemInfoNameTx.text = CS_LanguageManagerInst:GetValueByKey(UnionTechnologyConfig.name)
+		self.tips_unionlvItemInfoBtn.gameObject:SetActive(true)
+
+	end
+
+end
+
+function UnionWealUpDetailUI:closeBtnClick()
+	self:hide()
+end
+
+function UnionWealUpDetailUI:wealButtonClick()
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func_2 = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+
+	if CS_UserDataProxyInst.playerData.memberJob == 0 then
+		func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("只有管理员和公会会长可以购买联盟福利。"),CS.GUIHelper.GetColorByColorHex("FE4747"))
+		return
+	end
+
+
+	if self.bottom_scoreTx.color == CS.GUIHelper.GetColorByColorHex("FF4040") then
+		func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("联盟积分不足"),CS.GUIHelper.GetColorByColorHex("FE4747"))
+	else
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+		local func_1 = funcGeneric(CS.System.Int32)
+
+		func_1(CS_EventControllerInst,CS_GameEventType.UnionEvent.UNION_REQUEST_SCIENCEUPGRADE,self.data.serverData.type)
+		
+		self:hide()
+		
+	end
+
+end
+
+function UnionWealUpDetailUI:onTips_unionlvItemInfoBtnClick()
+
+	self.tips_unionlvItemInfoObj:SetActive(false)
+	self.tips_unionlvItemInfoBtn.gameObject:SetActive(false)
+
+end
+
+
+
+------------------------------------------------

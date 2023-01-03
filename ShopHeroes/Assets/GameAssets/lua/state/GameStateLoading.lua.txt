@@ -1,0 +1,21 @@
+--GameStateLoading
+local BaseState = require("state/BaseState")
+
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+
+local GameStateLoading = class(BaseState)
+
+local mTransition
+
+function GameStateLoading:onEnter(transition)
+	mTransition = transition
+	csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_LOADINGUI)
+	CS.ManagerBinder.inst.stateIsChanging = false
+end
+
+function GameStateLoading:onExit()
+	csEventControllerInst:TriggerEvent(csGameEventType.HIDEUI_LOADINGUI)
+end
+
+return GameStateLoading

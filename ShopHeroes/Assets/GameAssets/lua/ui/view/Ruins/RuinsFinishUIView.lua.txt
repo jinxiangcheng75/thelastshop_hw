@@ -1,0 +1,220 @@
+--RuinsFinishUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local EventDispatcher = require("event/EventDispatcher")
+
+RuinsFinishUIView = class(ViewBase)
+
+function RuinsFinishUIView:ctor()
+	self.viewID = Constants.ViewName.RuinsFinishUIView
+	RuinsFinishUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function RuinsFinishUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.normalObj = contentPane:GetObjByName("normalObj")
+	self.nextObj = contentPane:GetObjByName("nextObj")
+	self.successObj = contentPane:GetObjByName("successObj")
+	self.loseObj = contentPane:GetObjByName("loseObj")
+	self.finishText = contentPane:GetText("finishText")
+	self.nextNameText = contentPane:GetText("nextNameText")
+	local allHero = contentPane:GetObjByName("allHero"):GetComponent("ObjList")
+	if(allHero ~= nil)then
+		self.allHeroItem = allHero.objList
+	end
+	local allAwardComp = contentPane:GetObjByName("allAwards"):GetComponent("ObjList")
+	if(allAwardComp ~= nil)then
+		self.allRewards = allAwardComp.objList
+	end
+	self.collectBtn = contentPane:GetButton("collectBtn")
+	self.bossIcon = contentPane:GetGUIIcon("bossIcon")
+	self.remainEnemyText = contentPane:GetText("remainEnemyText")
+	self.enemyHpSlider = contentPane:GetObjByName("enemyHpSlider"):GetComponent("Slider")
+	self.remainHpText = contentPane:GetText("remainHpText")
+	self.continueBtn = contentPane:GetButton("continueBtn")
+	self.nameText = contentPane:GetText("nameText")
+	self.icon = contentPane:GetGUIIcon("icon")
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.finishBg = contentPane:GetGUIIcon("finishBg")
+end
+
+function RuinsFinishUIView:onInit()
+	self:initComp()
+
+	self.collectBtn:ButtonClickTween(
+		function()
+			self:CheckIsHaveNewMap()
+		end
+	)
+
+	self.continueBtn:ButtonClickTween(
+		function()
+			self:hide()
+			RuinsDataProxy.inst.isShowPrepare = true
+			EventDispatcher:dispatchEvent(GameEvent.CSEvent.Change_State, CS.StateTransition(CS.kGameState.Ruins,true))
+		end
+	)
+
+	self.closeBtn:ButtonClickTween(
+		function()
+			self:hide()
+			RuinsDataProxy.inst.isShowPrepare = true
+			EventDispatcher:dispatchEvent(GameEvent.CSEvent.Change_State, CS.StateTransition(CS.kGameState.Ruins,true))
+		end
+	)
+end
+
+function RuinsFinishUIView:CheckIsHaveNewMap()
+	local curCfg = RuinsConfigManager:GetConfig(RuinsDataProxy.inst.curId)
+	local endCfg = RuinsConfigManager:GetConfig(RuinsDataProxy.inst.endId)
+
+	if(curCfg ~= nil and endCfg ~= nil)then
+		if(curCfg.instance_group ~= endCfg.instance_group)then
+			self:SetNextMapData(endCfg)
+		else
+			self:hide()
+			RuinsDataProxy.inst.isShowPrepare = true
+			EventDispatcher:dispatchEvent(GameEvent.CSEvent.Change_State, CS.StateTransition(CS.kGameState.Ruins,true))
+		end
+	else
+		self:hide()
+		RuinsDataProxy.inst.isShowPrepare = true
+		EventDispatcher:dispatchEvent(GameEvent.CSEvent.Change_State, CS.StateTransition(CS.kGameState.Ruins,true))
+	end
+end
+
+function RuinsFinishUIView:SetNextMapData(cfg)
+	self.normalObj:SetActive(false)
+	self.nextObj:SetActive(true)
+
+	self.nameText.text = cs_LanguageManagerInst:GetValueByKey(cfg.instance_group_name)
+	self.icon:SetSpriteURL(cfg.instance_icon,"",false,true)
+end
+
+function RuinsFinishUIView:onHide()
+
+end
+
+function RuinsFinishUIView:onShowed()
+	if(CS.RuinsMap.inst ~= nil)then
+		CS.RuinsMap.inst:setIsInMain(false)
+	end
+
+	self.normalObj:SetActive(true)
+	self.nextObj:SetActive(false)
+
+	self:SetHeroData()
+
+	if(#RuinsDataProxy.inst.endReward > 0)then
+		self:SetSuccessData()
+	else
+		self:SetFailData()
+	end
+end
+
+function RuinsFinishUIView:SetHeroData()
+	local heroUids = RuinsDataProxy.inst.endHeroUIids
+
+	for i = 0, self.allHeroItem.Count - 1 do
+		local index = i
+		if(index <= #heroUids - 1)then
+			self.allHeroItem[index]:SetActive(true)
+
+			local heroData = RuinsDataProxy.inst:GetHeroDataByUid(heroUids[index + 1])
+			local curItem = self.allHeroItem[index]:GetComponent("LuaListItem")
+
+			if(heroData ~= nil and curItem ~= nil)then
+				curItem:SetData(heroData)
+			else
+				self.allHeroItem[index]:SetActive(false)
+			end
+		else
+			self.allHeroItem[index]:SetActive(false)
+		end
+	end
+end
+
+function RuinsFinishUIView:SetRewardData()
+	local rewardList = RuinsDataProxy.inst.endReward
+
+	for i = 0, self.allRewards.Count - 1 do
+		local index = i
+
+		if(index <= #rewardList - 1)then
+			self.allRewards[index]:SetActive(true)
+			local curItem = self.allRewards[index]:GetComponent("LuaListItem")
+			if(curItem ~= nil)then
+				local commonData = CS.CommonRewardData(rewardList[index + 1].itemId,rewardList[index + 1].count,0,rewardList[index + 1].itemType)
+				curItem:SetData(commonData)
+			else
+				self.allRewards[index]:SetActive(false)
+			end
+		else
+			self.allRewards[index]:SetActive(false)
+		end
+	end
+end
+
+function RuinsFinishUIView:SetSuccessData()
+	self.successObj:SetActive(true)
+	self.loseObj:SetActive(false)
+	
+	self.finishBg:SetSprite("__common_1", "shoudao_piaodai")
+
+	self.finishText.text = cs_LanguageManagerInst:GetValueByKey("通关成功！")
+	--self.finishText.color = CS.UnityEngine.Color.white
+	self.nextNameText.enabled = true
+
+	local endCfg = RuinsConfigManager:GetConfig(RuinsDataProxy.inst.endId)
+
+	if(endCfg ~= nil)then
+		self.nextNameText.text = cs_LanguageManagerInst:GetValueByKey("即将进入 {0} {1}",cs_LanguageManagerInst:GetValueByKey(endCfg.instance_group_name),cs_LanguageManagerInst:GetValueByKey(endCfg.instance_name))
+	end
+
+	self:SetRewardData()
+end
+
+function RuinsFinishUIView:SetFailData()
+	self.successObj:SetActive(false)
+	self.loseObj:SetActive(true)
+
+	self.finishBg:SetSprite("__common_1", "shoudao_shibai")
+	
+	self.finishText.text = cs_LanguageManagerInst:GetValueByKey("通关失败！")
+	--self.finishText.color = CS.UnityEngine.Color.red
+	self.nextNameText.enabled = false
+
+	if(RuinsDataProxy.inst.curRuinsCfg ~= nil)then
+		local bossCfg = CS.MonsterConfigManager.inst:GetConfig(RuinsDataProxy.inst.curRuinsCfg.boss_id)
+		if(bossCfg ~= nil)then
+			self.bossIcon:SetSprite(bossCfg.monster_atlas,bossCfg.monster_icon)
+		end
+	end
+
+	self.remainEnemyText.text = cs_LanguageManagerInst:GetValueByKey("剩余怪物数量：{0}",tostring(RuinsDataProxy.inst.endRemainCount))
+	self.enemyHpSlider.maxValue = RuinsDataProxy.inst.sumEnemyCount
+	self.enemyHpSlider.value = RuinsDataProxy.inst.endRemainCount
+	self.remainHpText.text = tostring(math.floor(tonumber(RuinsDataProxy.inst.endRemainCount) / tonumber(RuinsDataProxy.inst.sumEnemyCount) * 100)) .. "%"
+end
+
+function RuinsFinishUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function RuinsFinishUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RuinsFinishUIView:closeBtnClick()
+	self:hide()
+end
+------------------------------------------------

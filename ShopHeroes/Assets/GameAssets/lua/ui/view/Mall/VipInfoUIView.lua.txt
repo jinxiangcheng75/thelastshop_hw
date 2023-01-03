@@ -1,0 +1,114 @@
+--VipInfoUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/MallDataProxy")
+require("config/VipInfoConfingManager")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local CS_type_luaList = typeof(CS.LuaListItem)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+
+local data
+local dataList = {}
+
+VipInfoUIView = class(ViewBase)
+
+function VipInfoUIView:ctor()
+	self.viewID = Constants.ViewName.VipInfoUIView
+	VipInfoUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+
+function VipInfoUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.bgBtn = contentPane:GetButton("bg")
+	local superList =  contentPane:GetObjByName("allInfos")
+	self.scrollView = superList:GetComponent(CS_type_superList)
+	self.listItemCount = 0
+end
+
+function VipInfoUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+	
+	self.bgBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.scrollView.itemRenderer = function(index,item)
+		self:ListItemRenderer(index,item)
+	end
+end
+
+function VipInfoUIView:onHide()
+	--print("VipInfoUIView onHide")
+end
+
+function  VipInfoUIView:onShowed()
+	--print("VipInfoUIView onShowed")
+	self:SetUIData()
+end
+
+function VipInfoUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function VipInfoUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function VipInfoUIView:closeBtnClick()
+	self:hide()
+end
+
+function VipInfoUIView:SetUIData()
+	--self:SetRewardItemData()
+	dataList = VipInfoConfingManager:GetConfigByType(3)
+	local wpCount = CS.WorldParConfigManager.inst:GetConfig(8006).parameters
+	local itemCount = 0
+	if(wpCount < #dataList)then
+		itemCount = wpCount
+	else
+		itemCount = #dataList
+	end
+	self:SetListItemTotalCount(itemCount)
+end
+
+function VipInfoUIView:ListItemRenderer(index,item)
+	local prefabItem = item
+
+	if(index >= self.listItemCount)then
+		prefabItem.gameObject:SetActive(false)
+	end
+
+	if(index < self.listItemCount)then
+		prefabItem.gameObject:SetActive(true)
+		prefabItem:SetData(dataList[index + 1])
+	end
+end
+
+function VipInfoUIView:SetListItemTotalCount(count)
+	self.listItemCount = count
+	if(count < 0)then
+		self.listItemCount = 0
+	end
+
+	self.scrollView.totalItemCount = count
+end
+------------------------------------------------

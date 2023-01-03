@@ -1,0 +1,198 @@
+
+require("const/Constants")
+
+local icon
+local tx_bottom
+local infoBtn
+local tuzhiBg
+local equipLvObj
+local equipLvTx
+local luxuryNumImg
+local luxuryNumText
+local icon_equipSubType
+local icon_shopkeeperDressType
+local img_shopkeeperDressColor
+local icon_furnitureType
+local obj_furnitureType
+local obj_equipSubType
+local obj_shopkeeperDressType
+
+local csItemConfigManagerInst = CS.ItemconfigManager.inst
+local csEquipConfigManagerInst = CS.EquipConfigManager.inst
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csItemType = CS.ItemType
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+
+local config
+local commonData
+
+function InitComp()
+
+	icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	tx_bottom = self:GetObjByName("tx_bottom"):GetComponent("Text")
+	infoBtn = self:GetObjByName("infoBtn"):GetComponent("Button")
+	tuzhiBg = self:GetObjByName("tuzhiBg"):GetComponent("Image")
+	equipLvObj = self:GetObjByName("equipLvObj")
+	equipLvTx = self:GetObjByName("equipLvTx"):GetComponent("Text")
+	luxuryNumImg = self:GetObjByName("luxuryNumImg"):GetComponent("Image")
+	luxuryNumText = self:GetObjByName("luxuryNumText"):GetComponent("Text")
+	icon_equipSubType = self:GetObjByName("icon_equipSubType"):GetComponent("GUIIcon")
+	icon_shopkeeperDressType = self:GetObjByName("icon_shopkeeperDressType"):GetComponent("GUIIcon")
+	icon_furnitureType = self:GetObjByName("icon_furnitureType"):GetComponent("GUIIcon")
+	img_shopkeeperDressColor = self:GetObjByName("img_shopkeeperDressColor"):GetComponent("Image")
+	obj_furnitureType = self:GetObjByName("obj_furnitureType")
+	obj_equipSubType = self:GetObjByName("obj_equipSubType")
+	obj_shopkeeperDressType = self:GetObjByName("obj_shopkeeperDressType")
+
+	infoBtn:ButtonClickTween(function()
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+			local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+			func(csEventControllerInst, csGameEventType.CommonEvent.COMMONTIPS_SETINFO, commonData, icon.transform)
+		end)
+end
+
+function SetData(sevenDayBuyPassRewardId)
+	
+	config = SevenDayPassAwardConfigManager:GetConfig(sevenDayBuyPassRewardId)
+
+	config.reward = tonumber(config.reward)
+	config.reward_number = tonumber(config.reward_number)
+	config.type = tonumber(config.type)
+	
+	commonData = CS.CommonRewardData(config.reward,config.reward_number,0,config.type)
+
+	obj_equipSubType:SetActive(false)
+	obj_shopkeeperDressType:SetActive(false)
+	obj_furnitureType:SetActive(false)
+	luxuryNumImg.gameObject:SetActive(false)
+	luxuryNumText.gameObject:SetActive(false)
+	luxuryNumText.text = ""
+
+	if config.label ~= nil and config.label ~= "" then
+		
+		tx_bottom.color = CS.GUIHelper.GetColorByColorHex("ffea56")
+		tx_bottom.text = csLanguageManagerInst:GetValueByKey(config.label)
+		
+	else
+		
+		tx_bottom.color = CS.GUIHelper.GetColorByColorHex("FFFFFF")
+		tx_bottom.text = "x"..tostring(config.reward_number)
+		
+	end
+	
+	tuzhiBg.gameObject:SetActive(csItemType.__CastFrom(config.type) == csItemType.EquipmentDrawing or config.type == 1600)
+	equipLvObj.gameObject:SetActive(csItemType.__CastFrom(config.type) == csItemType.EquipmentDrawing or config.type == 1600 or csItemType.__CastFrom(config.type) == csItemType.Equip)
+	if(csItemType.__CastFrom(config.type) == csItemType.Craftsman)then
+		local workerCfg = CS.WorkerConfigManager.inst:GetConfig(config.reward)
+		icon:SetSprite("portrait_atlas", workerCfg.pic)
+	elseif csItemType.__CastFrom(config.type) == csItemType.Equip then
+		local equipCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(config.reward);
+		icon:SetSprite(equipCfg.equipDrawingsConfig.atlas, equipCfg.equipDrawingsConfig.icon, CS.StaticConstants.qualityColor[equipCfg.equipQualityConfig.quality - 1]);
+		local classcfg = CS.EquipConfigManager.inst:GetEquipTypeByID(equipCfg.equipDrawingsConfig.sub_type);
+		if classcfg ~= nil then
+			obj_equipSubType:SetActive(true)
+			icon_equipSubType:SetSprite(classcfg.Atlas, classcfg.icon)
+		end
+		equipLvTx.text = tostring(equipCfg.equipDrawingsConfig.level)
+		
+	elseif config.type == 1600 then
+		local equipDrawingCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(config.reward)
+		icon:SetSprite(equipDrawingCfg.atlas,equipDrawingCfg.icon)
+		local classcfg = CS.EquipConfigManager.inst:GetEquipTypeByID(equipDrawingCfg.sub_type);
+		if classcfg ~= nil then
+			obj_equipSubType:SetActive(true)
+			icon_equipSubType:SetSprite(classcfg.Atlas, classcfg.icon)
+		end
+		equipLvTx.text = tostring(equipDrawingCfg.level)
+		
+	elseif csItemType.__CastFrom(config.type) == csItemType.EquipmentDrawing then
+		local itemCfg = csItemConfigManagerInst:GetConfig(config.reward)
+		local equipDrawingCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(itemCfg.effect)
+		icon:SetSprite(equipDrawingCfg.atlas,equipDrawingCfg.icon)
+		local classcfg = CS.EquipConfigManager.inst:GetEquipTypeByID(equipDrawingCfg.sub_type);
+		if classcfg ~= nil then
+			obj_equipSubType:SetActive(true)
+			icon_equipSubType:SetSprite(classcfg.Atlas, classcfg.icon)
+		end
+		equipLvTx.text = tostring(equipDrawingCfg.level)
+
+	else
+		local itemCfg = csItemConfigManagerInst:GetConfig(config.reward)
+		icon:SetSprite(itemCfg.atlas, itemCfg.icon)
+		if(csItemType.__CastFrom(config.type) == csItemType.MakeSlotNum)then
+			tx_bottom.text = csLanguageManagerInst:GetValueByKey(itemCfg.name).." "..itemCfg.effect
+		elseif csItemType.__CastFrom(config.type) == csItemType.ExploreSlotNum then
+			tx_bottom.text = csLanguageManagerInst:GetValueByKey(itemCfg.name).." "..itemCfg.effect
+		elseif csItemType.__CastFrom(config.type) == csItemType.ShopSizeNum then
+			tx_bottom.text = csLanguageManagerInst:GetValueByKey(itemCfg.name).." "..itemCfg.effect
+		elseif csItemType.__CastFrom(config.type) == csItemType.HeroSlotNum then
+			tx_bottom.text = csLanguageManagerInst:GetValueByKey(itemCfg.name).." "..itemCfg.effect
+		elseif csItemType.__CastFrom(config.type) == csItemType.MarketSlotNum then
+			tx_bottom.text = csLanguageManagerInst:GetValueByKey(itemCfg.name).." "..itemCfg.effect
+		elseif csItemType.__CastFrom(config.type) == csItemType.ShopkeeperDress then --店主装扮
+
+			local atlas = "dressup_atlas"
+			local iconName = ""
+			local dressCfg = CS.dressconfigManager.inst:GetConfig(tonumber(itemCfg.effect))
+			img_shopkeeperDressColor.enabled = false
+
+			if dressCfg ~= nil then
+
+				if dressCfg.type_1 == 1 then --外观
+
+					local dic = dressCfg.gender == 2 and CS.StaticConstants.dressupIconYellow_Facade_Girl_Dic or CS.StaticConstants.dressupIconYellow_Facade_Boy_Dic
+					iconName = dic[dressCfg.type_2]
+					if dressCfg.val ~= nil and dressCfg.val ~= "" then --颜色
+						img_shopkeeperDressColor.enabled = true
+					end
+
+				elseif dressCfg.type_1 == 2 then --时装
+
+					iconName = CS.StaticConstants.dressupIconYellow_FashionDic[dressCfg.type_2]
+
+				end
+
+			end
+
+			obj_shopkeeperDressType:SetActive(true)
+			icon_shopkeeperDressType:SetSprite(atlas, iconName)
+
+		elseif csItemType.__CastFrom(config.type) == csItemType.Furniture then
+
+			luxuryNumImg.gameObject:SetActive(true)
+
+			local furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(tonumber(itemCfg.effect))
+
+			if furnitureCfg ~= nil then
+
+				local luxury = 0
+
+				if furnitureCfg.type_1 == 1 then --墙壁
+
+					local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS_UserDataProxyInst.shopData.shopLevel);
+
+					luxury = math.ceil((cfg.size_x / 2 + cfg.size_y / 2 ) * furnitureCfg.luxury)
+
+				elseif furnitureCfg.type_1 == 2 then --地板
+
+					local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS_UserDataProxyInst.shopData.shopLevel);
+
+					luxury = math.ceil((cfg.size_x / 2) * (cfg.size_y / 2) * furnitureCfg.luxury)
+
+				else
+					luxury = furnitureCfg.luxury
+				end
+
+				luxuryNumText.gameObject:SetActive(true)
+				luxuryNumText.text = tostring(luxury)
+
+				obj_furnitureType:SetActive(true)
+				icon_furnitureType:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.kTileGroupType.__CastFrom(furnitureCfg.type_1) == CS.kTileGroupType.OutdoorFurniture and "jiaju_shiwai" or "jiaju_danyao","",false,true)
+
+			end
+
+		end
+	end
+end

@@ -1,0 +1,74 @@
+
+-- ManagerBinderHotfix
+
+require("utils/XLuaUtils")
+require("utils/Dictionary")
+local coroutine_cs = require("coroutine_cs")
+
+local LogType = CS.UnityEngine.LogType
+local UTF8 = CS.System.Text.Encoding.UTF8
+cast(UTF8, typeof(CS.System.Text.Encoding))
+
+xlua.private_accessible(CS.ManagerBinder)
+
+local logDic = {}
+
+coroutine_cs.start(
+	function()
+		while true do
+
+			coroutine_cs.wait(30)
+			logDic = {}
+
+		end
+	end
+)
+
+
+xlua.hotfix(
+	CS.ManagerBinder,
+	"Application_logMessageReceived",
+	function(self, condition, stackTrace, logType)
+
+		if CS.PlatformManager.platform == CS.PlatformType.unityendtor then --不是editor
+			return
+		end
+
+		if logType == LogType.Exception or logType == LogType.Error then
+
+			local osType = MsgType.EOsType.None
+			if CS.PlatformManager.platform == CS.PlatformType.Google or CS.PlatformManager.platform == CS.PlatformType.qkgameandroid then
+				osType = MsgType.EOsType.Android
+			elseif CS.PlatformManager.platform == CS.PlatformType.Ios or CS.PlatformManager.platform == CS.PlatformType.QuickIos then
+				osType = MsgType.EOsType.Ios
+			end
+
+			local needSubmit = true
+			
+			for i = 1, #logDic do
+				
+				if logDic[i] == condition.."||"..stackTrace then
+					needSubmit = false
+					break
+				end
+				
+			end
+			
+			if needSubmit then
+				
+				logDic[#logDic + 1] = condition.."||"..stackTrace
+				
+				local rep = MsgType.Request_Client_Error:New()
+				rep.err = condition
+				rep.userId = CS.UserDataProxy.inst.playerData ~= nil and CS.UserDataProxy.inst.playerData.userUid or ""
+				rep.ver = CS.GameSettingManager.appVersion
+				rep.stackTrack = CS.System.Convert.ToBase64String(UTF8:GetBytes(stackTrace))
+				rep.osType = osType
+				rep:Send()
+				
+			end
+			
+		end
+
+	end
+)

@@ -1,0 +1,30 @@
+--PlatformManager
+
+require("class")
+
+local csAndroidJavaClass = CS.AndroidJavaClass
+local csAndroidJavaObject = CS.AndroidJavaObject
+local csPlatformManager = CS.PlatformManager
+
+NativeManager = class()
+
+local cs_AndroidJavaClass_GetStatic_AndroidJavaObject = nil
+
+function NativeManager:init()
+	local funcGeneric = xlua.get_generic_method(csAndroidJavaClass, "GetStatic")
+	local func = funcGeneric(csAndroidJavaObject)
+	cs_AndroidJavaClass_GetStatic_AndroidJavaObject = func
+end
+
+function NativeManager:call(funcName, param)
+	-- local player = csAndroidJavaClass("com.unity3d.player.UnityPlayer")
+	-- local activity = cs_AndroidJavaClass_GetStatic_AndroidJavaObject(player, "currentActivity")
+	-- activity:call(funcName, param)
+end
+
+function NativeManager:NativeMessage(funcName, p)
+end
+
+--#region
+
+--#endregion

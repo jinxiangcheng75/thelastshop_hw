@@ -1,0 +1,307 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/RefugeTower/RefugeUIView")
+require("ui/view/RefugeTower/RefugeExchangeUIView")
+require("ui/view/RefugeTower/RefugePrepareUIView")
+require("ui/view/RefugeTower/RefugeSelectHeroUIView")
+require("ui/view/RefugeTower/RefugeUseItemUIView")
+require("ui/view/RefugeTower/RefugeAdventureUIView")
+require("network/NetworkEvent")
+require("data/RefugeTowerDataProxy")
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_Type_LuaListItem = typeof(CS.LuaListItem)
+local CS_GameObject = CS.UnityEngine.GameObject
+
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csStaticConstants = CS.StaticConstants
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+
+local csGameTimerInst = CS.GameTimer.inst
+local csTimeUtils = CS.TimeUtils
+
+RefugeTowerSystem = class(BaseSystem)
+RefugeTowerSystem.super = BaseSystem
+
+local refugeUIView
+local refugePanelUIView
+local refugePrepareUIView
+local refugeSelectHeroUIView
+local refugeSelectItemUIView
+local refugeAdventureUIView
+
+local tempComp = nil
+
+function RefugeTowerSystem:ctor()
+end
+
+function RefugeTowerSystem:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.ShowUI_RefugeUI,self,self.openRefugeUI)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.ShowUI_RefugePanelUI,self,self.openRefugePanel)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.RefreshUI_RefugePanelUI,self,self.RefugePanelRefresh)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.ShowUI_RefugePrepareUI,self,self.openRefugePrepare)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.RefreshUI_RefugePrepareUI,self,self.RefugePrepareRefreshHero)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.HideUI_RefugePrepareUI,self,self.hideRefugePrepare)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.ShowUI_RefugePrepareUIAddHero,self,self.RefugePrepareAddHero)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.ShowUI_RefugePrepareUIAddItem,self,self.RefugePrepareAddItem)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.ShowUI_RefugeSelectHero,self,self.openRefugeSelectHero)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.HideUI_RefugeSelectHero,self,self.hideRefugeSelectHero)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.RefreshUI_RefugeSelectHero,self,self.RefugeRefreshSelectHero)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.ShowUI_RefugeSelectItem,self,self.openRefugeSelectItem)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.ShowUI_RefugeAdventure,self,self.openRefugeAdventure)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.HideUI_RefugeAdventure,self,self.hideRefugeAdventureUI)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.RefreshUI_RefugeAdventure,self,self.RefugeRefreshAdventure)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.Request_RefugeStart,self,self.requestRefugeStart)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.Request_RefugeInfo,self,self.requestRefugeInfo)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.Request_RefugeEnd,self,self.requestRefugeEnd)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.Request_RefugeImmediately,self,self.requestRefugeImmediately)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.Request_RefugeReward,self,self.requestRefugeReward)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.Set_MainUIRefugeBtn,self,self.setMainUIBtn)
+	EventDispatcherInis:addEvent(GameEvent.RefugeEvent.Refresh_SortHeroList,self,self.sortHeroList)
+
+end
+
+function RefugeTowerSystem:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.ShowUI_RefugeUI,self.openRefugeUI)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.ShowUI_RefugePanelUI,self.openRefugePanel)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.RefreshUI_RefugePanelUI,self.RefugePanelRefresh)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.ShowUI_RefugePrepareUI,self.openRefugePrepare)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.RefreshUI_RefugePrepareUI,self.RefugePrepareRefreshHero)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.HideUI_RefugePrepareUI,self.hideRefugePrepare)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.ShowUI_RefugePrepareUIAddHero,self.RefugePrepareAddHero)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.ShowUI_RefugePrepareUIAddItem,self.RefugePrepareAddItem)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.ShowUI_RefugeSelectHero,self.openRefugeSelectHero)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.HideUI_RefugeSelectHero,self.hideRefugeSelectHero)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.RefreshUI_RefugeSelectHero,self.RefugeRefreshSelectHero)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.ShowUI_RefugeSelectItem,self.openRefugeSelectItem)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.ShowUI_RefugeAdventure,self.openRefugeAdventure)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.HideUI_RefugeAdventure,self.hideRefugeAdventureUI)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.RefreshUI_RefugeAdventure,self.RefugeRefreshAdventure)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.Request_RefugeStart,self.requestRefugeStart)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.Request_RefugeInfo,self.requestRefugeInfo)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.Request_RefugeEnd,self.requestRefugeEnd)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.Request_RefugeImmediately,self.requestRefugeImmediately)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.Request_RefugeReward,self.requestRefugeReward)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.Set_MainUIRefugeBtn,self.setMainUIBtn)
+	EventDispatcherInis:removeEvent(GameEvent.RefugeEvent.Refresh_SortHeroList,self.sortHeroList)
+
+
+end
+
+function RefugeTowerSystem:sortHeroList()
+	EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_SortHeroList)
+	refugePrepareUIView = GUIManager.inst:GetWindow(Constants.ViewName.RefugePrepareUIView, false)
+	if(refugePrepareUIView ~= nil and refugePrepareUIView.isShowing)then
+		refugePrepareUIView:SortAllHeroList()
+	end
+end
+
+function RefugeTowerSystem:setMainUIBtn(timeText,refugeBtn)
+	--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	--local func = funcGeneric(CS.System.Boolean)
+	--func(csEventControllerInst, csGameEventType.MenuEvent.SETREFUGEBTNSTATE, true)
+
+	refugeBtn.gameObject:SetActive(false)
+	if(tempComp ~= nil)then
+		csGameTimerInst:removeLoopTimer(tempComp)
+		tempComp = nil
+	end
+	if(RefugeTowerDataProxy.inst.remainTime == nil) then return end
+	if(#RefugeTowerDataProxy.inst.towerList <= 0) then return end	
+	
+	if(tonumber(RefugeTowerDataProxy.inst.remainTime) > 0)then
+		timeText.text = csTimeUtils.timeSpan3Str(RefugeTowerDataProxy.inst.remainTime)
+		refugeBtn.gameObject:SetActive(true)
+		tempComp = csGameTimerInst:AddLoopTimerComp(timeText.gameObject,1,function ()
+				if(RefugeTowerDataProxy.inst.remainTime > 0)then
+					timeText.text = csTimeUtils.timeSpan3Str(RefugeTowerDataProxy.inst.remainTime)
+				else
+					timeText.text = cs_LanguageManagerInst:GetValueByKey("活动已结束")
+					
+					if(RefugeTowerDataProxy.inst.haveNotGetAward)then
+						refugeBtn.gameObject:SetActive(true)
+					else
+						refugeBtn.gameObject:SetActive(false)
+					end
+					csGameTimerInst:removeLoopTimer(tempComp)
+					tempComp = nil
+				end
+			end)
+	else
+		timeText.text = cs_LanguageManagerInst:GetValueByKey("活动已结束")
+
+		if(RefugeTowerDataProxy.inst.haveNotGetAward)then
+			refugeBtn.gameObject:SetActive(true)
+		else
+			refugeBtn.gameObject:SetActive(false)
+		end
+	end
+end
+
+function RefugeTowerSystem:openRefugeUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RefugeUIView,
+		function(view)
+			refugeUIView = view
+			refugeUIView:SetUIData()
+			--luxuryLevelUpUIView:SetUIData(level)
+		end
+	)
+end
+
+function RefugeTowerSystem:ReInitSystem()
+	
+end
+
+function RefugeTowerSystem:openRefugePanel()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RefugeExchangeUIView,
+		function(view)
+			refugePanelUIView = view
+			refugePanelUIView:SetUIData()
+		end
+	)
+end
+
+function RefugeTowerSystem:openRefugePrepare()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RefugePrepareUIView,
+		function(view)
+			refugePrepareUIView = view
+			refugePrepareUIView:SetUIData()
+		end
+	)
+end
+
+function RefugeTowerSystem:hideRefugePrepare()
+	GUIManager.inst:HideView(Constants.ViewName.RefugePrepareUIView)
+end
+
+function RefugeTowerSystem:hideRefugeSelectHero()
+	GUIManager.inst:HideView(Constants.ViewName.RefugeSelectHeroUIView)
+end
+
+function RefugeTowerSystem:openRefugeSelectItem(fromType) -- fromType 1 - 爬塔 2 - 黄金城
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RefugeUseItemUIView,
+		function(view)
+			refugeSelectItemUIView = view
+			refugeSelectItemUIView:SetUIData(fromType)
+		end
+	)
+end
+
+function RefugeTowerSystem:openRefugeAdventure(slotId)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RefugeAdventureUIView,
+		function(view)
+			refugeAdventureUIView = view
+			refugeAdventureUIView:SetUIData(slotId)
+		end
+	)
+end
+
+function RefugeTowerSystem:RefugePrepareAddHero(heroUid,index)
+	EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_AddHeroCom,heroUid,index)
+	refugePrepareUIView = GUIManager.inst:GetWindow(Constants.ViewName.RefugePrepareUIView, false)
+	if(refugePrepareUIView ~= nil and refugePrepareUIView.isShowing)then
+		refugePrepareUIView:AddHeroCom(heroUid,index)
+	end
+end
+
+function RefugeTowerSystem:RefugePanelRefresh()
+	refugePanelUIView = GUIManager.inst:GetWindow(Constants.ViewName.RefugeExchangeUIView, false)
+	if(refugePanelUIView ~= nil and refugePanelUIView.isShowing)then
+		refugePanelUIView:RefreshUIData()
+	end
+end
+
+function RefugeTowerSystem:RefugePrepareAddItem(itemId)
+	refugePrepareUIView = GUIManager.inst:GetWindow(Constants.ViewName.RefugePrepareUIView, false)
+	if(refugePrepareUIView ~= nil and refugePrepareUIView.isShowing)then
+		refugePrepareUIView:SelectItemComplete(itemId)
+	end
+end
+
+function RefugeTowerSystem:RefugePrepareRefreshHero()
+	EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_PrepareResting)
+	refugePrepareUIView = GUIManager.inst:GetWindow(Constants.ViewName.RefugePrepareUIView, false)
+	if(refugePrepareUIView ~= nil and refugePrepareUIView.isShowing)then
+		refugePrepareUIView:RefreshHero()
+	end
+end
+
+function RefugeTowerSystem:RefugeRefreshSelectHero()
+	refugeSelectHeroUIView = GUIManager.inst:GetWindow(Constants.ViewName.RefugeSelectHeroUIView, false)
+	if(refugeSelectHeroUIView ~= nil and refugeSelectHeroUIView.isShowing)then
+		refugeSelectHeroUIView:RefreshUIData()
+	end
+end
+
+function RefugeTowerSystem:openRefugeSelectHero(_index,_exploreId,itemAddPercent,fromType) -- fromType 1 - 爬塔 2 - 黄金城
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RefugeSelectHeroUIView,
+		function(view)
+			refugeSelectHeroUIView = view
+			refugeSelectHeroUIView:SetUIData(_index,_exploreId,itemAddPercent,fromType)
+		end
+	)
+end
+
+function RefugeTowerSystem:hideRefugeAdventureUI()
+	GUIManager.inst:HideView(Constants.ViewName.RefugeAdventureUIView)
+end
+
+function RefugeTowerSystem:RefugeRefreshAdventure(slotId)
+	refugeAdventureUIView = GUIManager.inst:GetWindow(Constants.ViewName.RefugeAdventureUIView, false)
+	if(refugeAdventureUIView ~= nil and refugeAdventureUIView.isShowing)then
+		refugeAdventureUIView:SetUIData(slotId)
+	end
+end
+
+function RefugeTowerSystem:requestRefugeStart(slotId,exploreId,itemId,heroUids)
+	local rep = MsgType.Request_Tower_ExploreStart:New()
+	rep.exploreSlotId = slotId
+	rep.exploreId = exploreId
+	rep.useItemId = itemId
+	rep.heroInfoUIds = heroUids
+	rep:Send()
+end
+
+function RefugeTowerSystem:requestRefugeInfo()
+	local rep = MsgType.Request_Tower_Info:New()
+	rep:Send()
+end
+
+function RefugeTowerSystem:requestRefugeEnd(slotId)
+	local rep = MsgType.Request_Tower_ExploreEnd:New()
+	rep.exploreSlotId = slotId
+	rep:Send()
+end
+
+function RefugeTowerSystem:requestRefugeImmediately(slotId)
+	local rep = MsgType.Request_Tower_ExploreImmediately:New()
+	rep.slotId = slotId
+	rep:Send()
+end
+
+function RefugeTowerSystem:requestRefugeReward(id,vipFlag)
+	local rep = MsgType.Request_Tower_Reward:New()
+	rep.id = id
+	rep.vipFlag = vipFlag
+	rep:Send()
+end
+
+function RefugeTowerSystem:OnEnter()
+	RefugeTowerSystem.super.OnEnter(self)
+end
+
+function RefugeTowerSystem:OnExit()
+	RefugeTowerSystem.super.OnExit(self)
+end

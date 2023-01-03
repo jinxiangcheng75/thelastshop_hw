@@ -1,0 +1,136 @@
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+--Activity_WorkerGameBtn
+
+Activity_WorkerGameBtn = class()
+----
+
+function Activity_WorkerGameBtn:ctor()
+end
+
+function Activity_WorkerGameBtn:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.button = self.transform:GetComponent("Button")
+	self.tx_countdown = self.contentPane:GetObjByName("tx_countdownTx"):GetComponent("Text")
+	self.tx_name = self.contentPane:GetObjByName("tx_name"):GetComponent("Text")
+	self.obj_redPoint = self.contentPane:GetObjByName("obj_redPoint")
+
+end
+
+
+function Activity_WorkerGameBtn:init(obj)
+
+	self:initComp(obj)
+
+	self.timerId = 0
+
+	self.button:ButtonClickTween(
+		function()
+			self:onButtonClick()
+		end
+	)
+	
+	self:refreshRedPoint(false)
+
+end
+
+function Activity_WorkerGameBtn:onButtonClick()
+
+	if Activity_WorkerGameProxy.inst.flag then
+		EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGamePanel)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGameScoreRewardPanel,Activity_WorkerGameProxy.inst:GetCurScorePointLv())
+	end
+
+end
+
+function Activity_WorkerGameBtn:check(flag)
+
+	self:clearTimer()
+
+	self.tx_name.text = Activity_WorkerGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Name)
+
+	if not flag then --巧匠大赛未开启  判断是否有可以领奖的(真正可以领取的)
+
+		if Activity_WorkerGameProxy.inst:GetScoreReallyCanRewardCount() > 0 then
+			self.tx_countdown.text = ""
+			self.gameObject:SetActive(true)
+		else
+			self.gameObject:SetActive(false)
+		end
+
+		return
+
+	end
+
+	self:timerMethod()
+	self.timerId = CS_GameTimerInst:AddTimer(1,function ()
+
+			self:timerMethod()
+
+		end)
+
+end
+
+function Activity_WorkerGameBtn:timerMethod()
+
+	local remainTime = Activity_WorkerGameProxy.inst.endtime_serverEndtime - CS_GameTimerInst.serverNow
+	if Activity_WorkerGameProxy.inst.flag == true and remainTime > 0 then --巧匠大赛开启
+
+		self.tx_countdown.text = CS_TimeUtils.timeSpanStrip(remainTime,true)
+		self.gameObject:SetActive(true)
+
+	else
+
+		self.tx_countdown.text = ""
+		self.gameObject:SetActive(false)
+
+	end
+
+end
+
+function Activity_WorkerGameBtn:clearTimer()
+
+	if self.timerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+
+end
+
+function Activity_WorkerGameBtn:refreshRedPoint(flag)
+
+	if Activity_WorkerGameProxy.inst.flag then
+
+		flag = Activity_WorkerGameProxy.inst.scoreCanRewardCount > 0 or Activity_WorkerGameProxy.inst.coinFreeFlag
+
+	else
+
+		flag = Activity_WorkerGameProxy.inst:GetScoreReallyCanRewardCount() > 0
+
+	end
+	
+	if flag then
+		self.gameObject:SetActive(true)
+	end
+
+	self.obj_redPoint:SetActive(flag)
+
+	if not flag and not Activity_WorkerGameProxy.inst.flag then
+		self:clearTimer()
+		self.gameObject:SetActive(false)
+	end
+
+end
+
+return Activity_WorkerGameBtn

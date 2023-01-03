@@ -1,0 +1,112 @@
+local icon
+local numText
+local selfBtn
+
+local data
+
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+
+local csItemType = CS.ItemType
+
+--GetObjByName   GetComponent
+function InitComp()
+	icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	numText = self:GetObjByName("numText"):GetComponent("Text")
+	selfBtn = self.gameObject:GetComponent("Button")
+	if(selfBtn ~= nil)then
+		selfBtn:ButtonClickTween(
+			function ()
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+				func(csEventControllerInst, csGameEventType.CommonEvent.COMMONTIPS_SETINFO, data, self.transform)
+			end
+		)
+	end
+end
+
+function SetData(_data)
+	if(_data == nil) then return end
+
+	data = _data
+
+	numText.text = tostring(data.count)
+
+	local itemCfg = CS.ItemconfigManager.inst:GetConfig(data.rewardId)
+	if(csItemType.__CastFrom(data.itemType) == csItemType.Craftsman)then
+		local workerCfg = nil
+		if(itemCfg ~= nil)then
+			workerCfg = CS.WorkerConfigManager.inst:GetConfig(itemCfg.effect)
+		else
+			workerCfg = CS.WorkerConfigManager.inst:GetConfig(data.rewardId)
+		end
+
+		if(workerCfg ~= nil)then
+			icon:SetSprite("portrait_atlas",workerCfg.pic)
+		else
+			self.gameObject:SetActive(false)
+		end
+	elseif csItemType.__CastFrom(data.itemType) == csItemType.Equip then
+		local equipCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(data.rewardId)
+
+		if(equipCfg ~= nil)then
+			icon:SetSpriteURL(equipCfg.equipDrawingsConfig.big_icon)
+		else
+			self.gameObject:SetActive(false)
+		end
+	elseif csItemType.__CastFrom(data.itemType) == csItemType.EquipmentDrawing then
+		local equipDrawingCfg = nil
+		if(itemCfg ~= nil)then
+			equipDrawingCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(itemCfg.effect)
+		else
+			equipDrawingCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(data.rewardId)
+		end
+
+		if(equipDrawingCfg ~= nil)then
+			--icon:SetSpriteURL(equipDrawingCfg.big_icon)
+			icon:SetSprite(equipDrawingCfg.atlas,equipDrawingCfg.icon)
+		else
+			self.gameObject:SetActive(false)
+		end
+	elseif csItemType.__CastFrom(data.itemType) == csItemType.ShopkeeperDress then
+		local dressCfg = nil
+		if(itemCfg ~= nil)then
+			dressCfg = CS.dressconfigManager.inst:GetConfig(itemCfg.effect)
+		else
+			dressCfg = CS.dressconfigManager.inst:GetConfig(data.rewardId)
+		end
+
+		if(dressCfg ~= nil)then
+			icon:SetSprite("ClotheIcon_atlas",dressCfg.icon)
+		else
+			self.gameObject:SetActive(false)
+		end
+	--elseif csItemType.__CastFrom(data.itemType) == csItemType.Furniture then
+		--local furnitureCfg = nil
+		--if(itemCfg ~= nil)then
+			--furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(itemCfg.effect)
+		--else
+			--furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(data.rewardId)
+		--end
+
+		--if(furnitureCfg ~= nil)then
+			--icon:SetSpriteURL(furnitureCfg.icon_big)
+		--else
+			--self.gameObject:SetActive(false)
+		--end
+	else
+		if(itemCfg ~= nil)then
+			--icon:SetSpriteURL(itemCfg.icon)
+			icon:SetSprite(itemCfg.atlas, itemCfg.icon)
+		else
+			self.gameObject:SetActive(false)
+		end
+	end
+
+
+	--if(itemCfg ~= nil)then
+		--icon:SetSpriteURL(itemCfg.icon)
+	--else
+		--self.gameObject:SetActive(false)
+	--end
+end

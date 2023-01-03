@@ -1,0 +1,217 @@
+--CustomizeSelectionUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local CS_GameTimerInst = CS.GameTimer.inst
+
+local CS_type_ToggleGroupMarget = typeof(CS.ToggleGroupMarget)
+local CS_type_DynamicScrollView = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_BtnList = typeof(CS.BtnList)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+CustomizeSelectionUI = class(ViewBase)
+
+function CustomizeSelectionUI:ctor()
+	self.viewID = Constants.ViewName.CustomizeSelectionUI
+	CustomizeSelectionUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.luxury
+end
+
+function CustomizeSelectionUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.btn_close = contentPane:GetButton("btn_close")
+	self.btn_mask = contentPane:GetButton("btn_mask")
+	self.toggleGroup_tab = contentPane:GetObjByName("toggleGroup_tab"):GetComponent(CS_type_ToggleGroupMarget)
+	self.superList = contentPane:GetObjByName("superList"):GetComponent(CS_type_DynamicScrollView)
+	self.obj_mask = contentPane:GetObjByName("obj_mask")
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+function CustomizeSelectionUI:onInit()
+
+	self:initComp()
+
+	self.mDisplayType = 0
+	self.listItemCount = -1
+	self.mDataList = {}
+	self.curFurnId = -1
+	self.needShowAni = false
+
+	self.btn_close:ButtonClickTween(
+		function()
+			self:hide()
+		end
+	)
+
+	self.btn_mask.onClick:AddListener(function ()
+			self:hide()
+		end)
+
+	self.toggleGroup_tab.OnSelectedIndexValueChange = function (index)
+		self:onSelectedIndexValueChange(index)
+	end
+
+	self.superList.itemRenderer = function(index,item)
+		self:ListItemRenderer(index,item)
+	end
+
+	self.superList.itemUpdateInfo = function(index,item)
+		self:ListItemRenderer(index,item)
+	end
+
+end
+
+
+function CustomizeSelectionUI:onSelectedIndexValueChange(index)
+
+	self.mDisplayType = index;
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.kCustomizeDisplayType)
+	func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.CustomizeSelection_TabSelectd,CS.kCustomizeDisplayType.__CastFrom(self.mDisplayType))
+
+end
+
+function CustomizeSelectionUI:refreshData(list)
+
+	self.mDataList = list
+	self:SetListItemTotalCount(list.Count)
+
+end
+
+function CustomizeSelectionUI:showTargetType(index,curFurnId)
+
+	self.curFurnId = curFurnId;
+	self.toggleGroup_tab:OnEnableMethod(index)
+
+
+
+end
+
+
+function CustomizeSelectionUI:ListItemRenderer(index,item)
+
+	local btnList = item.transform:GetComponent(CS_type_BtnList).buttonList
+
+	for i = 0, 3 - 1 do
+
+		local itemIndex = index * 3 + i
+
+		if 	itemIndex < self.listItemCount then
+
+			btnList[i].gameObject:SetActive(true)
+
+			btnList[i].gameObject:GetComponent(CS_type_LuaListItem):SetData({furnitureDisplayData = self.mDataList[itemIndex] ,furnitureDisplayType = self.mDisplayType, needShowAni = self.needShowAni })
+
+		else
+
+			btnList[i].gameObject:SetActive(false)
+
+		end
+
+	end
+
+
+end
+
+function CustomizeSelectionUI:SetListItemTotalCount(count)
+
+	if count < 0 then
+		count = 0
+	end
+
+	self.listItemCount = count
+
+	local num = math.floor(count / 3)
+
+	if count % 3 > 0 then
+		num = num + 1
+	end
+
+	self.superList.totalItemCount = num
+
+end
+
+
+function CustomizeSelectionUI:DoShowAnimation()
+
+	self.needShowAni = true;
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+
+	self.obj_mask:SetActive(true);
+
+	CS_GameTimerInst:AddTimer(self.mDataList.Count <= 9 and (self.mDataList.Count * 0.02 + 0.28) or 0.46,1,function()
+			self.obj_mask:SetActive(false);
+			self.needShowAni = false
+		end)--播放动画禁止滑动
+
+end
+
+function CustomizeSelectionUI:DoHideAnimation()
+
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("commonBagUI_hide");
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+
+		end)
+
+end
+
+function CustomizeSelectionUI:onShowed()
+
+	self.toggleGroup_tab:OnEnableMethod(self.mDisplayType)
+
+	local scrollRect = self.superList.gameObject:GetComponent("ScrollRect")
+
+	if (CS.FGUI.inst.isLandscape) then
+
+		scrollRect.vertical = false;
+		scrollRect.horizontal = true;
+
+	else
+
+		scrollRect.vertical = true;
+		scrollRect.horizontal = false;
+
+	end
+
+	if (CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver) then
+		if CS.K_Guide_Type.__CastFrom(CS.GuideDataProxy.inst.CurInfo.m_curCfg.guide_type) == CS.K_Guide_Type.RestrictClick or CS.K_Guide_Type.__CastFrom(CS.GuideDataProxy.inst.CurInfo.m_curCfg.guide_type) == CS.K_Guide_Type.TipsAndRestrictClick then
+			scrollRect.vertical = false;
+		end
+	end
+
+end
+
+function CustomizeSelectionUI:shiftIn()
+	self.contentObject:SetActive(true)
+	self.toggleGroup_tab:OnEnableMethod(self.mDisplayType)
+end
+
+function CustomizeSelectionUI:shiftOut()
+	self.contentObject:SetActive(false)
+
+end
+------------------------------------------------

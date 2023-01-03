@@ -1,0 +1,682 @@
+--GameEvent
+require("utils/LuaUtils")
+
+GameEvent = {}
+GameEvent.ShowLoadingBarUI = "ShowLoadingBarUI"
+GameEvent.Loading_Update = "Loading_Update"
+GameEvent.HideLoadingBarUI = "HideLoadingBarUI"
+
+GameEvent.MainUIEvent = {}
+GameEvent.MainUIEvent.mainUI_refreshRedPoints = "mainUI_refreshRedPoints"
+
+GameEvent.CityUIEvent = {}
+GameEvent.CityUIEvent.cityUI_refreshRedPoints = "cityUI_refreshRedPoints"
+
+--拜访
+GameEvent.OnGetVisitUserData = "OnGetVisitUserData"
+GameEvent.GetVisitUserData = "GetVisitUserData"
+GameEvent.Show_VisitShopUI = "Show_VisitShopUI"
+GameEvent.Exit_VisitShop = "Exit_VisitShop"
+
+GameEvent.CSEvent = {}
+GameEvent.CSEvent.Change_State = "csevent.change_state"
+GameEvent.CSEvent.Set_Cur_Window = "csevent.set_cur_window"
+GameEvent.CSEvent.On_UI_Open = "csevent.on_ui_open"
+GameEvent.CSEvent.On_UI_Hide = "csevent.on_ui_hide"
+
+GameEvent.State = {}
+GameEvent.State.Change_State = "state.change_state"
+GameEvent.State.ChangeLastState = "ChangeLastState"
+
+GameEvent.Asset = {}
+GameEvent.Asset.Start_System = "asset.start_system"
+GameEvent.Asset.Load_Version = "asset.load_version"
+GameEvent.Asset.Load_Assets = "asset.load_assets"
+GameEvent.Asset.Load_Progress = "asset.load_progress"
+GameEvent.Asset.AA_UpdateComplete = "asset.aa_updatecomplete"
+
+GameEvent.UI = {}
+GameEvent.UI.ShowUI_Loading = "ui.showui_loading"
+GameEvent.UI.HideUI_Loading = "ui.hide_loading"
+GameEvent.UI.ShowUI_TestNew = "ui.showui_testnew"
+GameEvent.UI.HideUI_TestNew = "ui.hideui_testnew"
+
+GameEvent.UI.ShowUI_GameHintUI = "ShowUI_GameHintUI"
+GameEvent.UI.HideUI_GameHintUI = "HideUI_GameHintUI"
+GameEvent.UI.QueueResp_ShowGameHintUI = "QueueResp_ShowGameHintUI"
+
+GameEvent.UIUnlock = {}
+GameEvent.UIUnlock.View_OnShow = "View_OnShow"
+
+--提示信息框
+GameEvent.MsgTipEvent = {}
+GameEvent.MsgTipEvent.AddRaceLampTip = "AddRaceLampTip"
+GameEvent.MsgTipEvent.GoOnRaceLampTip = "GoOnRaceLampTip"
+GameEvent.MsgTipEvent.PauseRaceLampTip = "PauseRaceLampTip"
+GameEvent.MsgTipEvent.RePlayRaceLampTip = "RePlayRaceLampTip"
+
+GameEvent.MsgTipEvent.ShowTextMsgTip = "ShowTextMsgTip"
+
+--二次确认提示框
+GameEvent.MsgTipEvent.ShowTipsAgainAffirmUI = "ShowTipsAgainAffirmUI"
+
+--等级上限提示
+GameEvent.MsgTipEvent.ShowLuaTextTipUI = "ShowLuaTextTipUI"
+GameEvent.MsgTipEvent.TextTip_FullWorkerExpDataList = "TextTip_FullWorkerExpDataList"
+
+GameEvent.MsgTipEvent.HasMaxLevelHero = "HasMaxLevelHero"
+
+--概率公示
+GameEvent.MsgTipEvent.ShowProbabilityPublic = "ShowProbabilityPublic"
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--联盟
+GameEvent.UnionEvent = {}
+GameEvent.UnionEvent.ShowUI_UnionAidUIView = "ShowUI_UnionAidUIView"
+GameEvent.UnionEvent.ShowUI_UnionAidMemberByGemUIView = "ShowUI_UnionAidMemberByGemUIView"
+GameEvent.UnionEvent.UNION_MEMBERHELPLISTREFRESH = "UNION_MEMBERHELPLISTREFRESH"
+GameEvent.UnionEvent.ShowUI_UnionTaskUIView = "ShowUI_UnionTaskUIView"
+GameEvent.UnionEvent.ShowUI_UnionRenownDetailUI = "ShowUI_UnionRenownDetailUI"
+GameEvent.UnionEvent.ShowUI_UnionTaskCheckView = "ShowUI_UnionTaskCheckView"
+GameEvent.UnionEvent.ShowTips_UnionTaskItemOtherInfo = "ShowTips_UnionTaskItemOtherInfo"
+GameEvent.UnionEvent.TurnPage_UnionTaskCheckView = "TurnPage_UnionTaskCheckView"
+GameEvent.UnionEvent.RefreshUnionTaskCheckView = "RefreshUnionTaskCheckView"
+GameEvent.UnionEvent.GetUnionStartUnionTaskData = "getUnionStartUnionTaskData"
+GameEvent.UnionEvent.ShowUI_UnionWealUIView = "ShowUI_UnionWealUIView"
+GameEvent.UnionEvent.ShowUI_UnionWealUpDetailUI = "ShowUI_UnionWealUpDetailUI"
+GameEvent.UnionEvent.ShowTips_UnionWealUpDataItemInfo = "ShowTips_UnionWealUpDataItemInfo"
+GameEvent.UnionEvent.ShowUI_UnionBuffDesPanel = "ShowUI_UnionBuffDesPanel"
+GameEvent.UnionEvent.ShowUI_UnionSelfTaskDetailUI = "ShowUI_UnionSelfTaskDetailUI"
+GameEvent.UnionEvent.HideUI_UnionSelfTaskDetailUI = "HideUI_UnionSelfTaskDetailUI"
+
+----通信
+GameEvent.UnionEvent.Request_UnionHelpMember = "Request_UnionHelpMember"
+GameEvent.UnionEvent.OnUnionTaskDataChanged = "onUnionTaskDataChanged"
+GameEvent.UnionEvent.OnUnionScienceDataChanged = "onUnionScienceDataChanged"
+GameEvent.UnionEvent.GetUnionRenownRankList = "getUnionRenownRankList"
+GameEvent.UnionEvent.Request_ImpeachPresident = "Request_ImpeachPresident"
+------------------------------------------------------------------------------------------------------------
+
+--每日签到
+GameEvent.DailySignEvent = {}
+GameEvent.DailySignEvent.ShowUI_DailySignUI = "ShowUI_DailySignUI"
+GameEvent.DailySignEvent.REQUEST_DAILYLIST = "REQUEST_DAILYLIST"
+GameEvent.DailySignEvent.RefreshUI_DailySignUI = "RefreshUI_DailySignUI"
+GameEvent.DailySignEvent.REQUEST_DAILYGIFTREWARD = "REQUEST_DAILYGIFTREWARD"
+
+--商城
+GameEvent.MallEvent = {}
+GameEvent.MallEvent.ShowUI_MallUI = "ShowUI_MallUI"
+GameEvent.MallEvent.RefreshUI_MallContent = "RefreshUI_MallContent"
+GameEvent.MallEvent.ShowUI_MallBuyItemUI = "ShowUI_MallBuyItemUI"
+GameEvent.MallEvent.REQUEST_MALLLIST = "REQUEST_MALLLIST"
+GameEvent.MallEvent.REQUEST_MALLREFRESH = "REQUEST_MALLREFRESH"
+GameEvent.MallEvent.REQUEST_MALLGOODSBUY = "REQUEST_MALLGOODSBUY"
+GameEvent.MallEvent.REQUEST_MALLVIPBUY = "REQUEST_MALLVIPBUY"
+GameEvent.MallEvent.REQUEST_GeneralPurchase = "REQUEST_GeneralPurchase"
+GameEvent.MallEvent.REQUEST_DailySale = "REQUEST_DailySale"
+GameEvent.MallEvent.REQUEST_PAYIOSBUY = "REQUEST_Pay_IOSBuy"
+GameEvent.MallEvent.REQUEST_STORELIST = "REQUEST_STORELIST"
+GameEvent.MallEvent.HideUI_MallBuyItemUI = "HideUI_MallBuyItemUI"
+GameEvent.MallEvent.ShowUI_MallRefreshUI = "ShowUI_MallRefreshUI"
+GameEvent.MallEvent.HideUI_MallRefreshUI = "HideUI_MallRefreshUI"
+GameEvent.MallEvent.ShowUI_VipInfoUI = "ShowUI_VipInfoUI"
+GameEvent.MallEvent.ShowUI_MallBuyVipUI = "ShowUI_MallBuyVipUI"
+GameEvent.MallEvent.HideUI_MallBuyVipUI = "HideUI_MallBuyVipUI"
+GameEvent.MallEvent.ShowUI_MallBuyVipComUI = "ShowUI_MallBuyVipComUI"
+GameEvent.MallEvent.ShowUI_MallBuyVipOtherComUI = "ShowUI_MallBuyVipOtherComUI"
+GameEvent.MallEvent.ShowUI_BuyVipUI = "ShowUI_BuyVipUI"
+GameEvent.MallEvent.ShowUI_DealInfoUI = "ShowUI_DealInfoUI"
+GameEvent.MallEvent.HideUI_DealInfoUI = "HideUI_DealInfoUI"
+GameEvent.MallEvent.ShowUI_VipGetRewardUI = "ShowUI_VipGetRewardUI"
+GameEvent.MallEvent.ShowUI_VipOverDueUI = "ShowUI_VipOverDueUI"
+GameEvent.MallEvent.ShowUI_BlackMarketUI = "ShowUI_BlackMarketUI"
+GameEvent.MallEvent.HideUI_BlackMarketUI = "HideUI_BlackMarketUI"
+
+--新系统解锁
+GameEvent.SystemUnlock = {}
+GameEvent.SystemUnlock.ShowUI_SystemUnlock = "ShowUI_SystemUnlock"
+GameEvent.SystemUnlock.Check_SystemUnlock = "Check_SystemUnlock"
+
+--直购礼包 （包含首充，6元周卡，大额破冰槽位贩卖，每日礼包领取，等级礼包）
+GameEvent.DirectPurchaseEvent = {}
+GameEvent.DirectPurchaseEvent.ShowUI_MainGiftUI = "ShowUI_MainGiftUI"
+GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI = "AddMsgTipsUI_GiftDetailUI"
+GameEvent.DirectPurchaseEvent.ShowUI_GiftDetailUI = "ShowUI_GiftDetailUI"
+GameEvent.DirectPurchaseEvent.ShowUI_GiftDetailUIByUid = "ShowUI_GiftDetailUIByUid"
+GameEvent.DirectPurchaseEvent.HideUI_GiftDetailUI = "HideUI_GiftDetailUI"
+GameEvent.DirectPurchaseEvent.ShowUI_GiftDesUI = "ShowUI_GiftDesUI"
+GameEvent.DirectPurchaseEvent.MainUI_RefreshGiftBtn = "MainUI_RefreshGiftBtn"
+GameEvent.DirectPurchaseEvent.MainUI_ClearGiftBtns = "MainUI_ClearGiftBtns"
+GameEvent.DirectPurchaseEvent.CSCallLua_ShowGiftDeatilUI = "CSCallLua_ShowGiftDeatilUI"
+GameEvent.DirectPurchaseEvent.CSCallLua_CheckMakeSlotDirectPurchase = "CSCallLua_CheckMakeSlotDirectPurchase"
+
+GameEvent.DirectPurchaseEvent.onDirectPurchaseDataChged = "onDirectPurchaseDataChged"
+GameEvent.DirectPurchaseEvent.ShowDirectPurchasePanel = "showDirectPurchasePanel"
+GameEvent.DirectPurchaseEvent.Check_DirectPurchasePushByLevel = "Check_DirectPurchasePushByLevel"
+
+GameEvent.DirectPurchaseEvent.Request_Pay_DirectPurchase = "Request_Pay_DirectPurchase"
+--获取直购礼包列表
+
+--宠物
+GameEvent.PetEvent = {}
+GameEvent.PetEvent.ShowUI_MainPetUI = "ShowUI_MainPetUI"
+GameEvent.PetEvent.HideUI_MainPetUI = "HideUI_MainPetUI"
+GameEvent.PetEvent.ShowUI_PetDetailUI = "ShowUI_PetDetailUI"
+GameEvent.PetEvent.HideUI_PetDetailUI = "HideUI_PetDetailUI"
+GameEvent.PetEvent.ShowUI_FeedPetUI = "ShowUI_FeedPetUI"
+GameEvent.PetEvent.HideUI_FeedPetUI = "HideUI_FeedPetUI"
+GameEvent.PetEvent.ShowUI_PetChangeNameUI = "ShowUI_PetChangeNameUI"
+GameEvent.PetEvent.ShowUI_PetHouseDesignUI = "ShowUI_PetHouseDesignUI"
+GameEvent.PetEvent.HideUI_PetHouseDesignUI = "HideUI_PetHouseDesignUI"
+GameEvent.PetEvent.PutPetHouse = "PutPetHouse"
+GameEvent.PetEvent.ShowUI_BuyPetBoothUI = "ShowUI_BuyPetBoothUI"
+GameEvent.PetEvent.ShowUI_PetSettingUI = "ShowUI_PetSettingUI"
+GameEvent.PetEvent.HideUI_PetSettingUI = "HideUI_PetSettingUI"
+GameEvent.PetEvent.ShowUI_StorePetHouseConfirmUI = "ShowUI_StorePetHouseConfirmUI"
+GameEvent.PetEvent.ShowUI_CreateNewPetUI = "ShowUI_CreateNewPetUI"
+GameEvent.PetEvent.HideUI_CreateNewPetUI = "HideUI_CreateNewPetUI"
+GameEvent.PetEvent.ShowUI_ChangePetDressUpUI = "ShowUI_ChangePetDressUpUI"
+GameEvent.PetEvent.HideUI_ChangePetDressUpUI = "HideUI_ChangePetDressUpUI"
+GameEvent.PetEvent.ShowUI_PetLevelUpUI = "ShowUI_PetLevelUpUI"
+
+GameEvent.PetEvent.OnPetDataChged = "onPetDataChged"
+GameEvent.PetEvent.OnPetSlotsDataChged = "onPetSlotsDataChged"
+GameEvent.PetEvent.OnPetBreedsDataChged = "onPetBreedsDataChged"
+GameEvent.PetEvent.OnMainPetUidChged = "onMainPetUidChged"
+
+GameEvent.PetEvent.REQUEST_PET_BUYSLOT = "REQUEST_PET_BUYSLOT"
+--购买宠物栏位
+GameEvent.PetEvent.REQUEST_PET_BUYBREED = "REQUEST_PET_BUYBREED" --购买宠物品种
+GameEvent.PetEvent.REQUEST_PET_CHANGEDRESS = "REQUEST_PET_CHANGEDRESS" --更改宠物外形
+GameEvent.PetEvent.REQUEST_PET_CHANGENAME = "REQUEST_PET_CHANGENAME" --宠物改名
+GameEvent.PetEvent.REQUEST_PET_FEED = "REQUEST_PET_FEED" --宠物喂食
+GameEvent.PetEvent.REQUEST_PET_SETMAIN = "REQUEST_PET_SETMAIN" --设置主宠物
+
+--英雄兑换
+GameEvent.RoleExchange = {}
+GameEvent.RoleExchange.ShowUI_RoleExchange = "ShowUI_RoleExchange"
+GameEvent.RoleExchange.HideUI_RoleExchange = "HideUI_RoleExchange"
+GameEvent.RoleExchange.RefreshUI_RoleExchange = "RefreshUI_RoleExchange"
+GameEvent.RoleExchange.ShowUI_RoleAddNew = "ShowUI_RoleAddNew"
+GameEvent.RoleExchange.ShowUI_RoleAtt = "ShowUI_RoleAtt"
+
+--英雄
+GameEvent.HeroEvent = {}
+GameEvent.HeroEvent.ShowUI_UseGeneItem = "ShowUI_UseGeneItem" --使用基因药剂界面
+GameEvent.HeroEvent.HideUI_UseGeneItem = "HideUI_UseGeneItem" 
+
+GameEvent.HeroEvent.ShowUI_CanWearEquipTip = "ShowUI_CanWearEquipTip"
+
+GameEvent.HeroEvent.RefreshUI_RoleRecruitBar = "RefreshUI_RoleRecruitBar" --刷新酒吧招募界面
+
+GameEvent.HeroEvent.Request_UseGeneItem = "Request_UseGeneItem"
+
+
+--活动—巧匠大赛
+GameEvent.Activity_WorkerGameEvent = {}
+GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGamePanel = "ShowUI_Activity_WorkerGamePanel"
+GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGameScoreRewardPanel =
+	"ShowUI_Activity_WorkerGameScoreRewardPanel"
+GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_RefeshExchangeDataConfirmUI =
+	"ShowUI_Activity_WorkerGame_RefeshExchangeDataConfirmUI"
+GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_ExchangeItemDesUI =
+	"ShowUI_Activity_WorkerGame_ExchangeItemDesUI"
+GameEvent.Activity_WorkerGameEvent.ShowUI_WorkerGameCoinGiftsUI = "ShowUI_WorkerGameCoinGiftsUI"
+GameEvent.Activity_WorkerGameEvent.RefreshUI_WorkerGameCoinGiftsUI = "RefreshUI_WorkerGameCoinGiftsUI"
+GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_WorkerGamePanel_PointChanged =
+	"RefreshUI_Activity_WorkerGamePanel_PointChanged"
+--活动积分变化
+GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_MakingActivityDataChanged =
+	"RefreshUI_Activity_MakingActivityDataChanged"
+--制作加积分Item变化
+GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_WorkerGameScoreRewardPanel =
+	"RefreshUI_Activity_WorkerGameScoreRewardPanel"
+--积分奖励列表UI刷新
+GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_WorkerGamePanel_ExchangeData =
+	"RefreshUI_Activity_WorkerGamePanel_ExchangeData"
+--活动币兑换奖励UI变化
+GameEvent.Activity_WorkerGameEvent.RefreshRedPoint_Activity_WorkerGame_ScoreCanReward =
+	"RefreshRedPoint_Activity_WorkerGame_ScoreCanReward"
+GameEvent.Activity_WorkerGameEvent.CS_RefreshRedPoint_Activity_WorkerGame_ScoreCanReward =
+"CS_RefreshRedPoint_Activity_WorkerGame_ScoreCanReward"
+
+GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState = "RefrshActivity_WorkerGameState" --刷新巧匠大赛状态 开启或结束
+
+GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_messRankUI = "ShowUI_Activity_WorkerGame_messRankUI"
+GameEvent.Activity_WorkerGameEvent.Activity_WorkerGame_GetUnionMemberRankMess = "Activity_WorkerGame_GetUnionMemberRankMess"
+
+GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_DataCheck = "Request_OperatingActivity_DataCheck"
+GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Check = "Request_OperatingActivity_Check"
+GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_CheckReward = "Request_OperatingActivity_CheckReward"
+GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_CheckExchange = "Request_OperatingActivity_CheckExchange"
+GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Reward = "Request_OperatingActivity_Reward"
+GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Exchange = "Request_OperatingActivity_Exchange"
+GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UpdateInfo = "Request_OperatingActivity_UpdateInfo"
+GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UpdateExchange = "Request_OperatingActivity_UpdateExchange"
+GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_DailyCoin = "Request_OperatingActivity_DailyCoin"
+GameEvent.Activity_WorkerGameEvent.Request_Pay_OperatingActivityPurchase = "Request_Pay_OperatingActivityPurchase"
+GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UnionRankList = "Request_OperatingActivity_UnionRankList"
+
+
+--待办任务
+GameEvent.GuideTask = {}
+GameEvent.GuideTask.REQUEST_GuideTask = "REQUEST_GuideTask"
+GameEvent.GuideTask.REQUEST_GuideTaskReward = "REQUEST_GuideTaskReward"
+GameEvent.GuideTask.ShowUI_GuideTaskInfo = "ShowUI_GuideTaskInfo"
+GameEvent.GuideTask.HideUI_GuideTaskInfo = "HideUI_GuideTaskInfo"
+GameEvent.GuideTask.ShowUI_GuideTask = "ShowUI_GuideTask"
+GameEvent.GuideTask.RefreshUI_GuideTask = "RefreshUI_GuideTask"
+GameEvent.GuideTask.HideUI_GuideTask = "HideUI_GuideTask"
+GameEvent.GuideTask.RefreshShowUI_GuideTask = "RefreshShowUI_GuideTask"
+GameEvent.GuideTask.RefreshUI_EndGuideTask = "RefreshUI_EndGuideTask"
+GameEvent.GuideTask.RefreshUI_GuideTaskInfo = "RefreshUI_GuideTaskInfo"
+GameEvent.GuideTask.DoOperation_TimeFalse = "DoOperation_TimeFalse"
+
+--触发式引导
+GameEvent.GuideTrigger = {}
+GameEvent.GuideTrigger.SelectNormal = "SelectNormal"
+GameEvent.GuideTrigger.SelectSceneFurn = "SelectSceneFurn"
+GameEvent.GuideTrigger.SelectPanelFurn = "SelectPanelFurn"
+GameEvent.GuideTrigger.SelectShopperPopup = "SelectShopperPopup"
+GameEvent.GuideTrigger.SelectTargetWorker = "SelectTargetWorker"
+GameEvent.GuideTrigger.SelectTargetEquip = "SelectTargetEquip"
+GameEvent.GuideTrigger.SelectUpgradingFurnHelp = "SelectUpgradingFurnHelp"
+GameEvent.GuideTrigger.SelectUpgradingFurn = "SelectUpgradingFurn"
+GameEvent.GuideTrigger.OpenPanelByType = "OpenPanelByType"
+GameEvent.GuideTrigger.HidePanelByType = "HidePanelByType"
+GameEvent.GuideTrigger.HideGuideTriggerUI = "HideGuideTriggerUI"
+GameEvent.GuideTrigger.ShowMask = "ShowMask"
+GameEvent.GuideTrigger.ShowGMask = "ShowGMask"
+GameEvent.GuideTrigger.GuideTriggerTest = "GuideTriggerTest"
+GameEvent.GuideTrigger.HideFinger = "HideFinger"
+GameEvent.GuideTrigger.HideFingerFromTouch = "HideFingerFromTouch"
+GameEvent.GuideTrigger.CheckGuideTrigger = "CheckGuideTrigger"
+GameEvent.GuideTrigger.StartGuideTrigger = "StartGuideTrigger"
+GameEvent.GuideTrigger.Request_GuideTrigger = "Request_GuideTrigger"
+GameEvent.GuideTrigger.Request_GuideTriggerFurnUpgrade = "Request_GuideTriggerFurnUpgrade"
+GameEvent.GuideTrigger.SetPreMaskState = "SetPreMaskState"
+GameEvent.GuideTrigger.SetAllMaskState = "SetAllMaskState"
+
+--创角
+GameEvent.CreatRoleEvent = {}
+GameEvent.CreatRoleEvent.ShowUI_CreatRoleUI = "ShowUI_CreatRoleUI"
+GameEvent.CreatRoleEvent.HideUI_CreatRoleUI = "HideUI_CreatRoleUI"
+GameEvent.CreatRoleEvent.ShowUI_BindingUI = "ShowUI_BindingUI"
+
+--家具--
+
+--ShopDesignUI
+GameEvent.ShopDesignEvent = {}
+GameEvent.ShopDesignEvent.ShowUI_ShopDesignUI = "ShowUI_ShopDesignUI"
+GameEvent.ShopDesignEvent.HideUI_ShopDesignUI = "HideUI_ShopDesignUI"
+GameEvent.ShopDesignEvent.ShopDesignUI_Refresh = "ShopDesignUI_Refresh"
+GameEvent.ShopDesignEvent.ShopDesignUI_OnPickItem = "ShopDesignUI_OnPickItem"
+GameEvent.ShopDesignEvent.ShopDesignUI_ReSetContentSliderVal = "ShopDesignUI_ReSetContentSliderVal"
+GameEvent.ShopDesignEvent.ShopDesignUI_OnResourceProductionRefreshCom = "ShopDesignUI_OnResourceProductionRefreshCom"
+GameEvent.ShopDesignEvent.ShopDesignUI_Create_Furniture = "ShopDesignUI_Create_Furniture"
+GameEvent.ShopDesignEvent.ShopDesignUI_Create_Customize = "ShopDesignUI_Create_Customize"
+GameEvent.ShopDesignEvent.ShopDesignUI_Furniture_CANAPPLY = "ShopDesignUI_Furniture_CANAPPLY"
+
+--FurnitureSelectionUI
+GameEvent.ShopDesignEvent.ShowUI_FurnitureSelectionUI = "ShowUI_FurnitureSelectionUI"
+GameEvent.ShopDesignEvent.HideUI_FurnitureSelectionUI = "HideUI_FurnitureSelectionUI"
+GameEvent.ShopDesignEvent.FurnitureSelectionUI_RefreshListData = "FurnitureSelectionUI_RefreshListData"
+GameEvent.ShopDesignEvent.FurnitureSelectionUI_ShowTargetType = "FurnitureSelectionUI_ShowTargetType"
+
+--CustomizeSelectionUI
+GameEvent.ShopDesignEvent.ShowUI_CustomizeSelectionUI = "ShowUI_CustomizeSelectionUI"
+GameEvent.ShopDesignEvent.HideUI_CustomizeSelectionUI = "HideUI_CustomizeSelectionUI"
+GameEvent.ShopDesignEvent.CustomizeSelectionUI_RefreshListData = "CustomizeSelectionUI_RefreshListData"
+
+--FurnitureUpgradePanel
+GameEvent.ShopDesignEvent.ShowUI_FurnitureUpgradePanel = "ShowUI_FurnitureUpgradePanel"
+GameEvent.ShopDesignEvent.HideUI_FurnitureUpgradePanel = "HideUI_FurnitureUpgradePanel"
+GameEvent.ShopDesignEvent.FurnitureUpgradePanel_RefreshShelfGridItem = "FurnitureUpgradePanel_RefreshShelfGridItem"
+
+--FurnitureUpgradeFinishView
+GameEvent.ShopDesignEvent.ShowUI_FurnitureUpgradeFinishView = "ShowUI_FurnitureUpgradeFinishView"
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+--在线领奖
+GameEvent.OnlineRewardEvent = {}
+GameEvent.OnlineRewardEvent.ShowUI_OnlineInfo = "ShowUI_OnlineInfo"
+GameEvent.OnlineRewardEvent.HideUI_OnlineInfo = "HideUI_OnlineInfo"
+GameEvent.OnlineRewardEvent.RefreshUI_OnlineInfo = "RefreshUI_OnlineInfo"
+GameEvent.OnlineRewardEvent.Refresh_OnlineBtn = "Refresh_OnlineBtn"
+GameEvent.OnlineRewardEvent.Clear_OnlineBtn = "Clear_OnlineBtn"
+GameEvent.OnlineRewardEvent.Request_OnlineList = "Request_OnlineList"
+GameEvent.OnlineRewardEvent.Request_OnlineReward = "Request_OnlineReward"
+--GameEvent.HelpNavigation = {}
+--GameEvent.HelpNavigation. =
+
+--事件系统
+GameEvent.EventSystem = {}
+GameEvent.EventSystem.AddEvent = "EventSystem_AddEvent"
+GameEvent.EventSystem.EventEnd = "EventSystem_EventEnd"
+
+GameEvent.EventSystem.Design_Levelup_Event = "Design_Levelup_Event"
+
+--豪华度
+GameEvent.LuxuryEvent = {}
+GameEvent.LuxuryEvent.ShowUI_LuxuryInfo = "ShowUI_LuxuryInfo"
+GameEvent.LuxuryEvent.RefreshUI_Luxury = "RefreshUI_Luxury"
+GameEvent.LuxuryEvent.Request_LuxuryRank = "Request_LuxuryRank"
+GameEvent.LuxuryEvent.ShowUI_LuxuryRank = "ShowUI_LuxuryRank"
+GameEvent.LuxuryEvent.HideUI_LuxuryRank = "HideUI_LuxuryRank"
+GameEvent.LuxuryEvent.ShowUI_LuxuryLevelUp = "ShowUI_LuxuryLevelUp"
+GameEvent.LuxuryEvent.ShowUI_LuxuryTip = "ShowUI_LuxuryTip"
+
+--礼包商城
+GameEvent.GiftMall = {}
+GameEvent.GiftMall.Show_GiftMallUI = "Show_GiftMallUI" --打开界面
+GameEvent.GiftMall.Update_GiftMallUI = "Update_GiftMallUI"
+GameEvent.GiftMall.Request_LvGrowthData = "Request_LvGrowthData" --获取等级成长数据
+GameEvent.GiftMall.Request_ReceiveAward = "Request_ReceiveAward" --领取等级奖励
+--每日奖励
+
+GameEvent.DailyReward = {
+	DailyReward_RequestInfo = "DailyReward_RequestInfo", --获取每日奖励数据
+	DailyReward_ReceiveAward = "DailyReward_ReceiveAward" --奖励数据刷新
+}
+
+--剧情NPC
+GameEvent.StoryRoleEvent = {}
+GameEvent.StoryRoleEvent.AddStoryRole = "AddStoryRole"
+
+--讲话界面
+GameEvent.DialogEvent = {}
+GameEvent.DialogEvent.StartDialog = "StartDialog"
+GameEvent.DialogEvent.ShowTips = "ShowTips"
+GameEvent.DialogEvent.DialogUIViewClear = "DialogUIViewClear"
+GameEvent.DialogEvent.ShowFinger = "ShowFinger"
+GameEvent.DialogEvent.HideFinger = "HideFinger"
+GameEvent.DialogEvent.ShowMask = "Dialog_ShowMask"
+GameEvent.DialogEvent.HideMask = "Dialog_HideMask"
+GameEvent.DialogEvent.NPCMoveEndCompent = "NPCMoveEndCompent"
+
+GameEvent.RefugeEvent = {}
+GameEvent.RefugeEvent.ShowUI_RefugeUI = "ShowUI_RefugeUI"
+GameEvent.RefugeEvent.ShowUI_RefugePanelUI = "ShowUI_RefugePanelUI"
+GameEvent.RefugeEvent.RefreshUI_RefugePanelUI = "RefreshUI_RefugePanelUI"
+GameEvent.RefugeEvent.ShowUI_RefugePrepareUI = "ShowUI_RefugePrepareUI"
+GameEvent.RefugeEvent.RefreshUI_RefugePrepareUI = "RefreshUI_RefugePrepareUI"
+GameEvent.RefugeEvent.HideUI_RefugePrepareUI = "HideUI_RefugePrepareUI"
+GameEvent.RefugeEvent.ShowUI_RefugePrepareUIAddHero = "ShowUI_RefugePrepareUIAddHero"
+GameEvent.RefugeEvent.ShowUI_RefugePrepareUIAddItem = "ShowUI_RefugePrepareUIAddItem"
+GameEvent.RefugeEvent.ShowUI_RefugeSelectHero = "ShowUI_RefugeSelectHero"
+GameEvent.RefugeEvent.HideUI_RefugeSelectHero = "HideUI_RefugeSelectHero"
+GameEvent.RefugeEvent.RefreshUI_RefugeSelectHero = "RefreshUI_RefugeSelectHero"
+GameEvent.RefugeEvent.ShowUI_RefugeSelectItem = "ShowUI_RefugeSelectItem"
+GameEvent.RefugeEvent.ShowUI_RefugeAdventure = "ShowUI_RefugeAdventure"
+GameEvent.RefugeEvent.HideUI_RefugeAdventure = "HideUI_RefugeAdventure"
+GameEvent.RefugeEvent.RefreshUI_RefugeAdventure = "RefreshUI_RefugeAdventure"
+GameEvent.RefugeEvent.Request_RefugeStart = "Request_RefugeStart"
+GameEvent.RefugeEvent.Request_RefugeInfo = "Request_RefugeInfo"
+GameEvent.RefugeEvent.Request_RefugeEnd = "Request_RefugeEnd"
+GameEvent.RefugeEvent.Request_RefugeImmediately = "Request_RefugeImmediately"
+GameEvent.RefugeEvent.Request_RefugeReward = "Request_RefugeReward"
+GameEvent.RefugeEvent.Set_MainUIRefugeBtn = "Set_MainUIRefugeBtn"
+GameEvent.RefugeEvent.Refresh_RefugeRedPoint = "Refresh_RefugeRedPoint"
+GameEvent.RefugeEvent.Refresh_SortHeroList = "Refresh_SortHeroList"
+
+--店主
+GameEvent.ShopkeeperComEvent = {}
+GameEvent.ShopkeeperComEvent.SPAWNSHOPKEEPER = "SPAWNSHOPKEEPER"
+GameEvent.ShopkeeperComEvent.CHANGECLOTHE = "CHANGECLOTHE"
+GameEvent.ShopkeeperComEvent.CHANGESTATETOFREE = "CHANGESTATETOFREE"
+GameEvent.ShopkeeperComEvent.JUDGEROUNDHAVESHOPPER = "JUDGEROUNDHAVESHOPPER"
+GameEvent.ShopkeeperComEvent.ADDROUNDCOUNTERNUM = "ADDROUNDCOUNTERNUM"
+GameEvent.ShopkeeperComEvent.SUBTRACTROUNDCOUNTERNUM = "SUBTRACTROUNDCOUNTERNUM"
+GameEvent.ShopkeeperComEvent.SHOPPEALLNEW = "SHOPPEALLNEW"
+GameEvent.ShopkeeperComEvent.SHOPKEEPER_ACHEIVEMENTREFRESH = "SHOPKEEPER_ACHEIVEMENTREFRESH" --成就状态刷新
+GameEvent.ShopkeeperComEvent.REFRESHSHOPKEEPERCURCELLPOS = "REFRESHSHOPKEEPERCURCELLPOS"
+GameEvent.ShopkeeperComEvent.SETSHOPKEEPERACHEIVEMENTSTATE = "SETSHOPKEEPERACHEIVEMENTSTATE"
+GameEvent.ShopkeeperComEvent.FACETOSHOPPER = "FACETOSHOPPER"
+GameEvent.ShopkeeperComEvent.SETVISIBLE = "SETVISIBLE"
+
+--店内场景编辑
+GameEvent.ShopMapEditEvent = {}
+GameEvent.ShopMapEditEvent.ShowHeadTips = "SHOPMAPEDITSHOWHEADTIPS" --展示所有店内物品的头顶tips
+GameEvent.ShopMapEditEvent.HideHeadTips = "SHOPMAPEDITHIDEHEADTIPS" --隐藏所有店内物品的头顶tips
+
+
+
+--新手引导关于店主的
+GameEvent.Guide_ShopkeeperEvent = {}
+GameEvent.Guide_ShopkeeperEvent.GuideManager_ShopkeeperMoveToCounter = "GuideManager_ShopkeeperMoveToCounter"
+GameEvent.Guide_ShopkeeperEvent.GuideSystem_CreateShopkeeper = "GuideSystem_CreateShopkeeper"
+GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperMachineState = "Guide_SetShopkeeperMachineState"
+GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperObjActive = "Guide_SetShopkeeperObjActive"
+GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperMove = "Guide_SetShopkeeperMove"
+GameEvent.Guide_ShopkeeperEvent.Guide_SetShopkeeperDirection = "Guide_SetShopkeeperDirection"
+
+
+--福利相关
+GameEvent.WelfareEvent = {}
+GameEvent.WelfareEvent.ShowUI_WelfareUI = "ShowUI_WelfareUI"
+GameEvent.WelfareEvent.HideUI_WelfareUI = "HideUI_WelfareUI"
+GameEvent.WelfareEvent.RefreshUI_WelfareContent = "RefreshUI_WelfareContent"
+
+--福利 转盘相关
+GameEvent.WelfareEvent.Lottery_refreshBtnTx = "WelfareLottery_refreshBtnTx"
+GameEvent.WelfareEvent.Lottery_refreshCumulativeData = "WelfareLottery_refreshCumulativeData"
+GameEvent.WelfareEvent.Lottery_refresh = "WelfareLottery_refresh"
+GameEvent.WelfareEvent.Lottery_JackpotJumpAnim = "Lottery_JackpotJumpAnim"
+GameEvent.WelfareEvent.Lottery_getJackpotDatas = "WelfareLottery_getJackpotDatas"
+
+--福利 七日 大亨通行证购买
+GameEvent.WelfareEvent.ShowUI_SevenDayBuyPassUI = "ShowUI_SevenDayBuyPassUI"
+GameEvent.WelfareEvent.HideUI_SevenDayBuyPassUI = "HideUI_SevenDayBuyPassUI"
+
+--排行
+GameEvent.RankEvent = {}
+GameEvent.RankEvent.Refresh_MainRankBtnActive = "Refresh_MainRankBtnActive"
+GameEvent.RankEvent.Request_RankList = "Request_RankList"
+GameEvent.RankEvent.Open_RankUI = "Open_RankUI"
+GameEvent.RankEvent.Open_RankUIByBtn = "Open_RankUIByBtn"
+GameEvent.RankEvent.ShowUI_LookOtherUserRoleEquip = "ShowUI_LookOtherUserRoleEquip"
+GameEvent.RankEvent.ShowUI_RoleInfo = "ShowUI_RoleInfo"
+GameEvent.RankEvent.Request_OtherHeroData = "Request_OtherHeroData"
+
+--兑换
+GameEvent.ExchangeEvent = {}
+GameEvent.ExchangeEvent.Open_ExchangeUI = "Open_ExchangeUI"
+GameEvent.ExchangeEvent.Hide_ExchangeUI = "Hide_ExchangeUI"
+GameEvent.ExchangeEvent.Request_ExchangeCodeReward = "Request_ExchangeCodeReward"
+
+--系统弹出消息
+GameEvent.LookBackEvent = {}
+GameEvent.LookBackEvent.Open_LookBackUI = "Open_LookBackUI"
+GameEvent.LookBackEvent.Check_LookBackUI = "Check_LookBackUI"
+
+--资源栏弹出
+GameEvent.TopInfoEvent = {}
+GameEvent.TopInfoEvent.Show_UnionTaskTip = "Show_UnionTaskTip"
+GameEvent.TopInfoEvent.Check_UnionTaskTip = "Check_UnionTaskTip"
+GameEvent.TopInfoEvent.Show_DailyTaskTip = "Show_DailyTaskTip"
+GameEvent.TopInfoEvent.Check_DailyTaskTip = "Check_DailyTaskTip"
+
+--市场
+GameEvent.MarketEvent = {}
+GameEvent.MarketEvent.Market_BuyOrSellOneSuccessed = "Market_BuyOrSellOneSuccessed"
+
+--装备升星效果触发
+GameEvent.EquipStarUpEffectTriggerEvent = {}
+GameEvent.EquipStarUpEffectTriggerEvent.ShowUI_EquipStarUpEffectTrigger = "ShowUI_EquipStarUpEffectTrigger"
+
+--废墟
+GameEvent.RuinsEvent = {}
+GameEvent.RuinsEvent.OpenUI_RuinsTipUI = "OpenUI_RuinsTipUI"
+GameEvent.RuinsEvent.OpenUI_RuinsMainUI = "OpenUI_RuinsMainUI"
+GameEvent.RuinsEvent.HideUI_RuinsMainUI = "HideUI_RuinsMainUI"
+GameEvent.RuinsEvent.OpenUI_RuinsPrepareUI = "OpenUI_RuinsPrepareUI"
+GameEvent.RuinsEvent.HideUI_RuinsPrepareUI = "HideUI_RuinsPrepareUI"
+GameEvent.RuinsEvent.OpenUI_RuinsFinishUI = "OpenUI_RuinsFinishUI"
+GameEvent.RuinsEvent.Request_RuinsData = "Request_RuinsData"
+GameEvent.RuinsEvent.Request_RuinsBattle = "Request_RuinsBattle"
+GameEvent.RuinsEvent.ClickEvent_House = "ClickEvent_House"
+GameEvent.RuinsEvent.OpenUI_RuinsHeroInfo = "OpenUI_RuinsHeroInfo"
+GameEvent.RuinsEvent.Ruins_SortAllHero = "Ruins_SortAllHero"
+GameEvent.RuinsEvent.Ruins_RemoveHeroCom = "Ruins_RemoveHeroCom"
+GameEvent.RuinsEvent.Ruins_AddHeroCom = "Ruins_AddHeroCom"
+GameEvent.RuinsEvent.Ruins_AddHeroComItem = "Ruins_AddHeroComItem"
+
+--金条月卡
+GameEvent.GemMonthEvent = {}
+GameEvent.GemMonthEvent.Request_GemMonthCardData = "Request_GemMonthCardData"
+GameEvent.GemMonthEvent.Request_GemMonthCardReward = "Request_GemMonthCardReward"
+
+--首充七日奖励
+GameEvent.GiftSevenEvent = {}
+GameEvent.GiftSevenEvent.OpenUI_GiftSeven = "OpenUI_GiftSeven"
+GameEvent.GiftSevenEvent.HideUI_GiftSeven = "HideUI_GiftSeven"
+GameEvent.GiftSevenEvent.RefreshUI_GiftSeven = "RefreshUI_GiftSeven"
+GameEvent.GiftSevenEvent.RefreshUI_GiftSevenRedPoint = "RefreshUI_GiftSevenRedPoint"
+GameEvent.GiftSevenEvent.RefreshUI_GiftSevenBtn = "RefreshUI_GiftSevenBtn"
+GameEvent.GiftSevenEvent.Request_AmountReward = "Request_AmountReward"
+
+--夺宝奇兵(黄金城)
+GameEvent.GoldenCityEvent = {}
+GameEvent.GoldenCityEvent.OpenUI_GoldenCityMain = "OpenUI_GoldenCityMain"
+GameEvent.GoldenCityEvent.OpenUI_GoldenCityRewardList = "OpenUI_GoldenCityRewardList"
+GameEvent.GoldenCityEvent.OpenUI_GoldenCityMess = "OpenUI_GoldenCityMess"
+GameEvent.GoldenCityEvent.OpenUI_GoldenCityAdventure = "OpenUI_GoldenCityAdventure"
+GameEvent.GoldenCityEvent.OpenUI_GoldenCityPrepare = "OpenUI_GoldenCityPrepare"
+
+GameEvent.GoldenCityEvent.HideUI_GoldenCityMain = "HideUI_GoldenCityMain"
+GameEvent.GoldenCityEvent.HideUI_GoldenCityPrepare = "HideUI_GoldenCityPrepare"
+
+GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState = "RefrshActivity_GoldenCityState"
+GameEvent.GoldenCityEvent.RefreshRedPoint_Activity_GoldenCity_ScoreCanReward = "RefreshRedPoint_Activity_GoldenCity_ScoreCanReward"
+GameEvent.GoldenCityEvent.Refresh_GoldenCity_MessRank = "Refresh_GoldenCity_MessRank"
+GameEvent.GoldenCityEvent.Refresh_GoldenCity_ScoreReward = "Refresh_GoldenCity_ScoreReward"
+GameEvent.GoldenCityEvent.Refresh_GoldenCity_MainUI = "Refresh_GoldenCity_MainUI"
+GameEvent.GoldenCityEvent.Refresh_GoldenCity_SortHeroList = "Refresh_GoldenCity_SortHeroList"
+GameEvent.GoldenCityEvent.Refresh_GoldenCity_AddHeroCom = "Refresh_GoldenCity_AddHeroCom"
+GameEvent.GoldenCityEvent.Refresh_GoldenCity_AddItemCom = "Refresh_GoldenCity_AddItemCom"
+GameEvent.GoldenCityEvent.Refresh_GoldenCity_MainToggle = "Refresh_GoldenCity_MainToggle"
+GameEvent.GoldenCityEvent.Refresh_GoldenCity_PrepareResting = "Refresh_GoldenCity_PrepareResting"
+GameEvent.GoldenCityEvent.Refresh_GoldenCity_Adventure = "Refresh_GoldenCity_Adventure"
+GameEvent.GoldenCityEvent.RefreshUI_Activity_GoldenCity_PointChanged = "RefreshUI_Activity_GoldenCity_PointChanged"
+
+GameEvent.GoldenCityEvent.Request_GoldenCity_RankList = "Request_GoldenCity_RankList"
+GameEvent.GoldenCityEvent.Request_GoldenCity_DailyReward = "Request_GoldenCity_DailyReward"
+GameEvent.GoldenCityEvent.Request_GoldenCity_Reward = "Request_GoldenCity_Reward"
+GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreStart = "Request_GoldenCity_ExploreStart"
+GameEvent.GoldenCityEvent.Request_GoldenCity_DataCheck = "Request_GoldenCity_DataCheck"
+GameEvent.GoldenCityEvent.Request_GoldenCity_RewardCheck = "Request_GoldenCity_RewardCheck"
+GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreImmediately = "Request_GoldenCity_ExploreImmediately"
+GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreEnd = "Request_GoldenCity_ExploreEnd"
+
+--*********************************************************************夺宝奇兵(黄金城)
+
+--积分活动
+GameEvent.ActivityPointEvent = {}
+GameEvent.ActivityPointEvent.OpenUI_ActivityPoint_MainUI = "OpenUI_ActivityPoint_MainUI"
+GameEvent.ActivityPointEvent.OpenUI_ActivityPoint_MallInfoUI = "OpenUI_ActivityPoint_MallInfoUI"
+GameEvent.ActivityPointEvent.HideUI_ActivityPoint_MallInfoUI = "HideUI_ActivityPoint_MallInfoUI"
+
+GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_MainUI = "RefreshUI_ActivityPoint_MainUI"
+GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_MainAllUI = "RefreshUI_ActivityPoint_MainAllUI"
+GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_Btn = "RefreshUI_ActivityPoint_Btn"
+GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_RedPoint = "RefreshUI_ActivityPoint_RedPoint"
+
+GameEvent.ActivityPointEvent.Request_ActivityPoint_CheckData = "Request_ActivityPoint_CheckData"
+GameEvent.ActivityPointEvent.Request_ActivityPoint_Reward = "Request_ActivityPoint_Reward"
+GameEvent.ActivityPointEvent.Request_ActivityPoint_Exchange = "Request_ActivityPoint_Exchange"
+GameEvent.ActivityPointEvent.Request_PointActivity_CheckExchange = "Request_PointActivity_CheckExchange"
+GameEvent.ActivityPointEvent.Request_PointActivity_CheckExchange2 = "Request_PointActivity_CheckExchange2"
+GameEvent.ActivityPointEvent.Request_Pay_PointActivityPurchase = "Request_Pay_PointActivityPurchase"
+--*********************************************************************积分活动
+
+--聊天
+GameEvent.ChatEvent = {}
+GameEvent.ChatEvent.OpenChatView = "OpenChatView"
+GameEvent.ChatEvent.UpdateChatView = "UpdateChatView"
+GameEvent.ChatEvent.CloseEmojiSubPanel = "CloseEmojiSubPanel"
+GameEvent.ChatEvent.OpenOtherSubSettingPanel = "OpenOtherSubSettingPanel"
+
+GameEvent.ChatEvent.AddBlockUserId = "AddBlockUserId"
+GameEvent.ChatEvent.Clickhyperlink = "Clickhyperlink"
+
+GameEvent.ChatEvent.SendChatMsg = "SendChatMsg"
+
+
+
+--积分大奖赛（内容令状）
+GameEvent.Activity_ScoreAwardGameEvent = {}
+GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_MainPanel = "Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_MainPanel"
+GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_ScoreRewardPanel = "Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_ScoreRewardPanel"
+GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_messRankUI = "Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_messRankUI"
+GameEvent.Activity_ScoreAwardGameEvent.Activity_ScoreAwardGame_GetMemberRankMess = "Activity_ScoreAwardGameEvent.Activity_ScoreAwardGame_GetMemberRankMess"
+
+
+GameEvent.Activity_ScoreAwardGameEvent.RefrshActivity_ScoreAwardGameState = "Activity_ScoreAwardGameEvent.RefrshActivity_ScoreAwardGameState"
+GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_MainPanel = "Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_MainPanel"
+GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_ScoreRewardPanel ="Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_ScoreRewardPanel"
+GameEvent.Activity_ScoreAwardGameEvent.RefreshRedPoint_Activity_ScoreAwardGame_ScoreCanReward = "Activity_ScoreAwardGameEvent.RefreshRedPoint_Activity_ScoreAwardGame_ScoreCanReward"
+
+
+GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckData = "Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckData"
+GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_TaskReward = "Activity_ScoreAwardGameEvent.Request_PointActivity2_TaskReward"
+GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckReward = "Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckReward"
+GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_Reward = "Activity_ScoreAwardGameEvent.Request_PointActivity2_Reward"
+GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_UnionRankList = "Activity_ScoreAwardGameEvent.Request_PointActivity2_UnionRankList"
+
+
+--右上角特定任务完成时动画
+GameEvent.OnSomeOneTaskFinishGameEvent = {}
+GameEvent.OnSomeOneTaskFinishGameEvent.AddCommonTaskFinishProgressAnimData = "AddCommonTaskFinishProgressAnimData"
+GameEvent.OnSomeOneTaskFinishGameEvent.GoOnCommonTaskFinishProgressAnim = "GoOnCommonTaskFinishProgressAnim"
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+GameEvent.TempHotfix_LackResUIEvent = {}
+GameEvent.TempHotfix_LackResUIEvent.SetBtnRefreshAni = "TempHotfix_LackResUIEvent.SetBtnRefreshAni"
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--使用高阶装备或锁定装备提示弹窗   ps: 优先级  锁定 > 高阶
+GameEvent.UseAdvancedOrLockEquipTipsEvent = {}
+GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquipTipsUIBtnClickBackHandler = "UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquipTipsUIBtnClickBackHandler"
+GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquip = "UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquip"
+GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquipFromCS = "UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquipFromCS"
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--丧尸围城
+GameEvent.Activity_DeadRisingEvent = {}
+GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_MainUI = "Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_MainUI"
+GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_messRankUI = "Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_messRankUI"
+GameEvent.Activity_DeadRisingEvent.Activity_DeadRising_GetMemberRankMess = "Activity_DeadRisingEvent.Activity_DeadRising_GetMemberRankMess"
+GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_ScoreRewardUI = "Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_ScoreRewardUI"
+GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_HeroTeamUI = "Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_HeroTeamUI"
+GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_TeamEquipsUI = "Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_TeamEquipsUI"
+GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_MortarShopUI = "Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_MortarShopUI"
+GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_SelectHeroUI = "Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_SelectHeroUI"
+GameEvent.Activity_DeadRisingEvent.RefreshUI_Activity_DeadRising_SelectHeroUI = "Activity_DeadRisingEvent.RefreshUI_Activity_DeadRising_SelectHeroUI"
+GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_SelectItemUI = "Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_SelectItemUI"
+GameEvent.Activity_DeadRisingEvent.RefreshUI_Activity_DeadRising_SelectItemUI = "Activity_DeadRisingEvent.RefreshUI_Activity_DeadRising_SelectItemUI"
+
+
+GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_DataCheck = "Activity_DeadRisingEvent.Request_Activity_DeadRising_DataCheck"
+GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_UnionRankList = "Activity_DeadRisingEvent.Request_Activity_DeadRising_UnionRankList"
+GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelHero = "Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelHero"
+GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelItem = "Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelItem"
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+GameEvent.Network = {
+	Success = "network.success",
+	Failed = "network.failed"
+}
+
+GameEvent.Native = {}
+
+table_read_only(GameEvent)

@@ -1,0 +1,279 @@
+
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_TopPlayerAniItem = typeof(CS.TopPlayerAniItem)
+
+
+local luaClass_TopplayerCommonTaskProgressAnim = require("ui/view/TopPlayerInfoPanel/TopplayerCommonTaskProgressAnim")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+--TopPlayerInfoPanel_dlc --实际逻辑在lua侧
+
+local TopPlayerInfoPanel_dlc = class()
+
+function TopPlayerInfoPanel_dlc:ctor()
+	
+	self.commonTaskFinishProgressAnimDatas = {}
+	
+end
+
+function TopPlayerInfoPanel_dlc:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaBehaviour)
+
+	self.activity_workerGameScoreAni = self.contentPane:GetObjByName("Activity_workerGameScoreAni"):GetComponent(CS_type_TopPlayerAniItem)
+	self.activity_goldenCityScoreAni = self.contentPane:GetObjByName("activity_goldenCitySlider"):GetComponent(CS_type_TopPlayerAniItem)
+
+	self.commonTaskProgressAnim = luaClass_TopplayerCommonTaskProgressAnim.new()
+	self.commonTaskProgressAnim:Init(self.contentPane:GetObjByName("obj_CommonTaskProgressAnim"))
+
+end
+
+function TopPlayerInfoPanel_dlc:init(obj)
+
+	self:initComp(obj)
+	self:addListeners()
+	
+end
+
+function TopPlayerInfoPanel_dlc:addListeners()
+
+	EventDispatcher:addEvent(
+		GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_WorkerGamePanel_PointChanged,
+		self,
+		self.activity_WorkerGame_PointChanged
+	)
+
+	EventDispatcher:addEvent(
+		GameEvent.GoldenCityEvent.RefreshUI_Activity_GoldenCity_PointChanged,
+		self,
+		self.activity_GoldenCity_PointChanged
+	)
+
+	EventDispatcher:addEvent(
+		GameEvent.OnSomeOneTaskFinishGameEvent.AddCommonTaskFinishProgressAnimData,
+		self,
+		self.addCommonTaskFinishProgressAnimData
+	)
+
+	EventDispatcher:addEvent(
+		GameEvent.OnSomeOneTaskFinishGameEvent.GoOnCommonTaskFinishProgressAnim,
+		self,
+		self.goOnCommonTaskFinishProgressAnim
+	)
+
+end
+
+function TopPlayerInfoPanel_dlc:removeListeners()
+
+	EventDispatcher:removeEvent(
+		GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_WorkerGamePanel_PointChanged,
+		self,
+		self.activity_WorkerGame_PointChanged
+	)
+
+	EventDispatcher:removeEvent(
+		GameEvent.GoldenCityEvent.RefreshUI_Activity_GoldenCity_PointChanged,
+		self,
+		self.activity_GoldenCity_PointChanged
+	)
+
+	EventDispatcher:removeEvent(
+		GameEvent.OnSomeOneTaskFinishGameEvent.AddCommonTaskFinishProgressAnimData,
+		self,
+		self.addCommonTaskFinishProgressAnimData
+	)
+
+	EventDispatcher:removeEvent(
+		GameEvent.OnSomeOneTaskFinishGameEvent.GoOnCommonTaskFinishProgressAnim,
+		self,
+		self.goOnCommonTaskFinishProgressAnim
+	)
+
+end
+
+function TopPlayerInfoPanel_dlc:clear()
+
+	self.activity_workerGameScoreAni = nil
+	self.activity_goldenCityScoreAni = nil
+	self.commonTaskProgressAnim = nil
+	self:removeListeners()
+
+end
+
+function TopPlayerInfoPanel_dlc:activity_WorkerGame_PointChanged(changeVal)
+
+	if not Activity_WorkerGameProxy.inst.flag or changeVal <= 0 then --巧匠大赛未开启 或者改变分数<=0
+		return
+	end
+
+	if self.activity_workerGameScoreAni ~= nil then
+
+		--Activity_WorkerGameProxy.inst.scorePoint
+		local curScorePointLv = Activity_WorkerGameProxy.inst:GetCurScorePointLv()
+		local curLvData = Activity_WorkerGameProxy.inst.scoreRewardList[curScorePointLv]
+		local sliderVal = 0
+
+		if curScorePointLv >= #Activity_WorkerGameProxy.inst.scoreRewardList then --团队积分满级
+
+			--团队满级 查看个人积分
+			local curSelfScorePointLv = Activity_WorkerGameProxy.inst:GetCurSelfScorePointLv()
+			curLvData = Activity_WorkerGameProxy.inst.scoreRewardList[curSelfScorePointLv]
+
+			if curSelfScorePointLv >= #Activity_WorkerGameProxy.inst.scoreRewardList then --个人积分也满级
+
+				sliderVal = 1
+
+			elseif curScorePointLv == 1 and Activity_WorkerGameProxy.inst.scorePoint_self < curLvData.userNeedPoint then --个人积分未到1级
+
+				sliderVal = Activity_WorkerGameProxy.inst.scorePoint_self <= 0 and 0 or Activity_WorkerGameProxy.inst.scorePoint_self / tonumber(curLvData.userNeedPoint)
+
+			else
+
+				local nextLvData = Activity_WorkerGameProxy.inst.scoreRewardList[curSelfScorePointLv + 1]
+				sliderVal = (Activity_WorkerGameProxy.inst.scorePoint_self - tonumber(curLvData.userNeedPoint)) / (tonumber(nextLvData.userNeedPoint) - tonumber(curLvData.userNeedPoint))
+
+			end
+
+
+		elseif curScorePointLv == 1 and Activity_WorkerGameProxy.inst.scorePoint < curLvData.needPoint then --未到1级
+
+			sliderVal = Activity_WorkerGameProxy.inst.scorePoint <= 0 and 0 or Activity_WorkerGameProxy.inst.scorePoint / tonumber(curLvData.needPoint)
+
+		else
+
+			local nextLvData = Activity_WorkerGameProxy.inst.scoreRewardList[curScorePointLv + 1]
+			sliderVal = (Activity_WorkerGameProxy.inst.scorePoint - tonumber(curLvData.needPoint)) / (tonumber(nextLvData.needPoint) - tonumber(curLvData.needPoint))
+
+		end
+
+		self.activity_workerGameScoreAni:SetData(sliderVal,"activity_qjds_atlas","qiaojiang_jifen","+"..tostring(changeVal))
+
+	end
+
+
+end
+
+function TopPlayerInfoPanel_dlc:activity_GoldenCity_PointChanged(changeVal)
+
+	if not GoldenCityDataProxy.inst.flag or changeVal <= 0 then --夺宝奇兵(黄金城)未开启 或者改变分数<=0
+		return
+	end
+
+	if self.activity_goldenCityScoreAni ~= nil then
+
+		--Activity_WorkerGameProxy.inst.scorePoint
+		local curScorePointLv = GoldenCityDataProxy.inst:GetCurScorePointLv()
+		local curLvData = GoldenCityDataProxy.inst.scoreRewardList[curScorePointLv]
+		local sliderVal = 0
+
+		if curScorePointLv >= #GoldenCityDataProxy.inst.scoreRewardList then --团队积分满级
+
+			--团队满级 查看个人积分
+			local curSelfScorePointLv = GoldenCityDataProxy.inst:GetCurSelfScorePointLv()
+			curLvData = GoldenCityDataProxy.inst.scoreRewardList[curSelfScorePointLv]
+
+			if curSelfScorePointLv >= #GoldenCityDataProxy.inst.scoreRewardList then --个人积分也满级
+
+				sliderVal = 1
+
+			elseif curScorePointLv == 1 and GoldenCityDataProxy.inst.selfScore < curLvData.userNeedPoint then --个人积分未到1级
+
+				sliderVal = GoldenCityDataProxy.inst.selfScore <= 0 and 0 or GoldenCityDataProxy.inst.selfScore / tonumber(curLvData.userNeedPoint)
+
+			else
+
+				local nextLvData = GoldenCityDataProxy.inst.scoreRewardList[curSelfScorePointLv + 1]
+				sliderVal = (GoldenCityDataProxy.inst.selfScore - tonumber(curLvData.userNeedPoint)) / (tonumber(nextLvData.userNeedPoint) - tonumber(curLvData.userNeedPoint))
+
+			end
+
+
+		elseif curScorePointLv == 1 and GoldenCityDataProxy.inst.unionScore < curLvData.needPoint then --未到1级
+
+			sliderVal = GoldenCityDataProxy.inst.unionScore <= 0 and 0 or GoldenCityDataProxy.inst.unionScore / tonumber(curLvData.needPoint)
+
+		else
+
+			local nextLvData = GoldenCityDataProxy.inst.scoreRewardList[curScorePointLv + 1]
+			sliderVal = (GoldenCityDataProxy.inst.unionScore - tonumber(curLvData.needPoint)) / (tonumber(nextLvData.needPoint) - tonumber(curLvData.needPoint))
+
+		end
+
+		local atlas = ""
+		local icon = ""
+		local itemWdpCfg = CS.WorldParConfigManager.inst:GetConfig(8403)
+		if(itemWdpCfg ~= nil)then
+			local itemCfg = CS.ItemconfigManager.inst:GetConfig(itemWdpCfg.parameters)
+			atlas = "goldenCity_atlas"
+			if(itemCfg ~= nil)then
+				atlas = itemCfg.atlas
+				icon = itemCfg.icon
+			end
+		end
+		self.activity_goldenCityScoreAni:SetData(sliderVal,atlas,icon,"+"..tostring(changeVal))
+
+	end
+
+
+end
+
+function TopPlayerInfoPanel_dlc:addCommonTaskFinishProgressAnimData(data)
+	
+	self.commonTaskFinishProgressAnimDatas[#self.commonTaskFinishProgressAnimDatas + 1] = data --tipsIconUrl taskIcon_atlas taskIcon_name taskContent clickCallback
+
+	self:goOnCommonTaskFinishProgressAnim()
+
+end
+
+function TopPlayerInfoPanel_dlc:goOnCommonTaskFinishProgressAnim()
+	if(CS.ManagerBinder.inst.stateIsChanging)then return end
+	
+	if CS.ManagerBinder.inst.mGameState == CS.kGameState.Town or CS.ManagerBinder.inst.mGameState == CS.kGameState.Shop then
+		
+		if self.commonTaskProgressAnim ~= nil and not self.commonTaskProgressAnim.isPlayAnim and #self.commonTaskFinishProgressAnimDatas > 0 then
+
+			self.commonTaskProgressAnim:SetAnimData(self.commonTaskFinishProgressAnimDatas[1])
+			self.commonTaskProgressAnim:PlayAnim()
+			table.remove(self.commonTaskFinishProgressAnimDatas, 1)
+
+		end
+		
+	end
+
+end
+
+
+-----------LuaBehaviour---------------------------------------------------------------------------------------------------------------------------------------
+
+local topPlayerInfoPanel_dlc
+
+function awake()
+
+	topPlayerInfoPanel_dlc = TopPlayerInfoPanel_dlc.new()
+	topPlayerInfoPanel_dlc:init(self.gameObject)
+
+end
+
+--function update()
+
+	--if CS.UnityEngine.Input.GetKeyDown(CS.UnityEngine.KeyCode.C) then
+		
+		--EventDispatcher:dispatchEvent(GameEvent.OnSomeOneTaskFinishGameEvent.AddCommonTaskFinishProgressAnimData,{tipsIconUrl = "", taskIcon_atlas = "", taskIcon_name = "", taskContent = "漆黑烈焰使", clickCallback = function()
+			--print("邪王真眼是最强的！")
+		--end })
+		
+	--end
+
+--end
+
+function ondestroy()
+
+	if topPlayerInfoPanel_dlc ~= nil then
+		topPlayerInfoPanel_dlc:clear()
+		topPlayerInfoPanel_dlc = nil
+	end
+
+end

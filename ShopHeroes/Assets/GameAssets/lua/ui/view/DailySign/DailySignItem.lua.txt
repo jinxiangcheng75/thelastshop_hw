@@ -1,0 +1,140 @@
+local selfBtn
+local icon
+local numText
+local dayText
+local gouImg
+local bgIcon
+local grayImg
+local obj_furnitureType
+local icon_furniture
+local img_luxuryNum
+local tx_luxuryNum
+
+local data
+local commonData
+
+local csItemConfigManagerInst = CS.ItemconfigManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csLanguageManagerInst = CS.LanguageManager.inst
+local EventDispatcher = require("event/EventDispatcher")
+local csGUIHelper = CS.GUIHelper
+local csItemType = CS.ItemType
+local csEquipConfigManagerInst = CS.EquipConfigManager.inst
+require("utils/XLuaUtils")
+
+function InitComp()
+
+	selfBtn = self.transform:GetComponent("Button")
+	icon = self.transform:Find("icon"):GetComponent("GUIIcon")
+	numText = self.transform:Find("numText"):GetComponent("Text")
+	dayText = self.transform:Find("dayText"):GetComponent("Text")
+	gouImg = self.transform:Find("gouImg"):GetComponent("Image")
+	bgIcon = self.transform:GetComponent("GUIIcon")
+	grayImg = self.transform:Find("grayImg"):GetComponent("Image")
+	obj_furnitureType = self.transform:Find("furnitureTypeObj").gameObject
+	icon_furniture = self.transform:Find("furnitureTypeObj/furnitureTypeIcon"):GetComponent("GUIIcon")
+	img_luxuryNum = self.transform:Find("luxuryNumImg"):GetComponent("Image")
+	tx_luxuryNum = self.transform:Find("luxuryNumText"):GetComponent("Text")
+
+
+	selfBtn:ButtonClickTween(
+		function()
+			if (data == nil) then
+				return
+			end
+			--local func =
+			--get_generic_method(
+			--CS.EventController,
+			--	"TriggerEvent_Lua3",
+			--	CS.System.Int32,
+			--	CS.UnityEngine.Transform,
+			--		CS.System.Int64
+			--	)
+			--	func(csEventControllerInst, csGameEventType.CommonEvent.COMMONTIPS_SETINFO, data.itemId, self.transform, data.count)
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+			local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+			func(csEventControllerInst, csGameEventType.CommonEvent.COMMONTIPS_SETINFO, commonData, self.transform)
+		end
+	)
+end
+
+function SetData(index)
+	data = DailySignDataProxy.inst.dailyData.rewardList[index]
+	commonData = CS.CommonRewardData(data.itemId,data.count,data.quality,data.itemType)
+	local itemCfg = csItemConfigManagerInst:GetConfig(data.itemId)
+	local curDay = DailySignDataProxy.inst.dailyData.totalGiftCount
+	if curDay >= 30 then
+		curDay = curDay - math.floor(curDay/30) * 30
+	end
+	if (itemCfg == nil) then
+		local eqcfg = csEquipConfigManagerInst:GetEquipInfoConfig(data.itemId)
+		icon:SetSprite(eqcfg.equipDrawingsConfig.atlas, eqcfg.equipDrawingsConfig.icon,
+			CS.StaticConstants.qualityColor[eqcfg.equipQualityConfig.quality - 1])
+	else
+
+		obj_furnitureType:SetActive(false)
+		img_luxuryNum.enabled = false
+		tx_luxuryNum.enabled = false
+
+
+		if (csItemType.__CastFrom(itemCfg.type) == csItemType.EquipmentDrawing) then
+			local equipCfg = csEquipConfigManagerInst:GetEquipDrawingsCfg(itemCfg.effect)
+			icon:SetSprite(equipCfg.atlas, equipCfg.icon)
+		elseif (csItemType.__CastFrom(itemCfg.type) == csItemType.Furniture) then --家具装饰
+			local furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(tonumber(itemCfg.effect))
+
+			if furnitureCfg ~= nil then
+
+				local luxury = 0
+
+				if furnitureCfg.type_1 == 1 then --墙壁
+
+					local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS_UserDataProxyInst.shopData.shopLevel);
+
+					luxury = math.ceil((cfg.size_x / 2 + cfg.size_y / 2 ) * furnitureCfg.luxury)
+
+				elseif furnitureCfg.type_1 == 2 then --地板
+
+					local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS_UserDataProxyInst.shopData.shopLevel);
+
+					luxury = math.ceil((cfg.size_x / 2) * (cfg.size_y / 2) * furnitureCfg.luxury)
+
+				else
+					luxury = furnitureCfg.luxury
+				end
+				
+				obj_furnitureType:SetActive(true)
+				img_luxuryNum.enabled = true
+				tx_luxuryNum.enabled = true
+				tx_luxuryNum.text = tostring(luxury)
+				icon_furniture:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.kTileGroupType.__CastFrom(furnitureCfg.type_1) == CS.kTileGroupType.OutdoorFurniture and "jiaju_shiwai" or "jiaju_danyao","",false,true)
+				
+			end
+			icon:SetSprite(itemCfg.atlas, itemCfg.icon)
+		else
+			icon:SetSprite(itemCfg.atlas, itemCfg.icon)
+		end
+	end
+
+	numText.text = data.count
+	dayText.text = index
+
+	if (index - 1 < curDay) then
+		csGUIHelper.SetUIGray(icon.transform, true)
+		gouImg.enabled = true
+		grayImg.enabled = true
+		bgIcon:SetSprite("dailySign_atlas", "qiandao_wupinlan1")
+	elseif index - 1 == curDay and DailySignDataProxy.inst.dailyData.nextTime <= 0 then
+		--csGUIHelper.SetUIGray(icon.transform, false)
+		gouImg.enabled = false
+		grayImg.enabled = false
+		bgIcon:SetSprite("dailySign_atlas", "qiandao_wupinlan2")
+	else
+		--csGUIHelper.SetUIGray(icon.transform, false)
+		gouImg.enabled = false
+		grayImg.enabled = false
+		bgIcon:SetSprite("dailySign_atlas", "qiandao_wupinlan1")
+	end
+end

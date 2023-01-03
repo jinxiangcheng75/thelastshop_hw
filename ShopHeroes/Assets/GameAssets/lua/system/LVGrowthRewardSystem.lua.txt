@@ -1,0 +1,44 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+local EventDispatcherInis = require("event/EventDispatcher")
+
+LVGrowthRewardSystem = class(BaseSystem)
+LVGrowthRewardSystem.super = BaseSystem
+
+function LVGrowthRewardSystem:ctor()
+end
+
+function LVGrowthRewardSystem:AddListeners()
+	print("LVGrowthRewardSystem:AddListeners")
+	EventDispatcherInis:addEvent(GameEvent.GiftMall.Request_LvGrowthData,self, self.RequestLvGrowthData)
+	EventDispatcherInis:addEvent(GameEvent.GiftMall.Request_ReceiveAward, self, self.RequestLvGrowthReceiveAward)
+end
+
+function LVGrowthRewardSystem:RemoveListeners()
+	print("LVGrowthRewardSystem:RemoveListeners")
+	EventDispatcherInis:removeEvent(GameEvent.GiftMall.Request_LvGrowthData, self, self.RequestLvGrowthData)
+	EventDispatcherInis:removeEvent(GameEvent.GiftMall.Request_ReceiveAward, self, self.RequestLvGrowthReceiveAward)
+end
+
+function LVGrowthRewardSystem:OnEnter()
+	LVGrowthRewardSystem.super.OnEnter(self)
+end
+
+function LVGrowthRewardSystem:OnExit()
+	LVGrowthRewardSystem.super.OnExit(self)
+end
+
+--获得数据
+function LVGrowthRewardSystem:RequestLvGrowthData(_id)
+	local rep = MsgType.Request_Pay_ShopperLevelPurchase:New()
+	rep.id = _id
+	rep:Send()
+end
+--领取奖励
+function LVGrowthRewardSystem:RequestLvGrowthReceiveAward(_id)
+	local rep = MsgType.Request_User_ShopperLevelPurchaseReward:New()
+	rep.id = _id
+	rep:Send()
+end

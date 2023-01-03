@@ -1,0 +1,161 @@
+
+require("class")
+require("utils/Dictionary")
+
+
+local LFUNode = class()
+
+function LFUNode:ctor()
+
+	self.freq = 1
+	
+end
+
+function LFUNode:New(tk,tv)
+
+	self.key = tk
+	self.value = tv
+	self.freq = 1 --频率
+	self.pre = nil --上一个
+	self.post = nil --下一个
+	
+end
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--LFUCache
+
+local LFUCache = class()
+
+function LFUCache:ctor()
+	
+	self.size = 0 --当前容量
+	
+end
+
+function LFUCache:New(tk, capacity, onRemoveLastHandler)
+
+	self.cache = Dictionary:New(tk,LFUNode)
+	self.capacity = capacity --上限
+	self.onRemoveLastHandler = onRemoveLastHandler --移除时操作
+	self.head =	LFUNode.new()
+	self.head.freq = 1
+	self.tail = LFUNode.new()
+	self.tail.freq = 1
+	self.head.post = self.tail
+	self.tail.pre = self.head
+	self.size = 0 --当前容量
+	
+end
+
+function LFUCache:JustGet(tk)
+	
+	if self.cache:ContainsKey(tk) then
+
+		local node = self.cache[tk]
+		return node.value
+
+	end
+
+	return nil
+	
+end
+
+function LFUCache:Get(tk)
+	
+	if self.cache:ContainsKey(tk) then
+		
+		local node = self.cache[tk]
+		node.freq = node.freq + 1
+		self:moveToNewPosition(node)
+		return node.value
+		
+	end
+	
+	return nil
+	
+end
+
+function LFUCache:Put(tk,tv)
+	
+	if self.capacity <= 0 then
+		return
+	end
+	
+	if self.cache:ContainsKey(tk) then
+		
+		local node = self.cache[tk]
+		node.value = tv;
+		node.freq = node.freq + 1;
+		self:moveToNewPosition(node);
+		
+	else
+		
+		if self.size == self.capacity then
+			
+			self.cache:Remove(self.head.post.key)
+			self:removeNode(self.head.post)
+			self.size = self.size - 1
+			if self.onRemoveLastHandler ~= nil then
+				self.onRemoveLastHandler(self.head.post.key)
+			end
+			
+		end
+		
+		local newNode = LFUNode.new()
+		newNode:New(tk,tv)
+		self:addNode(newNode)
+		self.cache:Add(tk,newNode)
+		self.size = self.size + 1
+		
+	end
+	
+end
+
+function LFUCache:moveToNewPosition(node)
+	
+	local nextNode = node.post
+	self:removeNode(node)
+	
+	while nextNode.freq <= node.freq and nextNode ~= self.tail do
+		nextNode = nextNode.post
+	end
+	
+	nextNode.pre.post = node
+	node.pre = nextNode.pre
+	node.post = nextNode
+	nextNode.pre = node
+	
+end
+
+function LFUCache:addNode(node)
+	
+	node.post = self.head.post
+	node.pre = self.head
+	self.head.post.pre = node
+	self.head.post = node
+	self:moveToNewPosition(node)
+	
+end
+
+function LFUCache:removeNode(node)
+	
+	node.pre.post = node.post
+	node.post.pre = node.pre
+	
+end
+
+function LFUCache:Clear()
+	
+	self.size = 0
+	self.cache:Clear()
+	self.head =	LFUNode.new()
+	self.head.freq = 1
+	self.tail = LFUNode.new()
+	self.tail.freq = 1
+	self.head.post = self.tail
+	self.tail.pre = self.head
+	
+end
+
+return LFUCache

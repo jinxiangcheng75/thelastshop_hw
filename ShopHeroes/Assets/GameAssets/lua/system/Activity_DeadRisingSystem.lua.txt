@@ -1,0 +1,198 @@
+
+--Activity_DeadRisingSystem  丧尸围城
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("ui/view/Activity/DeadRising/Activity_DeadRising_MainUI")
+require("ui/view/Activity/DeadRising/Activity_DeadRising_messRankUI")
+require("ui/view/Activity/DeadRising/Activity_DeadRisingScoreRewardUI")
+require("ui/view/Activity/DeadRising/Activity_DeadRising_HeroTeamUI")
+require("ui/view/Activity/DeadRising/Activity_DeadRising_MortarShopUI")
+require("ui/view/Activity/DeadRising/Activity_DeadRising_SelectHeroUI")
+require("ui/view/Activity/DeadRising/Activity_DeadRising_SelectItemUI")
+
+
+local EventDispatcher = require("event/EventDispatcher")
+
+Activity_DeadRisingSystem = class(BaseSystem)
+Activity_DeadRisingSystem.super = BaseSystem
+
+function Activity_DeadRisingSystem:ctor()
+end
+
+function Activity_DeadRisingSystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_MainUI,self,self.showActivity_DeadRising_MainPanel)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_messRankUI,self,self.showActivity_DeadRising_messRankUI)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_ScoreRewardUI,self,self.showActivity_DeadRising_ScoreRewardUI)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_HeroTeamUI,self,self.showActivity_DeadRising_HeroTeamUI)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_TeamEquipsUI,self,self.showActivity_DeadRising_TeamEquipsUI)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_MortarShopUI,self,self.showActivity_DeadRising_MortarShopUI)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_SelectHeroUI,self,self.showActivity_DeadRising_SelectHeroUI)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.RefreshUI_Activity_DeadRising_SelectHeroUI,self,self.refreshActivity_DeadRising_SelectHeroUI)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_SelectItemUI,self,self.showActivity_DeadRising_SelectItemUI)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.RefreshUI_Activity_DeadRising_SelectItemUI,self,self.refreshActivity_DeadRising_SelectItemUI)
+	
+
+	------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_DataCheck,self,self.request_Activity_DeadRising_DataCheck)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_UnionRankList,self,self.request_Activity_DeadRising_UnionRankList)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelHero,self,self.request_Activity_DeadRising_AddOrDelHero)
+	EventDispatcher:addEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelItem,self,self.request_Activity_DeadRising_AddOrDelItem)
+
+
+end
+
+function Activity_DeadRisingSystem:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_MainUI,self,self.showActivity_DeadRising_MainPanel)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_messRankUI,self,self.showActivity_DeadRising_messRankUI)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_ScoreRewardUI,self,self.showActivity_DeadRising_ScoreRewardUI)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_HeroTeamUI,self,self.showActivity_DeadRising_HeroTeamUI)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_TeamEquipsUI,self,self.showActivity_DeadRising_TeamEquipsUI)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_MortarShopUI,self,self.showActivity_DeadRising_MortarShopUI)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_SelectHeroUI,self,self.showActivity_DeadRising_SelectHeroUI)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.RefreshUI_Activity_DeadRising_SelectHeroUI,self,self.refreshActivity_DeadRising_SelectHeroUI)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_SelectItemUI,self,self.showActivity_DeadRising_SelectItemUI)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.RefreshUI_Activity_DeadRising_SelectItemUI,self,self.refreshActivity_DeadRising_SelectItemUI)
+
+	------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_DataCheck,self,self.request_Activity_DeadRising_DataCheck)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_UnionRankList,self,self.request_Activity_DeadRising_UnionRankList)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelHero,self,self.request_Activity_DeadRising_AddOrDelHero)
+	EventDispatcher:removeEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelItem,self,self.request_Activity_DeadRising_AddOrDelItem)
+
+end
+
+function Activity_DeadRisingSystem:showActivity_DeadRising_MainPanel()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_DeadRising_MainUI,
+		function(view)
+
+		end
+	)
+
+end
+
+function Activity_DeadRisingSystem:showActivity_DeadRising_messRankUI(type) --0 信息  1 排行榜
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_DeadRising_messRankUI,
+		function(view)
+			view:SetUIData(type)
+		end
+	)
+
+end
+
+function Activity_DeadRisingSystem:showActivity_DeadRising_ScoreRewardUI(lv)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_DeadRisingScoreRewardUI,
+		function (view)
+			view:ShowByRewardLv(lv)
+		end)
+
+end
+
+function Activity_DeadRisingSystem:showActivity_DeadRising_HeroTeamUI()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_DeadRising_HeroTeamUI,
+		function (view)
+			
+		end)
+
+end
+
+function Activity_DeadRisingSystem:showActivity_DeadRising_TeamEquipsUI()
+
+
+
+
+end
+
+function Activity_DeadRisingSystem:showActivity_DeadRising_MortarShopUI()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_DeadRising_MortarShopUI,
+		function (view)
+
+		end)
+
+end
+
+function Activity_DeadRisingSystem:showActivity_DeadRising_SelectHeroUI()
+	
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_DeadRising_SelectHeroUI,
+		function (view)
+		end)
+	
+end
+
+function Activity_DeadRisingSystem:refreshActivity_DeadRising_SelectHeroUI()
+	
+	local activity_DeadRising_SelectHeroUI = GUIManager.inst:GetWindow(Constants.ViewName.Activity_DeadRising_SelectHeroUI, false)
+
+	if 	activity_DeadRising_SelectHeroUI ~= nil and activity_DeadRising_SelectHeroUI.isShowing == true then
+		activity_DeadRising_SelectHeroUI:Refresh()
+	end
+	
+end
+
+function Activity_DeadRisingSystem:showActivity_DeadRising_SelectItemUI()
+	
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_DeadRising_SelectItemUI,
+		function (view)
+		end)
+	
+end
+
+function Activity_DeadRisingSystem:refreshActivity_DeadRising_SelectItemUI()
+	
+end
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+function Activity_DeadRisingSystem:request_Activity_DeadRising_DataCheck()
+	
+	local req = MsgType.Request_Dragon_CheckData:New()
+	req:Send()
+	
+end
+
+
+function Activity_DeadRisingSystem:request_Activity_DeadRising_UnionRankList()
+
+	--local req = MsgType.Request_PointActivity2_UnionRankList:New()
+	--req:Send()
+
+end
+
+function Activity_DeadRisingSystem:request_Activity_DeadRising_AddOrDelHero(heroUid, type)
+	
+	local req = MsgType.Request_Dragon_SetHero:New()
+	req.heroUid = heroUid
+	req.type = type -- 0 add  1 del
+	
+	req:Send()
+		
+end
+
+function Activity_DeadRisingSystem:request_Activity_DeadRising_AddOrDelItem(itemId, type)
+	
+	local req = MsgType.Request_Dragon_SetItem:New()
+	
+	req.itemId = itemId
+	req.type = type -- 0 add  1 del
+	
+	req:Send()
+	
+end
+
+

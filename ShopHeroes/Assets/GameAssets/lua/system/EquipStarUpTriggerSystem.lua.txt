@@ -1,0 +1,57 @@
+
+--EquipStarUpTriggerSystem
+
+
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("ui/view/EquipStarUpTriggerUI/EquipStarUpTriggerUI")
+
+
+local EventDispatcher = require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+
+local luaClass_StoryRole = require("Role/StoryRole/StoryRole")
+
+EquipStarUpTriggerSystem = class(BaseSystem)
+EquipStarUpTriggerSystem.super = BaseSystem
+
+function EquipStarUpTriggerSystem:ctor()
+end
+
+function EquipStarUpTriggerSystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.EquipStarUpEffectTriggerEvent.ShowUI_EquipStarUpEffectTrigger,self,self.showUI_EquipStarUpEffectTrigger)
+
+end
+
+function EquipStarUpTriggerSystem:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.EquipStarUpEffectTriggerEvent.ShowUI_EquipStarUpEffectTrigger,self,self.showUI_EquipStarUpEffectTrigger)
+
+end
+
+function EquipStarUpTriggerSystem:showUI_EquipStarUpEffectTrigger(triggerData)
+
+	local starUpEffectTriggerUI = GUIManager.inst:GetWindow(Constants.ViewName.EquipStarUpTriggerUI, false)
+
+	if starUpEffectTriggerUI ~= nil and starUpEffectTriggerUI.isShowing == true then
+		starUpEffectTriggerUI:SetData(triggerData)
+	else
+
+		GUIManager.inst:OpenView(
+			Constants.ViewName.EquipStarUpTriggerUI,
+			function(view)
+				view:SetData(triggerData)
+			end
+		)
+
+	end
+
+end
+

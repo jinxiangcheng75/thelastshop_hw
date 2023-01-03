@@ -1,0 +1,70 @@
+-- SystemUnlockConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+SystemUnlockConfigData =
+class(
+	{
+		id,
+		level,
+		system_name,
+		system_des,
+		atlas,
+		icon,
+		task_scenes,
+		task_guide_1,
+		task_guide_2,
+		task_guide_3,
+		task_guide_4,
+		task_guide_5,
+		dialog,
+	}
+)
+
+SystemUnlockConfigManager = class()
+--SystemUnlockConfigManager.cfgDict = {}
+local csv_name = "system_unlock_level"
+
+function SystemUnlockConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("SystemUnlockConfigManager:InitCSVConfig csv:", csv)
+	local cfgs = CSVParser:parseClass(csv, 3, SystemUnlockConfigData)
+	SystemUnlockConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("SystemUnlockConfigManager  错误")
+	end
+end
+
+function SystemUnlockConfigManager:processConfigs(cfgs)
+	--print("SystemUnlockConfigManager:processConfigs ", cfgs, " len:", #cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		print("SystemUnlockConfigManager c i:", i," c:", c, " idtype:", type(c.id) , "id is",c.level)
+		self.cfgDict[tonumber(c.id)] = c
+	end
+	print("SystemUnlockConfigManager:processConfigs completed")
+end
+
+function SystemUnlockConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end
+
+function SystemUnlockConfigManager:CheckHasLevel(level)
+	--for i = 1, #self.cfgDict do
+		--if(tonumber(self.cfgDict[i].level) == level)then
+			--return self.cfgDict[i]
+		--end
+	--end
+
+	for k, v in pairs(self.cfgDict) do
+		if(tonumber(v.level) == level)then
+			return v
+		end
+	end
+
+	return nil
+end

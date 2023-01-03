@@ -1,0 +1,251 @@
+
+-- Activity_WorkerGame_messRankUI
+
+require("utils/XLuaUtils")
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_ToggleGroupMarget = typeof(CS.ToggleGroupMarget)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+Activity_WorkerGame_messRankUI = class(ViewBase)
+
+function Activity_WorkerGame_messRankUI:ctor()
+	self.viewID = Constants.ViewName.Activity_WorkerGame_messRankUI
+	Activity_WorkerGame_messRankUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+	self.topResPanelType = CS.TopPlayerShowType.activity_workerGame
+end
+
+function Activity_WorkerGame_messRankUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.closeBtn =  contentPane:GetButton("closeBtn");
+	self.stateGroup = contentPane:GetObjByName("stateGroup"):GetComponent(CS_type_ToggleGroupMarget)
+	self.toggleLinkObjs = contentPane:GetObjByName("toggleLinkObjs"):GetComponent(CS_type_ObjList).objList
+	self.titleTx = contentPane:GetText("titleTx")
+	self.countdownTx = contentPane:GetText("countdownTx")
+	self.rankSuperList = contentPane:GetObjByName("rankSuperList"):GetComponent(CS_type_superList)
+	self.rankNothingObj = contentPane:GetObjByName("rankNothingTips")
+	self.allScoreTx = contentPane:GetText("allScoreTx")
+	
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+
+function Activity_WorkerGame_messRankUI:onInit()
+
+	self:initComp()
+	self.index = 0
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.stateGroup.OnSelectedIndexValueChange = function (index)
+		self:onSelectedIndexValueChange(index)
+	end
+
+	self.rankSuperList.itemRenderer = function(index,item)
+		self:rankListItemRenderer(index,item)
+	end
+
+	self.rankSuperList.itemUpdateInfo = function(index,item)
+		self:rankListItemRenderer(index,item)
+	end
+
+
+end
+
+
+function Activity_WorkerGame_messRankUI:onHide()
+	print("Activity_WorkerGame_messRankUI onHide")
+	self:clearTimer()
+end
+
+function  Activity_WorkerGame_messRankUI:onShowed()
+	print("Activity_WorkerGame_messRankUI onShowed")
+
+	self:setTimer()
+
+	self.titleTx.text = Activity_WorkerGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Name)
+	
+	self.stateGroup:OnEnableMethod(self.index)
+
+end
+
+function Activity_WorkerGame_messRankUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function Activity_WorkerGame_messRankUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+
+function Activity_WorkerGame_messRankUI:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function Activity_WorkerGame_messRankUI:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function Activity_WorkerGame_messRankUI:closeBtnClick()
+	self:hide()
+end
+
+function Activity_WorkerGame_messRankUI:onSelectedIndexValueChange(index)
+
+	self.index = index
+
+	CS.AudioManager.inst:PlaySound(11)
+
+	for i = 0,self.toggleLinkObjs.Count - 1 do
+		self.toggleLinkObjs[i]:SetActive(false)
+	end
+
+	self.toggleLinkObjs[index]:SetActive(true)
+
+	self:setState(index)
+
+end
+
+function  Activity_WorkerGame_messRankUI:setState(index)
+
+	if index == 0 then --提示信息
+
+	elseif index == 1 then	--排行榜
+		
+		self:setMemberRankMess()
+		
+	end
+
+end
+
+
+function Activity_WorkerGame_messRankUI:setMemberRankMess()
+
+	self.rankSuperList.totalItemCount = 0
+	self.allScoreTx.text = "0"
+
+	EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UnionRankList)
+	
+	--测试
+	--local list = get_csharp_list(CS.OneUnionRankData)
+	--list:Add(CS.OneUnionRankData())
+	--list:Add(CS.OneUnionRankData())
+	--list:Add(CS.OneUnionRankData())
+
+
+	--for i = 0, list.Count - 1 do
+
+	--list[i].name = ""..(i+1)
+	--list[i].point = (i + 1) * 10
+
+	--end
+
+	--list[1].userId = CS_UserDataProxyInst.playerData.userUid
+
+	--self:getMemberRankList(list)
+end
+
+function Activity_WorkerGame_messRankUI:getMemberRankList(rankList)
+
+	if self.index ~= 1 then
+		return
+	end
+	
+	self.rankList = rankList
+
+	if #self.rankList > 1 then
+
+		table.sort(self.rankList,function (a,b)
+
+				if a == nil or b == nil then
+					return false
+				end
+
+				if a.point > b.point then
+					return true
+				elseif a.point == b.point then
+					return false
+				else
+					return false
+				end
+			end)
+
+	end
+	
+	self.rankSuperList.totalItemCount = #self.rankList
+	self.rankNothingObj:SetActive(#self.rankList == 0)
+	
+	local allPointNum = 0
+	
+	for i = 1, #self.rankList do
+		allPointNum = self.rankList[i].point + allPointNum
+	end
+	
+	self.allScoreTx.text = tostring(allPointNum)
+
+end
+
+function Activity_WorkerGame_messRankUI:rankListItemRenderer(index, item)
+	item:SetData(self.rankList[index + 1])
+end
+
+function Activity_WorkerGame_messRankUI:setTimer()
+
+	self:timerMethod()
+
+	self.timeId = CS_GameTimerInst:AddTimer(1,function()
+			self:timerMethod()
+		end)
+
+end
+
+function Activity_WorkerGame_messRankUI:timerMethod()
+	
+	local remainTime = Activity_WorkerGameProxy.inst.endtime_serverEndtime - CS_GameTimerInst.serverNow
+	self.countdownTx.text = CS_TimeUtils.timeSpanStrip(remainTime,true)
+	
+end
+
+function  Activity_WorkerGame_messRankUI:clearTimer()
+
+	if 	self.timeId ~= 0 then
+
+		CS_GameTimerInst:RemoveTimer(self.timeId)
+		self.timeId = 0
+
+	end
+
+end

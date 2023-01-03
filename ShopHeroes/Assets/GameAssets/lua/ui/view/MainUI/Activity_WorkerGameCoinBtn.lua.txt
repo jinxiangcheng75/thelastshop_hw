@@ -1,0 +1,96 @@
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+--Activity_WorkerGameCoinBtn
+
+Activity_WorkerGameCoinBtn = class()
+----
+
+function Activity_WorkerGameCoinBtn:ctor()
+end
+
+function Activity_WorkerGameCoinBtn:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.button = self.transform:GetComponent("Button")
+	self.tx_countdown = self.contentPane:GetObjByName("tx_countdownTx"):GetComponent("Text")
+	self.tx_name = self.contentPane:GetObjByName("tx_name"):GetComponent("Text")
+
+end
+
+
+function Activity_WorkerGameCoinBtn:init(obj)
+
+	self:initComp(obj)
+
+	self.timerId = 0
+
+	self.button:ButtonClickTween(
+		function()
+			self:onButtonClick()
+		end
+	)
+
+end
+
+function Activity_WorkerGameCoinBtn:onButtonClick()
+	EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_WorkerGameCoinGiftsUI)
+end
+
+function Activity_WorkerGameCoinBtn:check(flag)
+
+	self:clearTimer()
+
+	if not flag then --巧匠大赛未开启
+
+		self.gameObject:SetActive(false)
+		return
+
+	end
+
+	self.tx_name.text = Activity_WorkerGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.PurchaseTitle)
+	
+
+	self:timerMethod()
+	self.timerId = CS_GameTimerInst:AddTimer(1,function ()
+
+			self:timerMethod()
+
+		end)
+
+end
+
+function Activity_WorkerGameCoinBtn:timerMethod()
+	
+	local remainTime = Activity_WorkerGameProxy.inst.endtime_serverEndtime - CS_GameTimerInst.serverNow
+	if 	Activity_WorkerGameProxy.inst.flag == true and remainTime > 0 then --巧匠大赛开启
+
+		self.tx_countdown.text = CS_TimeUtils.timeSpanStrip(remainTime,true)
+		self.gameObject:SetActive(true)
+
+	else
+
+		self.gameObject:SetActive(false)
+
+	end
+	
+end
+
+function Activity_WorkerGameCoinBtn:clearTimer()
+
+	if self.timerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+
+end
+
+return Activity_WorkerGameCoinBtn

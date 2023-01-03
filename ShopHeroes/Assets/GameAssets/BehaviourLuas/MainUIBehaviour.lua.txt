@@ -1,0 +1,21 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+--void Awake();
+function awake()
+	print("LUA: 当前窗口对象为：" .. self.gameObject.name)
+	local testbtn = self:GetButton("TestBtn")
+	if testbtn ~= nil then
+		testbtn.onClick:AddListener(
+			function()
+				print("LUA: 点击了测试按钮")
+				EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI)
+				--CS.HotfixBridge.inst:TriggerLuaEvent(GameEvent.UI.ShowUI_GameHintUI)
+			end
+		)
+	end
+end
+--void start();
+--void onEnable();
+--void onDisable();
+--void onDestroy();
+--void update();

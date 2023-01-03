@@ -1,0 +1,85 @@
+--GameStateRuins
+
+require("class")
+require("utils/XLuaUtils")
+local BaseState = require("state/BaseState")
+local coroutine_cs = require("coroutine_cs")
+local EventDispatcher = require("event/EventDispatcher")
+
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csSceneManager = CS.UnityEngine.SceneManagement.SceneManager
+local CS_GameTimerInst = CS.GameTimer.inst
+local csAudioManager = CS.AudioManager
+local csFGUI = CS.FGUI
+local csManagerBinder = CS.ManagerBinder
+
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_TimeUtils = CS.TimeUtils
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+
+local GameStateRuins = class(BaseState)
+
+local startLoadScene = false
+
+function GameStateRuins:onEnter(transition)
+	print("enter GameStateRuins")
+	CS.ManagerBinder.inst.mGameState = CS.kGameState.Ruins
+
+	startLoadScene = false
+
+	GameStateRuins:loadRuinsScene()
+end
+
+function GameStateRuins:loadRuinsScene()
+	print("GameStateRuins:GameStateRuins")
+	coroutine_cs.start(
+		function()
+			if (startLoadScene == false) then
+				startLoadScene = true
+
+				local aop = csManagerBinder.inst.mSceneMgr:loadScene("RuinsScene")
+				coroutine.yield(aop)
+				coroutine_cs.wait(0.6)
+
+				csAudioManager.inst:PlayMusic(2)
+				csFGUI.inst:StartExcessAnimation(false, false)
+
+				if(CS.FGUI.inst ~= nil)then
+					if(CS.FGUI.inst.isLandscape)then
+						CS.UnityEngine.Camera.main.orthographicSize = 3
+					else
+						CS.UnityEngine.Camera.main.orthographicSize = 5.5
+					end
+				end
+				
+				local dateTime = CS_TimeUtils.getDateTimeBySecs(CS_GameTimerInst.serverNow)
+
+				if CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."RuinsClone"..tostring(dateTime.Year)..tostring(dateTime.Month)..tostring(dateTime.Day), "-1") == "-1" then
+					EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.OpenUI_RuinsTipUI,1)
+				else
+					--if(RuinsDataProxy.inst.isShowPrepare and RuinsDataProxy.inst.curId ~= 9999)then
+						--EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.OpenUI_RuinsPrepareUI)
+					--end
+					EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.Request_RuinsData)
+				end
+			end
+			
+			CS.ManagerBinder.inst.stateIsChanging = false
+
+			CS.ManagerBinder.inst:GC()
+		end
+	)
+end
+
+
+
+function GameStateRuins:onExit()
+	print("exit GameStateRuins")
+	startLoadScene = false
+
+	EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.HideUI_RuinsMainUI)
+	csSceneManager.UnloadSceneAsync("RuinsScene")
+end
+
+return GameStateRuins

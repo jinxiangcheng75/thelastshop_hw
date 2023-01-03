@@ -1,0 +1,348 @@
+--ChangePetDressUpUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+
+local CS_UnityUtils = CS.UnityUtils
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_PetDataProxyInst = CS.PetDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+ChangePetDressUpUI = class(ViewBase)
+
+function ChangePetDressUpUI:ctor()
+	self.viewID = Constants.ViewName.ChangePetDressUpUI
+	ChangePetDressUpUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.noSetting
+end
+------------------------------------------------
+
+function ChangePetDressUpUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn");
+	self.maskBtn = contentPane:GetButton("maskBtn");
+	self.cancelBtn = contentPane:GetButton("cancelBtn");
+	self.applyBtn = contentPane:GetButton("applyBtn")
+
+	self.petNameTx = contentPane:GetText("petNameTx")
+	self.goldBtn = contentPane:GetButton("goldBtn")
+	self.gemBtn = contentPane:GetButton("gemBtn")
+	self.lvTx = contentPane:GetText("lvTx")
+	self.goldTx = contentPane:GetText("goldTx")
+	self.gemTx = contentPane:GetText("gemTx")
+	self.tx_applyBtn = contentPane:GetText("tx_applyBtn")
+	
+	self.gemConfirmObj = contentPane:GetObjByName("gemConfirmObj")
+	self.petTf = contentPane:GetObjByName("petTf"):GetComponent("RectTransform")
+	self.superList = contentPane:GetObjByName("superList"):GetComponent(CS_type_superList)
+
+end
+
+function ChangePetDressUpUI:onInit()
+
+	self.petUid = -1
+	self.listItemCount = 0
+	self.dressUpSystem = nil
+	self.petCfg = nil
+	self.needBuy = false
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+
+	self.maskBtn:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+
+	self.cancelBtn:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+
+	self.superList.itemRenderer = function(index,item)
+		self:listItemRenderer(index,item)
+	end
+
+	self.superList.itemUpdateInfo = function(index,item)
+		self:listItemRenderer(index,item)
+	end
+
+	self.goldBtn:ButtonClickTween(
+		function ()
+			self:buyPetBreed(0)
+		end)
+
+	self.gemBtn:ButtonClickTween(
+		function ()
+			if self.gemConfirmObj.activeSelf == true then
+				self:buyPetBreed(1)
+			else
+				self.gemConfirmObj:SetActive(true)
+			end
+		end)
+
+	self.applyBtn:ButtonClickTween(
+		function ()
+			self:applyBtnClick()
+		end)
+
+end
+
+
+function ChangePetDressUpUI:onHide()
+	print("ChangePetDressUpUI onHide")
+
+	self.petUid = -1
+	self.petCfg = nil
+	self.needBuy = false
+
+end
+
+function ChangePetDressUpUI:onShowed()
+	print("ChangePetDressUpUI onShowed")
+
+	self.gemConfirmObj:SetActive(false)
+
+end
+
+function ChangePetDressUpUI:Refresh()
+	self:itemClickHandler(PetConfigManager:GetConfig(self.curSeletedId))
+end
+
+function ChangePetDressUpUI:SetData(petData)
+
+	self.data = petData
+
+	self.allItems = PetDataProxy.inst:GetCanShowPets()
+	self.curSeletedId = petData.petInfo.petId
+	
+	self:itemClickHandler(PetConfigManager:GetConfig(petData.petInfo.petId))
+	self:SetListItemTotalCount(#self.allItems)
+
+end
+
+function ChangePetDressUpUI:listItemRenderer(index,item)
+
+	local objList = item.transform:GetComponent(CS_type_ObjList).objList
+
+	for i = 0, 4 - 1 do
+
+		local itemIndex = index * 4 + i
+
+		if 	itemIndex < self.listItemCount then
+
+			objList[i]:SetActive(true)
+			local petBreedItem = objList[i]:GetComponent(CS_type_LuaListItem)
+			petBreedItem:SetData({data = self.allItems[itemIndex + 1],clickHandler = self.itemClickHandler, handlerexecutor = self, isSeleted = self.curSeletedId == self.allItems[itemIndex + 1].id })
+
+		else
+
+			objList[i]:SetActive(false)
+
+		end
+
+	end
+
+
+end
+
+function ChangePetDressUpUI:SetListItemTotalCount(count)
+
+	if count < 0 then
+		count = 0
+	end
+
+	self.listItemCount = count
+
+	local num = math.floor(count / 4)
+
+	if count % 4 > 0 then
+		num = num + 1
+	end
+
+	self.superList.totalItemCount = num
+
+end
+
+function ChangePetDressUpUI:itemClickHandler(petCfg)
+
+	self.petCfg = petCfg
+	self.curSeletedId = petCfg.id
+	self.superList:refresh()
+
+	CS.AudioManager.inst:PlaySound(petCfg.pet_music_id)
+	
+	self.petNameTx.text = CS_LanguageManagerInst:GetValueByKey(petCfg.name)
+
+	local haveBuy = CS_PetDataProxyInst.CanChangePetIds:Find(function(t)
+			return t.petId == petCfg.id
+		end)
+
+	self.needBuy = haveBuy == nil or (CS_UnityUtils.EqualsNull(haveBuy) == true)
+
+	CS.GUIHelper.SetSingleUIGray(self.applyBtn.transform,self.needBuy and petCfg.unlock_type == 1)
+	self.applyBtn.enabled = not self.needBuy or petCfg.unlock_type ~= 1
+
+	self.tx_applyBtn.text = CS_LanguageManagerInst:GetValueByKey("应用")
+	
+	if self.needBuy then
+		
+		--if petCfg.unlock_type == 2 then
+			--self.tx_applyBtn.text = CS_LanguageManagerInst:GetValueByKey("礼包解锁")
+		--elseif petCfg.unlock_type == 3 then
+			--self.tx_applyBtn.text = CS_LanguageManagerInst:GetValueByKey("活动解锁")
+		--end
+		
+		if petCfg.unlock_type ~= 1 then
+			self.tx_applyBtn.text = CS_LanguageManagerInst:GetValueByKey("前往解锁")
+		end
+		
+	end
+	
+	self.goldBtn.gameObject:SetActive(self.needBuy and petCfg.unlock_type == 1)
+	self.gemBtn.gameObject:SetActive(self.needBuy and petCfg.unlock_type == 1)
+
+	if self.needBuy and petCfg.unlock_type == 1 then
+		if(CS.FGUI.inst.isLandscape)then
+			self.petTf.localPosition = Vector3(-484,15,0)
+			self.petNameTx.rectTransform.anchoredPosition = Vector2(-450,-134)
+		else
+			self.petTf.localPosition = Vector3.up * 430
+			self.petNameTx.rectTransform.anchoredPosition = Vector2(45,308)
+		end
+		self.lvTx.text = tostring(petCfg.unlock_level)
+		self.lvTx.color = CS_UserDataProxyInst.playerData.level < petCfg.unlock_level and CS.GUIHelper.GetColorByColorHex("fd4f4f") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+		self.goldTx.text = tostring(petCfg.unlock_money)
+		self.goldTx.color = CS_UserDataProxyInst.playerData.gold < petCfg.unlock_money and CS.GUIHelper.GetColorByColorHex("fd4f4f") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+		self.gemTx.text = tostring(petCfg.unlock_diamond)
+		self.gemTx.color = CS_UserDataProxyInst.playerData.gem < petCfg.unlock_diamond and CS.GUIHelper.GetColorByColorHex("fd4f4f") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+
+	else
+		if(CS.FGUI.inst.isLandscape)then
+			self.petTf.localPosition = Vector3(-484,-115,0)
+			self.petNameTx.rectTransform.anchoredPosition = Vector2(-450,-234)
+			else
+			self.petTf.localPosition = Vector3.up * 300
+			self.petNameTx.rectTransform.anchoredPosition = Vector2(45,166)
+		end
+	end
+
+
+	if self.dressUpSystem == nil or self.dressUpSystem:IsNull() == true then
+
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByModel")
+		local func = funcGeneric(CS.DressUpSystem)
+
+		func(CS_CharacterManagerInst,petCfg.model,1.4,true,function (system)
+				self.dressUpSystem = system
+				system:SetUIPosition(self.petTf,self._uiCanvas.sortingLayerName,self._uiCanvas.sortingOrder + 1,1.8)
+				system:Play("idle",true)
+				system:SetDirection(CS.RoleDirectionType.Left);
+			end)
+
+	else
+		CS_CharacterManagerInst:ReSetCharacterByModel(self.dressUpSystem,petCfg.model)
+		self.dressUpSystem:SetUIPosition(self.petTf,self._uiCanvas.sortingLayerName,self._uiCanvas.sortingOrder + 1,1.8)
+	end
+
+
+
+end
+
+function ChangePetDressUpUI:buyPetBreed(costType) --0 新币  1 金条
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func_2 = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+
+	local cfg = PetConfigManager:GetConfig(self.curSeletedId)
+
+
+	if costType == 0 then
+
+		if 	CS_UserDataProxyInst.playerData.level < cfg.unlock_level then
+
+			func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("店主等级不足"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+			return
+
+		end
+
+		if CS_UserDataProxyInst.playerData.gold < cfg.unlock_money then
+
+			func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("新币不足"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+			return
+
+		end
+
+
+	elseif costType == 1 then
+
+		if CS_UserDataProxyInst.playerData.gem < cfg.unlock_diamond then
+			EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,cfg.unlock_diamond - CS_UserDataProxyInst.playerData.gem)
+			--func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("金条不足"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+			return
+
+		end
+
+	end
+
+	--购买宠物品种
+	EventDispatcher:dispatchEvent(GameEvent.PetEvent.REQUEST_PET_BUYBREED,self.curSeletedId,costType)
+
+end
+
+function ChangePetDressUpUI:applyBtnClick()
+
+	if 	self.data.petInfo.petId == self.curSeletedId then --要换的品种与当前一致 前端直接关闭界面 不发请求
+		self:hide()
+		return
+	end
+	
+	if self.needBuy then 
+		
+		if self.petCfg.unlock_type == 2 then --礼包购买 展示礼包
+			EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.CSCallLua_ShowGiftDeatilUI, self.petCfg.unlock_sale_id)
+		elseif self.petCfg.unlock_type == 3 then --巧匠大赛积分兑换活动 跳转到巧匠大赛积分页
+			EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGameScoreRewardPanel,Activity_WorkerGameProxy.inst:GetScoreRewardIndexByPetId(self.curSeletedId))
+		elseif self.petCfg.unlock_type == 4 then --夺宝奇兵积分兑换活动 跳转到夺宝奇兵积分页
+			EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityRewardList,GoldenCityDataProxy.inst:GetScoreRewardIndexByPetId(self.curSeletedId))
+		elseif self.petCfg.unlock_type == 5 then --勇气挑战积分兑换活动 跳转到勇气挑战积分页
+			EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_ScoreRewardPanel,Activity_ScoreAwardGameProxy.inst:GetScoreRewardIndexByPetId(self.curSeletedId))
+		elseif self.petCfg.unlock_type == 6 then --跳转到周活动兑换商城
+			EventDispatcher:dispatchEvent(GameEvent.ActivityPointEvent.OpenUI_ActivityPoint_MainUI,2,true)
+		elseif self.petCfg.unlock_type == 7 then --跳转到周活动活动商城
+			EventDispatcher:dispatchEvent(GameEvent.ActivityPointEvent.OpenUI_ActivityPoint_MainUI,3,true)
+		end
+		
+		return
+	end
+
+	--设置宠物装扮
+	EventDispatcher:dispatchEvent(GameEvent.PetEvent.REQUEST_PET_CHANGEDRESS,self.data.petUid,self.curSeletedId,"")
+
+end
+
+------------------------------------------------

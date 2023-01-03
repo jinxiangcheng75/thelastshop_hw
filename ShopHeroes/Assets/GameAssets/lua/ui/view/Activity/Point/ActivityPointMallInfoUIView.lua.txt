@@ -1,0 +1,366 @@
+--ActivityPointMallInfoUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/MallDataProxy")
+require("utils/XLuaUtils")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csItemConfigManagerInst = CS.ItemconfigManager.inst
+local csEquipConfigManagerInst = CS.EquipConfigManager.inst
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csItemType = CS.ItemType
+local csGUIHelper = CS.GUIHelper
+local csColor = CS.UnityEngine.Color
+
+local csEVIPPayState = CS.EVIPPayState
+
+ActivityPointMallInfoUIView = class(ViewBase)
+
+function ActivityPointMallInfoUIView:ctor()
+	self.viewID = Constants.ViewName.ActivityPointMallInfoUIView
+	ActivityPointMallInfoUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+
+function ActivityPointMallInfoUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.bgBtn = contentPane:GetButton("CoverBG")
+	self.tuzhiImg = contentPane:GetImage("tuzhiImg")
+	self.icon = contentPane:GetGUIIcon("icon")
+	self.nameText = contentPane:GetText("nameText")
+	self.descText = contentPane:GetText("desText")
+	self.buyBtn = contentPane:GetButton("buyBtn")
+	self.priceText = contentPane:GetText("countTx")
+	self.comfirmImg = contentPane:GetImage("comfirmImg")
+	self.coinIcon = contentPane:GetGUIIcon("coinIcon")
+	self.numText = contentPane:GetText("numText")
+	self.luxuryNumImg = contentPane:GetImage("luxuryNumImg")
+	self.luxuryNumText = contentPane:GetText("luxuryNumText")
+	self.infoBtn = contentPane:GetButton("infoBtn")
+
+	self.workerObj = contentPane:GetObjByName("workerList")
+	local workerObjList = self.workerObj:GetComponent("ObjList").objList
+	self.workerList = {}
+	for i = 0, workerObjList.Count - 1 do
+		self.workerList[#self.workerList + 1] = workerObjList[i]:GetComponent("needWorker")
+	end
+
+	--self.comfirmImg.enabled = false
+	self.tuzhiImg.enabled = false
+end
+
+function ActivityPointMallInfoUIView:onInit()
+
+	self:initComp()
+
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.bgBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.buyBtn:ButtonClickTween(
+		function ()
+			self:ExchangeBtnClick()
+		end
+	)
+
+	self.infoBtn:ButtonClickTween(
+		function ()
+			self:onInfoBtnClick()
+		end
+	)
+
+	self.data = nil
+	self.fromType = 0
+end
+
+function ActivityPointMallInfoUIView:ExchangeBtnClick()
+	if(self.data == nil) then return end
+
+	if((self.fromType == 1 and not ActivityPointDataProxy.inst.exchangeMallFlag) or (self.fromType == 2 and not ActivityPointDataProxy.inst.activityMallFlag))then
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+		func(
+			csEventControllerInst,
+			csGameEventType.SHOWUI_TEXTMSGTIP,
+			cs_LanguageManagerInst:GetValueByKey("活动已结束"),
+			csGUIHelper.GetColorByColorHex("FF2828")
+		)
+		return
+	end
+
+	if(self.data.process >= self.data.count)then
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+		func(
+			csEventControllerInst,
+			csGameEventType.SHOWUI_TEXTMSGTIP,
+			cs_LanguageManagerInst:GetValueByKey("已售罄"),
+			csGUIHelper.GetColorByColorHex("FF2828")
+		)
+		return
+	end
+
+	local count = CS.ItemBagProxy.inst:resItemCount(self.data.itemId)
+	if(count < self.data.needPoint)then -- 要判断兑换币够不够
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+		func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, cs_LanguageManagerInst:GetValueByKey("兑换币不足"),csGUIHelper.GetColorByColorHex("FF2828"))
+		return
+	end
+
+	--if(not self.comfirmImg.enabled) then
+	--self.comfirmImg.enabled = true
+	--else
+	--self.comfirmImg.enabled = false
+	----兑换
+
+	--end
+	EventDispatcher:dispatchEvent(GameEvent.ActivityPointEvent.Request_ActivityPoint_Exchange,self.data.id,self.data.itemId)
+end
+
+function ActivityPointMallInfoUIView:onInfoBtnClick()
+
+	local itemCfg = CS.ItemconfigManager.inst:GetConfig(self.data.reward.itemId)
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.Int32)
+	func(csEventControllerInst, csGameEventType.SHOWUI_EQUIPINFOUIBYDRAWINGID,itemCfg.effect)
+
+end
+
+function ActivityPointMallInfoUIView:onHide()
+	--self.comfirmImg.enabled = false
+end
+
+function  ActivityPointMallInfoUIView:onShowed()
+
+end
+
+function ActivityPointMallInfoUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function ActivityPointMallInfoUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function ActivityPointMallInfoUIView:closeBtnClick()
+	self:hide()
+end
+
+function ActivityPointMallInfoUIView:SetData(_data,fromType)
+	if(_data == nil) then return end
+
+	self.fromType = fromType
+	self.data = _data
+
+	local exchangeItemCfg = csItemConfigManagerInst:GetConfig(self.data.itemId)
+	if(exchangeItemCfg ~= nil)then
+		self.coinIcon.iconImage.enabled = true
+		self.coinIcon:SetSprite(exchangeItemCfg.atlas,exchangeItemCfg.icon)
+	else
+		self.coinIcon.iconImage.enabled = false
+	end
+
+	self.priceText.text = tostring(self.data.needPoint)
+	local count = CS.ItemBagProxy.inst:resItemCount(self.data.itemId)
+	if(count >= self.data.needPoint)then
+		self.priceText.color = csColor.white
+	else
+		self.priceText.color = csColor.red
+	end
+
+	self.numText.text = "x" .. self.data.reward.count
+
+	self:SetGoodItemData()
+end
+
+function ActivityPointMallInfoUIView:SetGoodItemData()
+
+	self.infoBtn.gameObject:SetActive(false)
+
+	self.tuzhiImg.enabled = false
+	self.workerObj:SetActive(false)
+
+	self.luxuryNumImg.enabled = false
+	self.luxuryNumText.text = ""
+
+	local itemCfg = CS.ItemconfigManager.inst:GetConfig(self.data.reward.itemId)
+	if(csItemType.__CastFrom(self.data.reward.itemType) == csItemType.Craftsman)then
+		local workerCfg = nil
+		if(itemCfg ~= nil)then
+			workerCfg = CS.WorkerConfigManager.inst:GetConfig(itemCfg.effect)
+		else
+			workerCfg = CS.WorkerConfigManager.inst:GetConfig(self.data.reward.itemId)
+		end
+
+		if(workerCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(workerCfg.name)
+			self.descText.text = cs_LanguageManagerInst:GetValueByKey(workerCfg.desc)
+			self.icon:SetSprite("portrait_atlas",workerCfg.pic)
+		else
+			if(itemCfg ~= nil)then
+				self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+				self.descText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.desc)
+				self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+			else
+				self.gameObject:SetActive(false)
+			end
+		end
+	elseif csItemType.__CastFrom(self.data.reward.itemType) == csItemType.Equip then
+		local equipCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(self.data.reward.itemId)
+
+		if(equipCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(equipCfg.equipDrawingsConfig.name)
+			self.descText.text = cs_LanguageManagerInst:GetValueByKey(equipCfg.equipDrawingsConfig.desc)
+			self.icon:SetSpriteURL(equipCfg.equipDrawingsConfig.big_icon)
+		else
+			self.gameObject:SetActive(false)
+		end
+	elseif csItemType.__CastFrom(self.data.reward.itemType) == csItemType.EquipmentDrawing then
+		self.tuzhiImg.enabled = true
+		self.workerObj:SetActive(true)
+		self.infoBtn.gameObject:SetActive(true)
+
+		local equipDrawingCfg = nil
+		if(itemCfg ~= nil)then
+			equipDrawingCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(itemCfg.effect)
+		else
+			equipDrawingCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(self.data.reward.itemId)
+		end
+
+		if(equipDrawingCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(equipDrawingCfg.name)
+			self.descText.text = cs_LanguageManagerInst:GetValueByKey(equipDrawingCfg.desc)
+			self.icon:SetSpriteURL(equipDrawingCfg.big_icon)
+
+			for i = 1, #self.workerList do
+				local curWorkerItem = self.workerList[i]
+				if(i <= equipDrawingCfg.artisan_id.Length)then
+					curWorkerItem.gameObject:SetActive(true)
+					local workerCfg = CS.WorkerConfigManager.inst:GetConfig(equipDrawingCfg.artisan_id[i - 1])
+					if(workerCfg ~= nil)then
+						curWorkerItem.workerIcon:SetSprite("portrait_atlas", workerCfg.icon)
+					end
+
+					curWorkerItem.workerLv.text = CS.LanguageManager.inst:GetValueByKey("{0}级", tostring(equipDrawingCfg.artisan_lv[i - 1]))
+
+					local workerData = CS.RoleDataProxy.inst:GetWorker(workerCfg.id)
+					if(workerData.state == CS.EWorkerState.Unlock and workerData.level >= equipDrawingCfg.artisan_lv[i - 1])then
+						curWorkerItem.workerLv.color = CS.GUIHelper.GetColorByColorHex("#FFFFFF")
+					else
+						curWorkerItem.workerLv.color = CS.GUIHelper.GetColorByColorHex("#CC2201")
+					end
+				else
+					curWorkerItem.gameObject:SetActive(false)
+				end
+			end
+		else
+			if(itemCfg ~= nil)then
+				self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+				self.descText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.desc)
+				self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+			else
+				self.gameObject:SetActive(false)
+			end
+		end
+	elseif csItemType.__CastFrom(self.data.reward.itemType) == csItemType.ShopkeeperDress then
+		local dressCfg = nil
+		if(itemCfg ~= nil)then
+			dressCfg = CS.dressconfigManager.inst:GetConfig(itemCfg.effect)
+		else
+			dressCfg = CS.dressconfigManager.inst:GetConfig(self.data.reward.itemId)
+		end
+
+		if(dressCfg ~= nil)then
+			if(itemCfg ~= nil)then
+				self.descText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.desc)
+			else
+				self.descText.text = ""
+			end
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(dressCfg.name)
+			self.icon:SetSprite("ClotheIcon_atlas",dressCfg.icon)
+		else
+			if(itemCfg ~= nil)then
+				self.descText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.desc)
+				self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+				self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+			else
+				self.descText.text = ""
+				self.gameObject:SetActive(false)
+			end
+		end
+	elseif csItemType.__CastFrom(self.data.reward.itemType) == csItemType.Furniture then
+		self.luxuryNumImg.enabled = true
+
+		local furnitureCfg = nil
+		if(itemCfg ~= nil)then
+			furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(itemCfg.effect)
+		else
+			furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(self.data.reward.itemId)
+		end
+
+		if(furnitureCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(furnitureCfg.name)
+			self.icon:SetSprite(furnitureCfg.atlas,furnitureCfg.icon)
+			if(itemCfg ~= nil)then
+				self.descText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.desc)
+			else
+				self.descText.text = cs_LanguageManagerInst:GetValueByKey(furnitureCfg.des)
+
+			end
+
+			local luxury = 0
+
+			if furnitureCfg.type_1 == 1 then --墙壁
+
+				local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS.UserDataProxy.inst.shopData.shopLevel)
+
+				luxury = math.ceil((cfg.size_x / 2 + cfg.size_y / 2 ) * furnitureCfg.luxury)
+
+			elseif furnitureCfg.type_1 == 2 then --地板
+
+				local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS.UserDataProxy.inst.shopData.shopLevel)
+
+				luxury = math.ceil((cfg.size_x / 2) * (cfg.size_y / 2) * furnitureCfg.luxury)
+
+			else
+				luxury = furnitureCfg.luxury
+			end
+
+			self.luxuryNumText.text = tostring(luxury)
+		else
+			if(itemCfg ~= nil)then
+				self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+				self.descText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.desc)
+				self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+			else
+				self.gameObject:SetActive(false)
+			end
+		end
+	else
+		if(itemCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+			self.descText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.desc)
+			self.icon:SetSpriteURL(itemCfg.icon)
+		else
+			self.gameObject:SetActive(false)
+		end
+	end
+end
+------------------------------------------------

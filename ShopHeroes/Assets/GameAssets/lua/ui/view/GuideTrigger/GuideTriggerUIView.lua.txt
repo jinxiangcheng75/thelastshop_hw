@@ -1,0 +1,383 @@
+--GuideTriggerUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local GameTimerInst = CS.GameTimer.inst
+local EventDispatcher = require("event/EventDispatcher")
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+local csVector3 = CS.UnityEngine.Vector3
+local csColor = CS.UnityEngine.Color
+
+local timerId
+
+local graphicDressUp = nil
+local tipsGraphicDressUp = nil
+
+local bgAlpha = 0
+
+GuideTriggerUIView = class(ViewBase)
+
+function GuideTriggerUIView:ctor()
+	self.viewID = Constants.ViewName.GuideTriggerUIView
+	GuideTriggerUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "top"
+end
+
+function GuideTriggerUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.mask = contentPane:GetObjByName("mask"):GetComponent("GuideTriggerMask")
+	self.preMask = contentPane:GetObjByName("preMask")
+	self.dialogObj = contentPane:GetObjByName("fullDialog")
+	self.dialogNextBtn = contentPane:GetButton("guideNextTalk")
+	self.modelPos = contentPane:GetObjByName("modelPos")
+	self.dialogName = contentPane:GetText("name")
+	self.dialogContent = contentPane:GetText("content")
+	self.tipsObj = contentPane:GetObjByName("tips")
+	self.tipsIcon = contentPane:GetGUIIcon("icon")
+	self.tipsContent = contentPane:GetText("contentText")
+	self.finger = contentPane:GetObjByName("arrow")
+	self.fakeFurnUpdateObj = contentPane:GetObjByName("fakeUpdatePanel")
+	self.fakeUpdateBtn = contentPane:GetButton("update_Btn")
+	self.tipsModelPos = contentPane:GetObjByName("tipsPos")
+	self.gTriggerFinger = contentPane:GetComponent("GuideTriggerFinger")
+	self.allBgMask = contentPane:GetObjByName("allBg")
+	if(self.allBgMask ~= nil)then
+		self.allBgImg = self.allBgMask:GetComponent("Image")
+	end
+end
+
+function GuideTriggerUIView:onInit()
+
+	self:initComp()
+
+	self.dialogNextBtn:ButtonClickTween(
+		function ()
+			self:nextDialog()
+		end
+	)
+
+	self.fakeUpdateBtn:ButtonClickTween(
+		function ()
+			-- 走新的协议
+			self.fakeFurnUpdateObj:SetActive(false)
+			EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.Request_GuideTriggerFurnUpgrade)
+		end
+	)
+end
+
+
+function GuideTriggerUIView:onHide()
+	--print("GuideTriggerUIView onHide")
+	CS.AudioManager.inst:PlaySound(9);
+	self.preMask:SetActive(false)
+	graphicDressUp = nil
+	tipsGraphicDressUp = nil
+end
+
+function  GuideTriggerUIView:onShowed()
+	CS.AudioManager.inst:PlaySound(8);
+	--print("GuideTriggerUIView onShowed")
+
+end
+
+function GuideTriggerUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function GuideTriggerUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+local changeTimerId
+-- panelType 1 - 全屏对话 2 - tips 3 - click 4 - tips + click 5 - 假家具升级界面
+function GuideTriggerUIView:OpenPanelByType(panelType,data)
+	--if(tonumber(GuideTriggerManager.curData.guide_type) ~= 4 or (tonumber(GuideTriggerManager.curData.guide_type) == 4 and tonumber(GuideTriggerManager.curData.if_constraint) == 1))then
+	--self.allBgMask:SetActive(true)
+	--else
+	--self.allBgMask:SetActive(false)
+	--end
+
+	if(data.mask_color ~= nil and string.len(data.mask_color) > 0)then
+		if(panelType == 1)then
+			bgAlpha = 0
+		else
+			bgAlpha = data.mask_color / 100
+		end
+	else
+		bgAlpha = 0
+	end
+
+	if(self.allBgImg ~= nil)then
+		self.allBgImg.color = csColor(0,0,0,bgAlpha)
+	end
+
+	self.allBgMask:SetActive(tonumber(GuideTriggerManager.inst.curData.guide_type) ~= 4 or (tonumber(GuideTriggerManager.inst.curData.guide_type) == 4 and tonumber(GuideTriggerManager.inst.curData.if_constraint) == 1))
+	self:CloseAllPanel()
+	if(changeTimerId ~= nil)then
+		GameTimerInst:RemoveTimer(changeTimerId)
+		changeTimerId = nil
+	end
+	if(panelType == 1)then
+		if(self.allBgImg ~= nil)then
+			self.allBgImg.color = csColor(0,0,0,bgAlpha)
+		end
+		self.dialogObj:SetActive(true)
+		self:SetDialogData(data)
+		return
+	end
+	if panelType == 5 then
+		self.preMask:SetActive(false)
+		self.fakeFurnUpdateObj:SetActive(true)
+		GuideTriggerManager.inst:nextGuideTrigger()
+		return
+	end
+	if panelType == 6 then
+		self.allBgMask:SetActive(false)
+		GuideTriggerManager.inst:nextGuideTrigger()
+		return
+	end
+	changeTimerId = GameTimerInst:AddTimer(0.1,function()
+			if(not CS.ManagerBinder.inst.stateIsChanging)then
+				panelType = tonumber(panelType)
+				if panelType == 2 then
+					self.tipsObj:SetActive(true)
+					self:SetTipsData(data)
+				elseif panelType == 3 then
+					--self.mask.gameObject:SetActive(true)
+				elseif panelType == 4 then
+					self.tipsObj:SetActive(true)
+					--self.mask.gameObject:SetActive(true)
+					self:SetTipsData(data)
+				end
+
+				GameTimerInst:RemoveTimer(changeTimerId)
+				changeTimerId = nil
+			end
+		end)
+
+end
+
+function GuideTriggerUIView:SetAllMask(activeSelf)
+	self.allBgMask:SetActive(activeSelf)
+end
+
+function GuideTriggerUIView:HidePanelByType(panelType)
+	panelType = tonumber(panelType)
+	if(panelType == 1)then
+		self.dialogObj:SetActive(false)
+	elseif panelType == 2 then
+		self.tipsObj:SetActive(false)
+	elseif panelType == 3 then
+		self.mask.gameObject:SetActive(false)
+	elseif panelType == 4 then
+		self.tipsObj:SetActive(false)
+		self.mask.gameObject:SetActive(false)
+	elseif panelType == 5 then
+		--self.fakeFurnUpdateObj:SetActive(false)
+	end
+	self.gTriggerFinger:HideFinger()
+end
+
+local contents = {}
+local dialogIndex = 1
+
+local dialogAnimIndex = 0
+local tipsAnimIndex = 0
+function GuideTriggerUIView:SetDialogData(data)
+	self.preMask:SetActive(false)
+	local npcCfg = CS.ArtisanNPCConfigManager.inst:GetConfig(data.guide_id)
+
+	self.dialogName.text = cs_LanguageManagerInst:GetValueByKey(npcCfg.name)
+	contents = self:Split(cs_LanguageManagerInst:GetValueByKey(data.dialog),'|')
+	dialogIndex = 1
+
+	if(contents == nil and #contents <= 0)then
+		self:hide()
+		return
+	end
+
+	self.dialogContent.text = cs_LanguageManagerInst:GetValueByKey(contents[dialogIndex])
+	self:creatNPCModel(npcCfg.model)
+end
+
+function GuideTriggerUIView:creatNPCModel(modelId)
+	if(graphicDressUp == nil)then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByModel")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		func(CS_CharacterManagerInst,modelId,0.14,true,function (system)
+				graphicDressUp = system
+				system.transform:SetParent(self.modelPos.transform)
+				system.transform.localScale = csVector3(1,1,1) * 1.3
+				system.transform.localPosition = csVector3(0,0,0)
+				self:setRandomAnim(0)
+			end,nil)
+	else
+		CS_CharacterManagerInst:ReSetCharacterByModel(graphicDressUp,modelId,true,nil)
+		self:setRandomAnim(0)
+	end
+end
+
+function GuideTriggerUIView:nextDialog()
+	if(contents == nil or #contents <= 0) then
+		print("没有对话数据")
+		return
+	end
+
+	dialogIndex = dialogIndex + 1
+	if(dialogIndex <= #contents)then
+		-- local tweenCore = self.dialogContent:DOText(contents[dialogIndex],0.5)
+		-- local funcGeneric = xlua.get_generic_method(CS.DG.Tweening.TweenSettingsExtensions, "From")
+		-- local func = funcGeneric(tweenCore:GetType())
+		-- func(tweenCore, "",true,false)
+		-- tweenCore.onPlay = function ()
+		-- 	graphicDressUp:Play("idle_4",true,1,0,nil)
+		-- end
+		-- tweenCore.onComplete = function ()
+		-- 	graphicDressUp:Play("idle_1",true,1,0,nil)
+		-- end
+		self.dialogContent.text = ""
+		self.dialogContent:DOText(contents[dialogIndex],0.5)
+		--.onPlay = function ()
+		--graphicDressUp:Play("idle_4",true,1,0,nil)
+		--end
+		-- .onComplete = function ()
+		-- graphicDressUp:Play("idle_1",true,1,0,nil)
+		-- end
+
+	else
+		contents = nil
+		dialogIndex = 1
+		self.dialogObj:SetActive(false)
+		self.preMask:SetActive(true)
+		--graphicDressUp:Play("idle_1",true,1,0,nil)
+		-- 下一步
+		GuideTriggerManager.inst:nextGuideTrigger()
+	end
+end
+
+function GuideTriggerUIView:SetTipsData(data)
+	local npcCfg = CS.ArtisanNPCConfigManager.inst:GetConfig(data.guide_id)
+
+	--self.tipsIcon:SetSprite(CS.StaticConstants.guideAtlas,npcCfg.pic,"",true)
+	self.tipsContent.text = cs_LanguageManagerInst:GetValueByKey(data.dialog)
+
+	if(tipsGraphicDressUp == nil)then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByModel")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		func(CS_CharacterManagerInst,npcCfg.model,0.14,true,function (system)
+				tipsGraphicDressUp = system
+				system.transform:SetParent(self.tipsModelPos.transform)
+				system.transform.localScale = csVector3(1,1,1) * 0.5
+				system.transform.localPosition = csVector3(0,95,0)
+				self:setRandomAnim(1)
+			end,nil)
+	else
+		CS_CharacterManagerInst:ReSetCharacterByModel(tipsGraphicDressUp,npcCfg.model,true,nil)
+		self:setRandomAnim(1)
+	end
+end
+
+function GuideTriggerUIView:setRandomAnim(fromType) -- 0 - dialog 1 - tips
+	local animName = ""
+
+	if(fromType == 0)then
+		if dialogAnimIndex % 2 == 0 then
+			animName = "idle_sp_1"
+		else
+			animName = "idle_2"
+		end
+		dialogAnimIndex = dialogAnimIndex + 1
+
+		if graphicDressUp ~= nil then
+			graphicDressUp:Play(animName,false,1,0,function ()
+					graphicDressUp:Play("idle_1",true,1,0,nil)
+				end)
+		end
+	else
+		if tipsAnimIndex % 2 == 0 then
+			animName = "idle_sp_1"
+		else
+			animName = "idle_2"
+		end
+		tipsAnimIndex = tipsAnimIndex + 1
+
+		if tipsGraphicDressUp ~= nil then
+			tipsGraphicDressUp:Play(animName,false,1,0,function ()
+					tipsGraphicDressUp:Play("idle_1",true,1,0,nil)
+				end)
+		end
+	end
+end
+
+function GuideTriggerUIView:CloseAllPanel()
+	self.mask.gameObject:SetActive(false)
+	self.dialogObj:SetActive(false)
+	self.tipsObj:SetActive(false)
+	--self.fakeFurnUpdateObj:SetActive(false)
+	self.gTriggerFinger:HideFinger()
+end
+
+function GuideTriggerUIView:SetGMask(targetRect)
+	GameTimerInst:AddTimer(0.25,1,function ()
+			self.allBgMask:SetActive(false)
+			self.mask.color = csColor(0,0,0,bgAlpha)
+			self.mask:ShowGMask(targetRect)
+			self.gTriggerFinger:ShowFinger(targetRect.transform,GuideTriggerManager.inst.operationCfg.guide_btn_dev)
+		end)
+end
+
+local notConstraint = false
+function GuideTriggerUIView:SetMask(panelName, targetTrans)
+	self.allBgMask:SetActive(false)
+	self.preMask:SetActive(false)
+	self.gTriggerFinger:ShowFinger(targetTrans,GuideTriggerManager.inst.operationCfg.guide_btn_dev)
+	notConstraint = panelName ~= "IndoorEvent"
+end
+
+function GuideTriggerUIView:hideFinger()
+	self.gTriggerFinger:HideFinger()
+end
+
+function GuideTriggerUIView:hideFingerFromTouch()
+	if(notConstraint)then
+		csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON)
+		GuideTriggerManager.inst.isInTrigger = false
+		CS.GuideManager.inst.isInTriggerGuide = false
+		notConstraint = false
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.HideGuideTriggerUI)
+		if(CS.IndoorMap.inst ~= nil)then
+			CS.IndoorMap.inst.indoorMask:SetActive(false)
+		end
+		self.preMask:SetActive(false)
+	end
+end
+
+function GuideTriggerUIView:setPreMaskState(isActive)
+	self.preMask:SetActive(isActive)
+end
+
+function GuideTriggerUIView:Split(szFullString, szSeparator)
+	local nFindStartIndex = 1
+	local nSplitIndex = 1
+	local nSplitArray = {}
+	while true do
+		local nFindLastIndex = string.find(szFullString, szSeparator, nFindStartIndex)
+		if not nFindLastIndex then
+			nSplitArray[nSplitIndex] = string.sub(szFullString, nFindStartIndex, string.len(szFullString))
+			break
+		end
+		nSplitArray[nSplitIndex] = string.sub(szFullString, nFindStartIndex, nFindLastIndex - 1)
+		nFindStartIndex = nFindLastIndex + string.len(szSeparator)
+		nSplitIndex = nSplitIndex + 1
+	end
+	return nSplitArray
+end
+------------------------------------------------

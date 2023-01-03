@@ -1,0 +1,111 @@
+--ExchangeUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csGameTimerInst = CS.GameTimer.inst
+local timerId = nil
+
+ExchangeUIView = class(ViewBase)
+
+function ExchangeUIView:ctor()
+	self.viewID = Constants.ViewName.ExchangeUIView
+	ExchangeUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function ExchangeUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.bgBtn = contentPane:GetButton("bg")
+
+	self.inputField = contentPane:GetObjByName("InputField"):GetComponent("InputField")
+	self.exchangeBtn = contentPane:GetButton("exchangeBtn")
+
+	self.uiAnimator = contentPane.uiAnimator
+end
+
+function ExchangeUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.bgBtn.onClick:AddListener(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.exchangeBtn:ButtonClickTween(
+		function ()
+			if(self.inputField.text == "" or self.inputField.text == nil)then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+				func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, cs_LanguageManagerInst:GetValueByKey("请先输入兑换码"),csGUIHelper.GetColorByColorHex("FF2828"))
+				return
+			end
+			
+			EventDispatcher:dispatchEvent(GameEvent.ExchangeEvent.Request_ExchangeCodeReward,self.inputField.text)
+			self.inputField.text = ""
+		end
+	)
+end
+
+function ExchangeUIView:DoShowAnimation()
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+end
+
+function ExchangeUIView:DoHideAnimation()
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	csGameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end
+	)
+end
+
+function ExchangeUIView:onHide()
+	--print("ExchangeUIView onHide")
+	if(timerId ~= nil)then
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = nil
+	end
+end
+
+function  ExchangeUIView:onShowed()
+	--print("ExchangeUIView onShowed")
+end
+
+function ExchangeUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function ExchangeUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function ExchangeUIView:closeBtnClick()
+	self:hide()
+end
+------------------------------------------------

@@ -1,0 +1,446 @@
+---@class PetSystem
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/Pet/MainPetUI")
+require("ui/view/Pet/PetDetailUI")
+require("ui/view/Pet/FeedPetUI")
+require("ui/view/Pet/PetChangeNameUI")
+require("ui/view/Pet/PetHouseDesignUI")
+require("ui/view/Pet/PetBuyBoothUI")
+require("ui/view/Pet/PetSettingUI")
+require("ui/view/Pet/StorePetHouseConfirmUI")
+require("ui/view/Pet/CreateNewPetUI")
+require("ui/view/Pet/ChangePetDressUpUI")
+require("ui/view/Pet/PetLevelUpUI")
+
+
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local CS_GameObject = CS.UnityEngine.GameObject
+local CS_Type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_PetDataProxyInst = CS.PetDataProxy.inst
+
+PetSystem = class(BaseSystem)
+PetSystem.super = BaseSystem
+
+function PetSystem:ctor()
+
+end
+
+function PetSystem:OnInit()
+
+end
+
+function PetSystem:AddListeners()
+
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_MainPetUI,self,self.openMainPetUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.HideUI_MainPetUI,self,self.hideMainPetUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_PetDetailUI,self,self.openPetDetailUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.HideUI_PetDetailUI,self,self.hidePetDetailUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_FeedPetUI,self,self.openFeedPetUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.HideUI_FeedPetUI,self,self.hideFeedPetUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_PetChangeNameUI,self,self.openPetChangeNameUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_PetHouseDesignUI,self,self.openPetHouseDesignUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.HideUI_PetHouseDesignUI,self,self.hidePetHouseDesignUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.PutPetHouse,self,self.putPetHouse)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_BuyPetBoothUI,self,self.openBuyPetBoothUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_PetSettingUI,self,self.openPetSettingUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.HideUI_PetSettingUI,self,self.hidePetSettingUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_StorePetHouseConfirmUI,self,self.openStorePetHouseConfirmUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_CreateNewPetUI,self,self.openCreateNewPetUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.HideUI_CreateNewPetUI,self,self.hideCreateNewPetUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_ChangePetDressUpUI,self,self.openChangePetDressUpUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.HideUI_ChangePetDressUpUI,self,self.hideChangePetDressUpUI)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.ShowUI_PetLevelUpUI,self,self.openPetLevelUpUI)
+
+
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.OnPetDataChged,self,self.onPetDataChged)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.OnPetSlotsDataChged,self,self.onPetSlotsDataChged)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.OnPetBreedsDataChged,self,self.onPetBreedsDataChged)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.OnMainPetUidChged,self,self.onMainPetUidChged)
+
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.REQUEST_PET_CHANGENAME,self,self.request_setPetName)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.REQUEST_PET_FEED,self,self.request_feedPet)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.REQUEST_PET_BUYSLOT,self,self.request_buyPetSlot)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.REQUEST_PET_BUYBREED,self,self.request_buyPetBreed)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.REQUEST_PET_CHANGEDRESS,self,self.request_setPetSlot)
+	EventDispatcherInis:addEvent(GameEvent.PetEvent.REQUEST_PET_SETMAIN,self,self.request_setPetMain)
+
+
+end
+
+function PetSystem:RemoveListeners()
+
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_MainPetUI,self,self.openMainPetUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.HideUI_MainPetUI,self,self.hideMainPetUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_PetDetailUI,self,self.openPetDetailUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.HideUI_PetDetailUI,self,self.hidePetDetailUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_FeedPetUI,self,self.openFeedPetUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.HideUI_FeedPetUI,self,self.hideFeedPetUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_PetChangeNameUI,self,self.openPetChangeNameUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_PetHouseDesignUI,self,self.openPetHouseDesignUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.HideUI_PetHouseDesignUI,self,self.hidePetHouseDesignUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.PutPetHouse,self,self.putPetHouse)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_BuyPetBoothUI,self,self.openBuyPetBoothUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_PetSettingUI,self,self.openPetSettingUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.HideUI_PetSettingUI,self,self.hidePetSettingUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_StorePetHouseConfirmUI,self,self.openStorePetHouseConfirmUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_CreateNewPetUI,self,self.openCreateNewPetUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.HideUI_CreateNewPetUI,self,self.hideCreateNewPetUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_ChangePetDressUpUI,self,self.openChangePetDressUpUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.HideUI_ChangePetDressUpUI,self,self.hideChangePetDressUpUI)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.ShowUI_PetLevelUpUI,self,self.openPetLevelUpUI)
+
+
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.OnPetDataChged,self,self.onPetDataChged)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.OnPetSlotsDataChged,self,self.onPetSlotsDataChged)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.OnPetBreedsDataChged,self,self.onPetBreedsDataChged)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.OnMainPetUidChged,self,self.onMainPetUidChged)
+
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.REQUEST_PET_CHANGENAME,self,self.request_setPetName)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.REQUEST_PET_FEED,self,self.request_feedPet)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.REQUEST_PET_BUYSLOT,self,self.request_buyPetSlot)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.REQUEST_PET_BUYBREED,self,self.request_buyPetBreed)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.REQUEST_PET_CHANGEDRESS,self,self.request_setPetSlot)
+	EventDispatcherInis:removeEvent(GameEvent.PetEvent.REQUEST_PET_SETMAIN,self,self.request_setPetMain)
+
+end
+
+
+function PetSystem:openMainPetUI()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.MainPetUI,
+		function(view)
+
+		end
+	)
+
+end
+
+function PetSystem:hideMainPetUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.MainPetUI)
+
+end
+
+function PetSystem:openPetDetailUI(petData)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.PetDetailUI,
+		function(view)
+			view:SetData(petData)
+		end
+	)
+
+end
+
+function PetSystem:hidePetDetailUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.PetDetailUI)
+
+end
+
+function PetSystem:openFeedPetUI(petData)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.FeedPetUI,
+		function(view)
+			view:SetData(petData)
+		end
+	)
+
+end
+
+function PetSystem:hideFeedPetUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.FeedPetUI)
+
+end
+
+function PetSystem:openPetChangeNameUI(petUid,petNickName)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.PetChangeNameUI,
+		function(view)
+			view:SetData(petUid,petNickName)
+		end
+	)
+
+end
+
+function PetSystem:openPetHouseDesignUI(petData)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.PetHouseDesignUI,
+		function(view)
+			view:SetData(petData)
+		end
+	)
+
+end
+
+
+function PetSystem:hidePetHouseDesignUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.PetHouseDesignUI)
+
+	EventDispatcherInis:dispatchEvent(GameEvent.GuideTask.ShowUI_GuideTask)
+end
+
+function PetSystem:putPetHouse(furnitureUid)
+
+	local data = CS_UserDataProxyInst:GetFuriture(furnitureUid)
+
+	if data ~= nil then
+
+		local furnitureDisplayData = CS.FurnitureDisplayData()
+		furnitureDisplayData.id = data.id
+		furnitureDisplayData.uid = data.uid
+		furnitureDisplayData.cfg = data.config
+		furnitureDisplayData.storeNum = 1
+
+		GUIManager.inst:HideView(Constants.ViewName.PetDetailUI)
+		GUIManager.inst:HideView(Constants.ViewName.MainPetUI)
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.FurnitureDisplayData)
+
+		func(CS_EventControllerInst,CS_GameEventType.ShopDesignEvent.Create_Furniture,furnitureDisplayData)
+		EventDispatcherInis:dispatchEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Create_Furniture,furnitureDisplayData)
+
+	else
+
+		print("无忧无虑小松鼠  没有对应宠物小家 家具uid:"..furnitureUid)
+
+	end
+
+end
+
+function PetSystem:openBuyPetBoothUI()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.PetBuyBoothUI,
+		function(view)
+
+		end
+	)
+
+end
+
+function PetSystem:openPetSettingUI(petData)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.PetSettingUI,
+		function(view)
+			view:SetData(petData)
+		end
+	)
+
+end
+
+function PetSystem:hidePetSettingUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.PetSettingUI)
+
+end
+
+function PetSystem:openStorePetHouseConfirmUI(furnitureUid)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.StorePetHouseConfirmUI,
+		function(view)
+			view:SetData(furnitureUid)
+		end
+	)
+
+end
+
+function PetSystem:openCreateNewPetUI(petUid)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.CreateNewPetUI,
+		function(view)
+			view:SetData(petUid)
+		end
+	)
+
+end
+
+function PetSystem:hideCreateNewPetUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.CreateNewPetUI)
+
+end
+
+
+function PetSystem:openChangePetDressUpUI(petData)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.ChangePetDressUpUI,
+		function(view)
+			view:SetData(petData)
+		end
+	)
+
+end
+
+function PetSystem:hideChangePetDressUpUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.ChangePetDressUpUI)
+
+end
+
+function PetSystem:openPetLevelUpUI(petData)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.PetLevelUpUI,
+		function(view)
+			view:SetData(petData)
+		end
+	)
+
+end
+
+function PetSystem:onPetDataChged(chgedPetUid)
+
+	local mainPetUI = GUIManager.inst:GetWindow(Constants.ViewName.MainPetUI, false)
+
+	if 	mainPetUI~=nil and mainPetUI.isShowing == true then
+		mainPetUI:UpdateOnePetData(chgedPetUid)
+	end
+
+	local petDetailUI = GUIManager.inst:GetWindow(Constants.ViewName.PetDetailUI, false)
+
+	if 	petDetailUI~=nil and petDetailUI.isShowing == true then
+		petDetailUI:UpdateData(chgedPetUid)
+	end
+
+	local petHouseDesignUI = GUIManager.inst:GetWindow(Constants.ViewName.PetHouseDesignUI, false)
+	if 	petHouseDesignUI~=nil and petHouseDesignUI.isShowing == true then
+		petHouseDesignUI:UpdateData(chgedPetUid)
+	end
+
+	local petSettingUI = GUIManager.inst:GetWindow(Constants.ViewName.PetSettingUI, false)
+	if petSettingUI~=nil and petSettingUI.isShowing == true then
+		local petData = CS_PetDataProxyInst:GetPetDataByPetUid(chgedPetUid)
+		petSettingUI:SetData(petData)
+	end
+
+end
+
+
+function PetSystem:onPetSlotsDataChged()
+
+	GUIManager.inst:HideView(Constants.ViewName.PetBuyBoothUI)
+
+	local mainPetUI = GUIManager.inst:GetWindow(Constants.ViewName.MainPetUI, false)
+
+	if 	mainPetUI~=nil and mainPetUI.isShowing == true then
+		mainPetUI:SetData()
+	end
+
+end
+
+function PetSystem:onPetBreedsDataChged()
+
+	local createNewPetUI = GUIManager.inst:GetWindow(Constants.ViewName.CreateNewPetUI, false)
+
+	if 	createNewPetUI~=nil and createNewPetUI.isShowing == true then
+		createNewPetUI:Refresh()
+	end
+
+	local changePetDressUpUI = GUIManager.inst:GetWindow(Constants.ViewName.ChangePetDressUpUI, false)
+
+	if 	changePetDressUpUI~=nil and changePetDressUpUI.isShowing == true then
+		changePetDressUpUI:Refresh()
+	end
+
+
+end
+
+function PetSystem:onMainPetUidChged()
+
+	local mainPetUI = GUIManager.inst:GetWindow(Constants.ViewName.MainPetUI, false)
+
+	if 	mainPetUI~=nil and mainPetUI.isShowing == true then
+		mainPetUI:SetData()
+	end
+
+	local petDetailUI = GUIManager.inst:GetWindow(Constants.ViewName.PetDetailUI, false)
+
+	if 	petDetailUI~=nil and petDetailUI.isShowing == true then
+		petDetailUI:Refresh()
+	end
+
+end
+
+
+--------------------------------发送协议
+function PetSystem:request_setPetName(petUid,petName)
+
+	--发送设置宠物名字的请求
+	local req = MsgType.Request_User_PetChangeName:New()
+	req.petUid = petUid
+	req.petName = petName
+	req:Send()
+
+end
+
+function PetSystem:request_feedPet(petUid,feedType)  --Free = 1,Gold = 2,Gem = 3,
+
+	--发送购买喂食宠物的请求
+	local req = MsgType.Request_User_PetFeed:New()
+	req.petUid = petUid
+	req.petFeedType = feedType
+	req:Send()
+
+end
+
+function PetSystem:request_buyPetSlot(costType) -- 0金币 1钻石
+
+	--发送购买宠物栏位的请求
+	local req = MsgType.Request_User_BuyPetSlot:New()
+	req.costType = costType
+	req:Send()
+
+end
+
+function PetSystem:request_buyPetBreed(petId,costType) -- 0金币 1钻石
+
+	--发送购买宠物品种的请求
+	local req = MsgType.Request_User_BuyPet:New()
+	req.petId = petId
+	req.costType = costType
+	req:Send()
+
+end
+
+function PetSystem:request_setPetSlot(petUid,petId,petName)
+
+	--发送设置宠物装扮的请求
+	local req = MsgType.Request_User_SetPetSlot:New()
+	req.petUid = petUid
+	req.petId = petId
+	req.petName = petName
+	req:Send()
+
+end
+
+function PetSystem:request_setPetMain(petUid)
+
+	--发送设置主宠物的请求
+	local req = MsgType.Request_User_SetMainPet:New()
+	req.petUid = petUid
+	req:Send()
+
+end

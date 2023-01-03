@@ -1,0 +1,342 @@
+
+--Welfare_sevenDay
+
+local CS_type_ToggleGroupMarget = typeof(CS.ToggleGroupMarget)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local CS_type_SevenDayToggleItem = typeof(CS.SevenDayToggleItem)
+--local CS_type_SevenDayTaskItem = typeof(CS.SevenDayTaskItem)
+
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_TimeUtils = CS.TimeUtils
+local CS_PayInst = CS.GamePay.inst
+
+local Vector2 = CS.UnityEngine.Vector2
+
+local CS_ItemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_SevenDayTaskConfigMangerInst = CS.SevenDayTaskConfigManger.inst
+local CS_SevenDayGoalDataProxyInst = CS.SevenDayGoalDataProxy.inst
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Welfare_sevenDay = class(luaClass_Welfare_CtrlBase)
+
+function Welfare_sevenDay:initComp(luaBehaviour)
+
+	local contentPane = luaBehaviour
+
+	self.tx_name = contentPane:GetText("tx_name")
+	self.rtf_nameBg = contentPane:GetObjByName("rtf_nameBg"):GetComponent("RectTransform")
+	self.tx_desc = contentPane:GetText("tx_desc")
+	self.icon_reward = contentPane:GetGUIIcon("icon_reward")
+	self.img_tuzhi = contentPane:GetImage("img_tuzhi")
+	self.img_lock = contentPane:GetImage("img_lock")
+	self.img_gou = contentPane:GetImage("img_gou")
+	self.tx_rewardNum = contentPane:GetText("tx_rewardNum")
+	self.tx_prompt = contentPane:GetText("tx_prompt")
+	self.obj_effect = contentPane:GetObjByName("obj_effect")
+	self.btn_buyPass = contentPane:GetButton("btn_buyPass")
+	self.btn_reward = contentPane:GetButton("btn_reward")
+	self.btn_rewardDes = contentPane:GetButton("btn_rewardDes")
+	self.tx_rewardBtn = contentPane:GetText("tx_rewardBtn")
+	self.icon_rewardBtn = contentPane:GetGUIIcon("icon_rewardBtn")
+	self.tf_tips = contentPane:GetObjByName("tf_tips").transform
+	self.toggleGroup = contentPane:GetObjByName("toggleGroup"):GetComponent(CS_type_ToggleGroupMarget)
+	self.superList = contentPane:GetObjByName("superList"):GetComponent(CS_type_superList)
+	self.scrollRect_toggle = contentPane:GetObjByName("scrollRect_toggle"):GetComponent("ScrollRect")
+
+	self.toggleItems = {}
+	for i = 0, self.toggleGroup.togglesBtn.Count - 1 do
+		local toggleItem = self.toggleGroup.togglesBtn[i]:GetComponent(CS_type_SevenDayToggleItem)
+		self.toggleItems[#self.toggleItems + 1] = toggleItem
+	end
+
+
+end
+
+function Welfare_sevenDay:Init(luaBehaviour)
+
+	self:initComp(luaBehaviour)
+
+	self.tasks = nil
+	self.listItemCount = 0
+	self.curData = nil
+	self.commonData = nil
+	self.curIndex = 0
+
+	self.toggleGroup.OnSelectedIndexValueChange = function(index)
+		self:typeSelectedChange(index)
+	end
+
+	self.superList.itemRenderer = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+	self.superList.itemUpdateInfo = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+	self.btn_rewardDes:ButtonClickTween(function ()
+			self:onRewardDesBtnClick()
+		end)
+
+	self.btn_reward:ButtonClickTween(function ()
+			self:onRewardBtnClick()
+		end)
+
+	self.btn_buyPass:ButtonClickTween(function ()
+		self:onBuyPassBtnClick()
+	end)
+	
+
+end
+
+function Welfare_sevenDay:setCurDateData()
+
+	self.tx_name.text = CS_LanguageManagerInst:GetValueByKey(self.curData.cfg.title)
+	self.tx_desc.text = CS_LanguageManagerInst:GetValueByKey(self.curData.cfg.slogan)
+
+	self.rtf_nameBg.sizeDelta = Vector2(self.tx_name.preferredWidth + 100, self.tx_name.preferredHeight + 20)
+	
+	if self.curData.cfg.reward_number > 1 then
+		self.tx_rewardNum.text = "x"..CS.AbbreviationUtility.AbbreviateNumber(self.curData.cfg.reward_number)
+	else
+		self.tx_rewardNum.text = "∞"
+	end
+
+	local itemCfg = CS_ItemConfigManagerInst:GetConfig(self.curData.cfg.reward)
+	if CS.ItemType.__CastFrom(itemCfg.type) == CS.ItemType.EquipmentDrawing then
+
+		self.img_tuzhi.enabled = true
+		local equipCfg = CS_EquipConfigManagerInst:GetEquipDrawingsCfg(itemCfg.effect);
+		self.icon_reward:SetSprite(equipCfg.atlas,equipCfg.icon)
+
+	else
+
+		self.img_tuzhi.enabled = false
+		self.icon_reward:SetSprite(itemCfg.atlas,itemCfg.icon)
+
+	end
+
+	self.img_lock.enabled = self.curData.listState == CS.ESevenDayTaskState.NotUnlock
+	self.img_gou.enabled = self.curData.listState == CS.ESevenDayTaskState.VIPRewarded
+	self.obj_effect:SetActive(self.curData.listState == CS.ESevenDayTaskState.CanReward)
+	CS_GUIHelper.SetUIGray(self.btn_rewardDes.transform, self.curData.listState == CS.ESevenDayTaskState.NotUnlock or self.curData.listState == CS.ESevenDayTaskState.VIPRewarded)
+	self.btn_reward.transform.gameObject:SetActive((self.curData.listState == CS.ESevenDayTaskState.Doing or self.curData.listState == CS.ESevenDayTaskState.CanReward) and CS_SevenDayGoalDataProxyInst.SevenDayFlag )
+	CS_GUIHelper.SetUIGray(self.btn_reward.transform, self.curData.listState == CS.ESevenDayTaskState.Doing)
+	self.btn_buyPass.transform.gameObject:SetActive((self.curData.listState == CS.ESevenDayTaskState.Doing or self.curData.listState == CS.ESevenDayTaskState.CanReward or self.curData.listState == CS.ESevenDayTaskState.NotUnlock) and not CS_SevenDayGoalDataProxyInst.SevenDayFlag )
+	self.btn_rewardDes.transform.gameObject:SetActive(CS_SevenDayGoalDataProxyInst.SevenDayFlag)
+	self.tx_prompt.enabled = (self.curData.listState == CS.ESevenDayTaskState.VIPRewarded or self.curData.listState == CS.ESevenDayTaskState.NotUnlock) and CS_SevenDayGoalDataProxyInst.SevenDayFlag
+	
+	if self.curData.listState == CS.ESevenDayTaskState.VIPRewarded then
+
+		self.tx_prompt.text = CS_LanguageManagerInst:GetValueByKey("已领取")
+		self.tx_prompt.color = CS_GUIHelper.GetColorByColorHex("#7deb60");
+
+	elseif self.curData.listState == CS.ESevenDayTaskState.NotUnlock then
+
+		self.tx_prompt.text = CS_LanguageManagerInst:GetValueByKey("未开启")
+		self.tx_prompt.color = CS_GUIHelper.GetColorByColorHex("#ffffff");
+
+	end
+
+	if self.curData.listState == CS.ESevenDayTaskState.CanReward then
+		self.icon_rewardBtn:SetSprite("__common_1", "icon_lvse");
+	else
+		self.icon_rewardBtn:SetSprite("__common_1", "icon_huise");
+	end
+
+	self.tx_rewardBtn.text = CS_LanguageManagerInst:GetValueByKey(self.curData.listState == CS.ESevenDayTaskState.VIPRewarded and "已领取" or "领取")
+
+	--if self.curData.listState == CS.ESevenDayTaskState.NotUnlock then
+	--self.tx_desc.text = CS_LanguageManagerInst:GetValueByKey("未解锁");
+	--self.tx_desc.color = CS_GUIHelper.GetColorByColorHex("#ff3e3e");
+	--else
+
+	--local doneCount = self.curData:GetCountByState(CS.ESevenDayTaskState.Rewarded);
+	--doneCount = doneCount + self.curData:GetCountByState(CS.ESevenDayTaskState.VIPRewarded);
+
+	--end
+
+end
+
+function Welfare_sevenDay:JumpTarget(targetId)
+
+	local cfg = CS_SevenDayTaskConfigMangerInst:GetConfig(targetId)
+	self.toggleGroup:OnEnableMethod(cfg.day - 1)
+
+	self:setDayToggleData()
+
+	if CS_SevenDayGoalDataProxyInst.curDay > 3 then
+		self.scrollRect_toggle.horizontalNormalizedPosition = 1
+	else
+		self.scrollRect_toggle.horizontalNormalizedPosition = 0
+	end
+	
+	local tempList = CS_SevenDayGoalDataProxyInst:GetDataByDayIndex(cfg.day).sevenDayList;
+
+	local targetIndex = 0
+	
+	for i = 0 , tempList.Count - 1 do
+
+		if tempList[i].id == targetId then
+			targetIndex = i
+			break
+		end
+
+	end
+	
+	self.superList:scrollByItemIndex(targetIndex)
+
+end
+
+function Welfare_sevenDay:setListItemTotalCount(count)
+
+	if count < 0 then
+		count = 0
+	end
+
+	self.listItemCount = count
+	self.superList.totalItemCount = count
+
+end
+
+function Welfare_sevenDay:typeSelectedChange(index)
+	
+	CS.AudioManager.inst:PlaySound(11);
+	self.curData = CS_SevenDayGoalDataProxyInst:GetDataByDayIndex(index + 1);
+	if self.curData == nil then
+		return
+	end
+	self.commonData = CS.CommonRewardData(self.curData.cfg.reward,self.curData.cfg.reward_number,1,self.curData.cfg.type)
+	if (self.curData.listState == CS.ESevenDayTaskState.NotUnlock) and (self.curData.cfg.day ~= (CS_SevenDayGoalDataProxyInst.curDay + 1)) then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("第{0}天解锁",tostring(self.curData.cfg.day)),"FF2828")
+		self.toggleGroup.selectedIndex = self.curIndex
+		return
+	end
+
+	self.curIndex = index
+	self.tasks = self.curData.sevenDayList
+	self:setListItemTotalCount(self.tasks.Count + (CS.FGUI.inst.isLandscape and 0 or 1))
+	self:setCurDateData()
+	self.superList:ScrollToTop();
+
+end
+
+function Welfare_sevenDay:superListItemRenderer(index,item) --CS.SevenDayTaskItem
+
+	if index < self.tasks.Count then
+
+		item.gameObject:SetActive(true)
+		item:setData(self.tasks[index])
+
+	else
+		item.parenTrans.gameObject:SetActive(false);
+	end
+
+end
+
+function Welfare_sevenDay:setDayToggleData()
+
+	for i = 1, #self.toggleItems do
+
+		local toggleData = CS_SevenDayGoalDataProxyInst:GetDataByDayIndex(i)
+		self.toggleItems[i]:setItemState(toggleData)
+
+	end
+
+end
+
+function Welfare_sevenDay:SetUIData()
+	
+	self.toggleGroup:OnEnableMethod(CS_SevenDayGoalDataProxyInst.curDay - 1)
+
+	self:setDayToggleData()
+
+	if CS_SevenDayGoalDataProxyInst.curDay > 3 then
+		self.scrollRect_toggle.horizontalNormalizedPosition = 1
+	else
+		self.scrollRect_toggle.horizontalNormalizedPosition = 0
+	end
+	
+end
+
+function Welfare_sevenDay:RefreshUIData()
+
+	local curIndex = self.toggleGroup.selectedIndex
+	
+	self.toggleItems[curIndex + 1]:setItemState(CS_SevenDayGoalDataProxyInst:GetDataByDayIndex(curIndex + 1))
+	self:typeSelectedChange(curIndex)
+
+end
+
+function Welfare_sevenDay:ExtraDispose(extraParam)
+	
+	if extraParam then
+		self:JumpTarget(extraParam)
+	end
+	
+end
+
+
+function Welfare_sevenDay:onRewardDesBtnClick()
+
+	if self.curData == nil then
+		return
+	end
+
+	if self.curData.listState ~= CS.ESevenDayTaskState.VIPRewarded then
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+		func(CS_EventControllerInst, CS_GameEventType.CommonEvent.COMMONTIPS_SETINFO, self.commonData, self.tf_tips)
+
+	end
+
+end
+
+function Welfare_sevenDay:onRewardBtnClick()
+
+	if self.curData == nil then
+		return
+	end
+
+	if self.curData.listState == CS.ESevenDayTaskState.CanReward then
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.System.Int32)
+		func(
+			CS_EventControllerInst,
+			CS_GameEventType.SevenDayGoalEvent.REQUEST_SEVENDAYLISTAWARD,
+			self.curData.id
+		)
+
+	elseif self.curData.listState == CS.ESevenDayTaskState.Doing or self.curData.listState == CS.ESevenDayTaskState.NotUnlock then
+
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("成功获取当日所有奖励可领取大奖"),"FF2828")
+
+	end
+
+end
+
+function Welfare_sevenDay:onBuyPassBtnClick()
+	
+	EventDispatcher:dispatchEvent(GameEvent.WelfareEvent.ShowUI_SevenDayBuyPassUI)
+	
+end
+
+function Welfare_sevenDay:Clear()
+
+end
+
+return Welfare_sevenDay

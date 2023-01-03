@@ -1,0 +1,177 @@
+
+--ChatSystem
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/ChatView/ChatView")
+local EventDispatcher = require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+ChatSystem = class(BaseSystem)
+ChatSystem.super = BaseSystem
+
+
+function ChatSystem:ctor()
+end
+
+function ChatSystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.ChatEvent.OpenChatView,self,self.openChatView)
+	EventDispatcher:addEvent(GameEvent.ChatEvent.UpdateChatView,self,self.updateChatView)
+	EventDispatcher:addEvent(GameEvent.ChatEvent.CloseEmojiSubPanel,self,self.closeEmojiSubPanel)
+	EventDispatcher:addEvent(GameEvent.ChatEvent.OpenOtherSubSettingPanel,self,self.openOtherSubSettingPanel)
+	
+	
+	EventDispatcher:addEvent(GameEvent.ChatEvent.AddBlockUserId,self,self.addBlockUserId)
+	EventDispatcher:addEvent(GameEvent.ChatEvent.Clickhyperlink,self,self.clickhyperlinkHanler)
+	
+	----------------------------------------------------------------------------------------------------
+	EventDispatcher:addEvent(GameEvent.ChatEvent.SendChatMsg,self,self.sendChatMsg)
+	
+
+end
+
+function ChatSystem:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.ChatEvent.OpenChatView,self.openChatView)
+	EventDispatcher:removeEvent(GameEvent.ChatEvent.UpdateChatView,self,self.updateChatView)
+	EventDispatcher:removeEvent(GameEvent.ChatEvent.CloseEmojiSubPanel,self,self.closeEmojiSubPanel)
+	EventDispatcher:removeEvent(GameEvent.ChatEvent.OpenOtherSubSettingPanel,self,self.openOtherSubSettingPanel)
+	
+	EventDispatcher:removeEvent(GameEvent.ChatEvent.AddBlockUserId,self,self.addBlockUserId)
+	EventDispatcher:removeEvent(GameEvent.ChatEvent.Clickhyperlink,self,self.clickhyperlinkHanler)
+	
+	----------------------------------------------------------------------------------------------------
+	EventDispatcher:removeEvent(GameEvent.ChatEvent.SendChatMsg,self.sendChatMsg)
+
+end
+
+function ChatSystem:openChatView()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.ChatView,
+		function(view)
+
+			CS.ChatDataProxy.inst.hasRedTip = false;
+			CS_EventControllerInst:TriggerEvent(CS_GameEventType.ChatSysEvent.CHAT_REQUEST_DATA);
+
+		end
+	)
+
+end
+
+function ChatSystem:updateChatView()
+	
+	local chatView = GUIManager.inst:GetWindow(Constants.ViewName.ChatView, false)
+
+	if chatView ~= nil and chatView.isShowing == true then
+
+		local chatChannel = CS.SaveManager.inst:GetInt("chatCurrTable");
+
+		if chatChannel == 0 or chatChannel == 2 or chatChannel == 3 then
+
+			chatView:UpdateView(ChatDataProxy.inst:GetChatList(chatChannel));
+
+		end
+
+	end
+	
+end
+
+function ChatSystem:closeEmojiSubPanel()
+	
+	local chatView = GUIManager.inst:GetWindow(Constants.ViewName.ChatView, false)
+
+	if chatView ~= nil and chatView.isShowing then
+		chatView:CloseEmojiSubPanel()
+	end
+	
+end
+
+function ChatSystem:openOtherSubSettingPanel(chatData,pos)
+	
+	local chatView = GUIManager.inst:GetWindow(Constants.ViewName.ChatView, false)
+
+	if chatView ~= nil and chatView.isShowing then
+		chatView:OpenOtherSubSettingPanel(chatData,pos)
+	end
+	
+end
+
+-------------------------------------------------------------------------------------------------------------------------
+function ChatSystem:addBlockUserId(blockUserId)
+
+	ChatDataProxy.inst:AddBlockUserId(blockUserId)
+	
+	local chatView = GUIManager.inst:GetWindow(Constants.ViewName.ChatView, false)
+
+	if chatView ~= nil and chatView.isShowing then
+		chatView:UpdateView(ChatDataProxy.inst:GetChatList(CS.SaveManager.inst:GetInt("chatCurrTable")));
+	end
+	
+	
+end
+
+-------------------------------------------------------------------------------------------------------------------------
+--超链接操作
+function ChatSystem:clickhyperlinkHanler(hyperlinkTx)
+	
+	--TODO 
+	
+end
+
+-------------------------------------------------------------------------------------------------------------------------
+function ChatSystem:sendChatMsg(msg, channel)
+
+	if msg == nil or msg == "" then
+		return
+	end
+
+	if (channel == 0) then
+
+		local spaceTime = CS.SaveManager.inst:GetInt("ChatSpace");
+		if (spaceTime ~= 0) then
+
+			if (spaceTime > CS.GameTimer.inst.serverNow) then
+
+				EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("您的发言太频繁了，请稍后尝试！"),"Fe4747")
+				return;
+
+			end
+
+		end
+
+		local timer = 30;
+		local cfg = CS.WorldParConfigManager.inst:GetConfig(353);
+		if (cfg ~= nil) then
+
+			timer = cfg.parameters;
+		end
+
+		CS.SaveManager.inst:SaveInt("ChatSpace", (CS.GameTimer.inst.serverNow + timer));
+
+	end
+
+	--屏蔽字库
+	local haveBad,str = CS.WordFilter.inst:filter(msg)
+
+	if haveBad then
+
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("发送内容中包含敏感内容"),"FF2828")
+
+	end
+
+
+	local rep = MsgType.Request_Chat_Send:New()
+	rep.chatChannel = channel
+	rep.content = str
+	rep:Send()
+
+
+end

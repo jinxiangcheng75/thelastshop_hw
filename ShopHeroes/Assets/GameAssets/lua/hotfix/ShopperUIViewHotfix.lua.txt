@@ -1,0 +1,194 @@
+
+require("utils/XLuaUtils")
+local util = require("xlua/util")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local Mathf = CS.UnityEngine.Mathf
+
+-- ShopperUIViewHotfix C#已同步逻辑 新包需要
+
+xlua.private_accessible(CS.ShopperUIView)
+
+util.hotfix_ex(
+	CS.ShopperUIView,
+	"onInit",
+	function (self)
+
+		self:onInit()
+
+		self.contentPane.checkoutBtn.onClick:RemoveAllListeners()
+		self.contentPane.checkoutBtn:ButtonClickTween(function ()
+
+				local sData = CS.ShopperDataProxy.inst:GetShopperData(self.currShopperUId);
+
+				if sData.data.shopperType == MsgType.EShopperType.Warrior then
+
+					local needAdvancedOrLockEquipDatas = {}
+					local count = 0
+					local equipconfig = CS.EquipConfigManager.inst:GetEquipQualityConfig(sData.data.targetEquipId);
+					local hcount = sData.data.targetCount;
+					local commonQuality = equipconfig.quality
+
+					for q = commonQuality, 5 do
+
+						local equipItem = CS.ItemBagProxy.inst:GetEquipItem(equipconfig.equip_id, q)
+						if equipItem ~= nil then
+
+							count = equipItem.count
+							if count > 0 then
+
+								equipconfig = CS.EquipConfigManager.inst:GetEquipQualityConfig(equipconfig.equip_id, q);
+
+								if equipItem.isLock then --先加锁着的
+									needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 0, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("物品已锁定"), content = CS_LanguageManagerInst:GetValueByKey("此物品当前已锁定。任要使用？") }
+								end
+
+								if q > commonQuality then
+									needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 1, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("正在使用高稀物品"), content = CS_LanguageManagerInst:GetValueByKey("会被交出。仍要继续吗？") }
+								end
+
+							end
+
+							if count >= hcount then
+								break
+							end
+
+							hcount = hcount - count
+
+						end
+
+					end
+
+					if count < hcount then
+
+						for q = commonQuality > CS.StaticConstants.SuperEquipBaseQuality and commonQuality or CS.StaticConstants.SuperEquipBaseQuality + commonQuality, CS.StaticConstants.SuperEquipBaseQuality + 5 do
+
+							local equipItem = CS.ItemBagProxy.inst:GetEquipItem(equipconfig.equip_id, q)
+
+							if equipItem ~= nil then
+
+								count = equipItem.count
+								if count > 0 then
+
+									equipconfig = CS.EquipConfigManager.inst:GetEquipQualityConfig(equipconfig.equip_id, q);
+									if equipItem.isLock then --先加锁着的
+										needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 0, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("物品已锁定"), content = CS_LanguageManagerInst:GetValueByKey("此物品当前已锁定。任要使用？") }
+									end
+
+									needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 1, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("正在使用高稀物品"), content = CS_LanguageManagerInst:GetValueByKey("会被交出。仍要继续吗？") }
+
+								end
+
+								if count >= hcount then
+									break
+								end
+								hcount = hcount - count
+
+							end
+
+						end
+
+					end
+
+
+					if #needAdvancedOrLockEquipDatas > 0 then
+
+						local callback = function()
+
+							local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+							local func = funcGeneric(CS.System.Int32)
+
+							func(
+								CS_EventControllerInst,
+								CS_GameEventType.ShopperEvent.SHOPPER_CHECKOUT,
+								self.currShopperUId
+							)
+
+							func(
+								CS_EventControllerInst,
+								CS_GameEventType.ShopperEvent.SHOPPER_HIDEBUBBLE,
+								self.currShopperUId
+							)
+
+						end
+
+						EventDispatcher:dispatchEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquip,needAdvancedOrLockEquipDatas,callback)
+						return
+
+					end
+
+				elseif sData.data.shopperType == MsgType.EShopperType.Buy then
+
+					local equipItem = CS.ItemBagProxy.inst:GetEquipItem(sData.data.targetEquipId)
+					local needAdvancedOrLockEquipDatas = {}
+
+
+					if equipItem ~= nil then
+
+						if equipItem.isLock then --锁定
+							needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 0, equipId = sData.data.targetEquipId, title = CS_LanguageManagerInst:GetValueByKey("物品已锁定"), content = CS_LanguageManagerInst:GetValueByKey("此物品当前已锁定。任要使用？") }
+						end
+
+						local isBetterQuality = equipItem.equipConfig.equipQualityConfig.quality > 2;
+						if isBetterQuality then --高品质
+							needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 1, equipId = sData.data.targetEquipId, title = CS_LanguageManagerInst:GetValueByKey("正在使用高稀物品"), content = CS_LanguageManagerInst:GetValueByKey("会被交出。仍要继续吗？") }
+						end
+
+					end
+
+					if #needAdvancedOrLockEquipDatas > 0 then
+
+						local callback = function()
+
+							local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+							local func = funcGeneric(CS.System.Int32)
+
+							func(
+								CS_EventControllerInst,
+								CS_GameEventType.ShopperEvent.SHOPPER_CHECKOUT,
+								self.currShopperUId
+							)
+
+							func(
+								CS_EventControllerInst,
+								CS_GameEventType.ShopperEvent.SHOPPER_HIDEBUBBLE,
+								self.currShopperUId
+							)
+
+						end
+
+						EventDispatcher:dispatchEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquip,needAdvancedOrLockEquipDatas, callback)
+						return
+
+					end
+
+				end
+
+
+				local _lastShopper = CS.IndoorRoleSystem.inst:GetShopperByUid(self.currShopperUId);
+				if _lastShopper ~= nil then
+					_lastShopper:HidePopupCheckout();
+				end
+
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+				local func = funcGeneric(CS.System.Int32)
+
+				func(
+					CS_EventControllerInst,
+					CS_GameEventType.ShopperEvent.SHOPPER_CHECKOUT,
+					self.currShopperUId
+				)
+
+				func(
+					CS_EventControllerInst,
+					CS_GameEventType.ShopperEvent.SHOPPER_HIDEBUBBLE,
+					self.currShopperUId
+				)
+
+			end)
+
+	end)
+

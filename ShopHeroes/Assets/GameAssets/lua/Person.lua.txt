@@ -1,0 +1,36 @@
+require("class")
+
+Person = class()
+Person.name = "pp";
+
+function Person:ctor()
+	print("Person ctor")
+end
+
+function Person:eat()
+	print("person eat "..Person.name)
+end
+
+
+Boy = class(Person)
+Boy.name = "bb"
+
+function Boy:ctor()
+	print("Boy ctor")
+
+end
+
+function Boy:eat()
+	if nil ~= self then
+		print("boy eat "..self.name)
+	else
+		print("boy eat pp")
+	end
+end
+
+print("Person self")
+
+print("new boy1")
+boy1 = Boy.new()
+boy1.name = "boy1"
+boy1:eat()

@@ -1,0 +1,223 @@
+--ViewBase
+
+require("class")
+local EventDispatcher = require("event/EventDispatcher")
+
+local csManagerBinder = CS.ManagerBinder
+local csFGUI = CS.FGUI
+local csVector2 = CS.UnityEngine.Vector2
+local csVector3 = CS.UnityEngine.Vector3
+local csGameObject = CS.UnityEngine.GameObject
+local csGameSettingManager = CS.GameSettingManager
+local csGUIHelper = CS.GUIHelper
+local csGameTimer = CS.GameTimer
+local csUIWindow = CS.uiWindow
+
+local type_cs_RectTransform = typeof(CS.UnityEngine.RectTransform)
+local type_cs_Canvas = typeof(CS.UnityEngine.Canvas)
+local type_cs_LuaBehaviour = typeof(CS.LuaBehaviour)
+local csUnityUtils = CS.UnityUtils
+ViewBase = class()
+ViewBase.contentObject = nil
+ViewBase._uiCanvas = nil
+
+function ViewBase:ctor()
+end
+
+function ViewBase:init(viewID)
+	self.isInit = false
+	self.isShowing = false
+	self.needOpen = false
+	self.isCache = false
+	self.sortingLayerName = "normal"
+	self.UIorder = 0
+	self.isShowResPanel = false
+	self.topResPanelType = CS.TopPlayerShowType.none
+	self.showType = 2
+	--self.viewID = viewID
+	print("ViewBase:init viewID ", viewID)
+
+	local UIFileName = viewID
+	-- + (FGUI.inst.isLandscape ? "L" : "");
+	if (CS.FGUI.inst.isLandscape) then
+		UIFileName = viewID .. "L"
+	end
+	csManagerBinder.inst.Asset:InstantiateUIAsync(
+		UIFileName,
+		function(uiObj)
+			if csUnityUtils.EqualsNull(uiObj) == false then
+				self.contentObject = uiObj
+				self.contentObject.name = viewID
+				self:OnEndLoad()
+			else
+				csManagerBinder.inst.Asset:InstantiateUIAsync(
+					viewID,
+					function(_uiObj)
+						self.contentObject = _uiObj
+						self.contentObject.name = viewID
+						self:OnEndLoad()
+					end
+				)
+			end
+		end
+	)
+end
+function ViewBase:OnEndLoad()
+	--viewObj.name = viewID
+	self.contentObject:SetActive(false)
+	self:ResetContentAnchor()
+	self._uiCanvas = self.contentObject:GetComponent(type_cs_Canvas)
+	self.contentPanel = self.contentObject:GetComponent(type_cs_LuaBehaviour)
+	self.isShowing = false
+	self:onInit()
+	self.isInit = true
+	if (self.needOpen) then
+		self:MgrShowView(self.onShowCallback)
+	end
+end
+function ViewBase:ResetContentAnchor()
+	local rt = self.contentObject:GetComponent(type_cs_RectTransform)
+	rt:SetParent(csFGUI.inst.uiRootTF, false)
+	rt.anchorMin = csVector2.zero
+	rt.anchorMax = csVector2.one
+	rt.anchoredPosition = csVector2.zero
+	rt.sizeDelta = csVector2.zero
+	rt.localScale = csVector3.one
+end
+
+function ViewBase:show()
+	print("不要使用旧的show方式打开界面")
+end
+
+function ViewBase:MgrShowView(callback)
+	if (self.isInit == false) then
+		self.needOpen = true
+		self.onShowCallback = callback
+		return
+	end
+	-- if(self.contentObject:IsNull()) then
+	--     print("ViewBase:show 2")
+	--     self:init("")
+	--     self.needOpen = true
+	--     self.onShowCallback = callback
+	-- end
+	if (self.isShowing == false and self.contentObject:IsNull() == false) then
+		self.contentObject:SetActive(true)
+	 	self:ResetContentAnchor()
+	end
+
+	if (self._uiCanvas.sortingLayerName == "Default") then
+		self._uiCanvas.sortingLayerName = "normal"
+	end
+	--local uiOrder = csUIWindow.UIorder
+
+	--uiOrder = uiOrder + 1
+	--csUIWindow.UIorder = uiOrder
+	if (self.sortingLayerName == "normal") then
+		self:setRenderSorting(self._uiCanvas.sortingLayerName, self.UIorder)
+	else
+		self:setRenderSorting(self.sortingLayerName, self.UIorder)
+	end
+
+	self.isShowing = true
+	--self:setRenderSorting(sortingLayerName == "normal" ? _uiCanvas.sortingLayerName : sortingLayerName, uiWindow.UIorder++)
+
+	if (csGameSettingManager.inst.needShowUIAnim) then
+		self:DoShowAnimation()
+	else
+		self:onShowed()
+	end
+	if (callback ~= nil) then
+		self.onShowCallback = callback
+		csGameTimer.inst:AddTimerFrame(
+			1,
+			1,
+			function()
+				self:onShowCallback(self)
+				self.onShowCallback = nil
+			end
+		)
+	end
+	--EventController.inst.TriggerEvent(GameEventType.UIUnlock.VIEW_ONSHOW, viewID);
+	EventDispatcher:dispatchEvent(GameEvent.UIUnlock.View_OnShow, self.viewID)
+end
+
+function ViewBase:DoShowAnimation()
+	self:onShowed()
+end
+
+function ViewBase:onShowed()
+end
+
+function ViewBase:setRenderSorting(sortingName, order)
+	local cvs = self._uiCanvas
+	cvs.sortingLayerName = sortingName
+	cvs.sortingOrder = order
+	csGUIHelper.setRandererSortinglayer(cvs.transform, sortingName, order)
+end
+
+function ViewBase:DoHideAnimation()
+	self:HideView()
+end
+function ViewBase:hide()
+	GUIManager.inst:HideView(self.viewID)
+end
+function ViewBase:MgrHideview(isCache)
+	print("ViewBase:hide")
+	self.needOpen = false
+	self.isCache = isCache
+	if (self.isShowing and self._uiCanvas:IsNull() == false) then
+		if (csGameSettingManager.inst.needShowUIAnim) then
+			self:DoHideAnimation()
+		else
+			self:HideView()
+		end
+	else
+		
+		if not isCache then
+			self:DestroySelf()
+		end
+		
+	end
+	
+end
+
+function ViewBase:onHide()
+end
+
+function ViewBase:HideView()
+	self:onHide()
+	self.isShowing = false
+	self.contentObject:SetActive(false)
+	
+	if self.isCache then
+		self.contentObject.transform:SetParent(csFGUI.inst.uiHideRootTF)
+	else
+		self:DestroySelf()
+	end
+	
+end
+
+function ViewBase:DestroySelf()
+	if csUnityUtils.EqualsNull(self.contentObject) == false then
+		CS.UnityEngine.GameObject.Destroy(self.contentObject)
+	end
+	self.contentObject = nil
+end
+
+function ViewBase:Dispose()
+	if (self.contentObject:IsNull() == false) then
+		csGameObject.Destroy(self.contentObject)
+	end
+	self.contentObject = nil
+	-- ignore hotfix dispose
+end
+
+function ViewBase:shiftIn()
+	EventDispatcher:dispatchEvent(GameEvent.UIUnlock.View_OnShow, self.contentObject.name)
+	self.contentObject:SetActive(true)
+end
+
+function ViewBase:shiftOut()
+	self.contentObject:SetActive(false)
+end

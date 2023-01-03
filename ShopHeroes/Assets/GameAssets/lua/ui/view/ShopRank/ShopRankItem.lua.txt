@@ -1,0 +1,199 @@
+local selfBtn
+local bgImg
+local rankIcon
+local rankNum
+local nameText
+local unionName
+local valueNum
+local headObj
+local headTf
+local unionTextRect
+local rankNormalLvBg
+local valueIcon
+
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csAbbreviationUtility = CS.AbbreviationUtility
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local csSpineUtils = CS.SpineUtils
+local csEGender = CS.EGender
+local csVector2 = CS.UnityEngine.Vector2
+local csVector3 = CS.UnityEngine.Vector3
+
+local shopRankDataProxy = require("data/ShopRankDataProxy")
+
+local data
+local headGraphicSystem
+local rankType
+
+function onDisable()
+	if(headGraphicSystem ~= nil)then
+		headGraphicSystem.transform:SetParent(CS.FGUI.inst.heroGraphicCacheParent)
+		headGraphicSystem.transform.localPosition = csVector3(0,0,0)
+	end
+	
+	headGraphicSystem = nil
+end
+
+function onEnable()
+	SetPrefabData()
+end
+
+function InitComp()
+	selfBtn = self.gameObject:GetComponent("Button")
+	bgImg = self:GetObjByName("normalBg"):GetComponent("Image")
+	rankIcon = self:GetObjByName("rankIcon"):GetComponent("GUIIcon")
+	rankNum = self:GetObjByName("rankNum"):GetComponent("Text")
+	nameText = self:GetObjByName("nameText"):GetComponent("Text")
+	unionName = self:GetObjByName("unionName"):GetComponent("Text")
+	valueNum = self:GetObjByName("valueNum"):GetComponent("Text")
+	headObj = self:GetObjByName("headObj")
+	headTf = self:GetObjByName("headIconTf").transform
+	unionTextRect = self:GetObjByName("unionName"):GetComponent("RectTransform")
+	rankNormalLvBg = self:GetObjByName("rankNormalLvBg"):GetComponent("Image")
+	valueIcon = self:GetObjByName("valueIcon"):GetComponent("GUIIcon")
+
+	selfBtn.onClick:AddListener(function ()
+
+			if(data == nil)then return end
+
+			if rankType == 1 or rankType == 2 then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+				local func = funcGeneric(CS.System.String)
+				func(csEventControllerInst, csGameEventType.SocialEvent.REQUEST_OTHERUSERDATA, data.userId)
+			elseif rankType == 3 then
+				if(data.userId == CS.UserDataProxy.inst.playerData.unionId)then
+					csEventControllerInst:TriggerEvent(csGameEventType.UnionEvent.SHOWUI_UNIONINFO)
+				end
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+				local func = funcGeneric(CS.System.String)
+				func(CS.EventController.inst, CS.GameEventType.UnionEvent.UNION_REQUEST_DATA, data.userId)
+			elseif rankType == 4 then --todo hero
+				EventDispatcher:dispatchEvent(GameEvent.RankEvent.Request_OtherHeroData,data.userId,data.heroUid)
+			end
+
+		end
+	)
+end
+
+function SetData(_data)
+	data = _data
+	self.gameObject.name = data.userId
+	rankType = ShopRankDataProxy.inst.rankListType
+
+	--bgImg.enabled = tonumber(data.rank) % 2 == 0
+	if(tonumber(data.rank) == 1)then
+		rankIcon.iconImage.enabled = true
+		rankNormalLvBg.enabled = false
+		rankIcon:SetSprite("luxury_atlas","jiaju_paiming1")
+	elseif tonumber(data.rank) == 2 then
+		rankIcon.iconImage.enabled = true
+		rankNormalLvBg.enabled = false
+		rankIcon:SetSprite("luxury_atlas","jiaju_paiming2")
+	elseif tonumber(data.rank) == 3 then
+		rankIcon.iconImage.enabled = true
+		rankNormalLvBg.enabled = false
+		rankIcon:SetSprite("luxury_atlas","jiaju_paiming3")
+	else
+		rankIcon.iconImage.enabled = false
+		rankNormalLvBg.enabled = true
+	end
+
+	rankNum.text = tostring(data.rank)
+	if(data.unionName ~= nil and string.len(data.unionName) > 0)then
+		unionName.text = csLanguageManagerInst:GetValueByKey(data.unionName)
+	else
+		unionName.text = csLanguageManagerInst:GetValueByKey("无公会")
+	end
+
+	if(data.number ~= nil)then
+		valueNum.text = csAbbreviationUtility.AbbreviateNumber(data.number,2)
+	else
+		valueNum.text = ""
+	end
+
+	if rankType ~= 4 then
+		valueIcon:SetSprite("luxury_atlas",ShopRankDataProxy.inst.numberIcon[rankType])
+	end
+
+	unionName.fontSize = 32
+	unionName.color = CS.GUIHelper.GetColorByColorHex("#BA8793")
+	if rankType == 1 or rankType == 2 then
+		nameText.enabled = true
+		nameText.text = csLanguageManagerInst:GetValueByKey(data.name) .. "#" .. data.userId
+		headObj:SetActive(true)
+		unionTextRect.anchoredPosition = csVector2(unionTextRect.anchoredPosition.x,-20)
+		SetPrefabData()
+	elseif rankType == 3 then
+		nameText.enabled = false
+		headObj:SetActive(false)
+		unionTextRect.anchoredPosition = csVector2(unionTextRect.anchoredPosition.x,0)
+		unionName.fontSize = 50
+		unionName.color = CS.UnityEngine.Color.white
+	elseif rankType == 4 then --英雄
+		nameText.enabled = true
+		nameText.text = csLanguageManagerInst:GetValueByKey(data.name) .. "#" .. data.userId
+		headObj:SetActive(true)
+		unionTextRect.anchoredPosition = csVector2(unionTextRect.anchoredPosition.x,-20)
+		local heroCfg = CS.HeroProfessionConfigManager.inst:GetConfig(data.heroId)
+		if(heroCfg ~= nil) then
+			valueIcon:SetSprite(heroCfg.atlas,heroCfg.ocp_icon)
+		end
+		SetPrefabData()
+	end
+end
+
+function SetPrefabData()
+	if(data == nil) then return end
+	if(data.userDress == nil) then return end
+	if(headGraphicSystem ~= nil and headGraphicSystem.gameObject.name ~= data.userId)then
+		headGraphicSystem.transform:SetParent(CS.FGUI.inst.heroGraphicCacheParent)
+		headGraphicSystem.transform.localPosition = csVector3(0,0,0)
+	end
+	if(ShopRankDataProxy.inst.headPrefabPool[data.userId..data.rank..rankType] == nil)then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		if(rankType == 4)then
+			local equipIdList = get_csharp_list(CS.System.Int32)
+			equipIdList:AddRange(csSpineUtils.RoleDressToHeadDressIdList(data.userDress))
+			equipIdList:AddRange(CS.CharacterManager.inst:EquipIdsToDressIds(data.heroEquipList))
+			func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(csEGender.__CastFrom(data.gender)),equipIdList,csEGender.__CastFrom(data.gender),0.35,true,function (system)
+					system.gameObject.name = data.userId..rankType
+					system.transform:SetParent(headTf)
+					system.transform.localScale = csVector3(1,1,1) * 0.35
+					system.transform.localPosition = csVector3(0,-220,0)
+					system:SetDirection(CS.RoleDirectionType.Left)
+					ShopRankDataProxy.inst.headPrefabPool[data.userId..data.rank..rankType] = system
+					headGraphicSystem = system
+				end,nil)
+		else
+			func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(csEGender.__CastFrom(data.gender)),csSpineUtils.RoleDressToHeadDressIdList(data.userDress),csEGender.__CastFrom(data.gender),0.35,true,function (system)
+					system.gameObject.name = data.userId..rankType
+					system.transform:SetParent(headTf)
+					system.transform.localScale = csVector3(1,1,1) * 0.35
+					system.transform.localPosition = csVector3(0,-220,0)
+					system:SetDirection(CS.RoleDirectionType.Left)
+					ShopRankDataProxy.inst.headPrefabPool[data.userId..data.rank..rankType] = system
+					headGraphicSystem = system
+				end,nil)
+		end
+	else
+		local system = ShopRankDataProxy.inst.headPrefabPool[data.userId..data.rank..rankType]
+		headGraphicSystem = system
+		system.transform:SetParent(headTf)
+		system.transform.localScale = csVector3(1,1,1) * 0.35
+		system.transform.localPosition = csVector3(0,-220,0)
+		system:SetDirection(CS.RoleDirectionType.Left)
+	end
+end
+
+function ClearData()
+	if(ShopRankDataProxy.inst.headPrefabPool[data.userId..data.rank] ~= nil) then
+		local system = ShopRankDataProxy.inst.headPrefabPool[data.userId..data.rank]
+		system.transform:SetParent(CS.FGUI.inst.heroGraphicCacheParent)
+		system.transform.localPosition = csVector3(0,0,0)
+	end
+end

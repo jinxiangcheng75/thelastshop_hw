@@ -1,0 +1,102 @@
+-- GuideTriggerConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+GuideTriggerConfigData =
+class(
+	{
+		id,
+		group_id,
+		trigger_type,
+		trigger_value,
+		end_level,
+		if_constraint,
+		condition_des,
+		mask_color,
+		guide_type,
+		guide_id,
+		dialog,
+		guide_condition,
+		whether_main,
+		guide_scenes,
+		operations_id,
+		server_behavior_type,
+		behavior_value,
+		behavior_num,
+		position,
+	}
+)
+
+GuideTriggerConfigManager = class()
+--GuideTriggerConfigManager.cfgDict = {}
+local csv_name = "guide_trigger"
+
+function GuideTriggerConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	self.groupList = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("GuideTriggerConfigManager:InitCSVConfig csv:", csv)
+	local cfgs = CSVParser:parseClass(csv, 3, GuideTaskConfigData)
+	GuideTriggerConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("GuideTriggerConfigManager  错误")
+	end
+end
+
+function GuideTriggerConfigManager:processConfigs(cfgs)
+	--print("GuideTriggerConfigManager:processConfigs ", cfgs, " len:", #cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		--print("GuideTriggerConfigManager c i:", i," c:", c, " idtype:", type(c.id) , "id is",c.id)
+		self.cfgDict[tonumber(c.id)] = c
+	end
+
+	for index, value in pairs(self.cfgDict) do
+		self.groupList[index] = value
+	end
+
+	table.sort(self.groupList,function (t1,t2)
+			return  tonumber(t1.id) < tonumber(t2.id)
+		end)
+	--print("GuideTriggerConfigManager:processConfigs completed")
+end
+
+function GuideTriggerConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end
+
+function GuideTriggerConfigManager:GetConfigByGroupId(groupId)
+	local cfgList = {}
+	local listIndex = 1
+
+	for index, value in pairs(GuideTriggerConfigManager.cfgDict) do
+		if(tonumber(value.group_id) == groupId)then
+			cfgList[listIndex] = value
+			listIndex = listIndex + 1
+		end
+	end
+	table.sort(cfgList,function (t1,t2)
+			return  tonumber(t1.id) < tonumber(t2.id)
+		end)
+
+	return  cfgList
+end
+
+function GuideTriggerConfigManager:GetGroupFirst()
+	local cfgList = {}
+	local listIndex = 1
+	local firstId = -1
+
+	for k, v in pairs(self.groupList) do
+		if(firstId ~= v.group_id)then
+			firstId = v.group_id
+			cfgList[listIndex] = v
+			listIndex = listIndex + 1
+		end
+	end
+	
+	return cfgList
+end

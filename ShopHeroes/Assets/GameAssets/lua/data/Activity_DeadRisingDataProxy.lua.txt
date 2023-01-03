@@ -1,0 +1,204 @@
+
+--Activity_DeadRisingDataProxy
+
+local CS_GameTimerInst = CS.GameTimer.inst
+
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+Activity_DeadRisingDataProxy = class(BaseDataProxy)
+
+Activity_DeadRisingDataProxy.inst = Activity_DeadRisingDataProxy:new()
+
+function Activity_DeadRisingDataProxy:init()
+
+	self.flag = false --活动是否开启
+	self.endtime_server = 0 --活动结束时间戳
+	self.version = 0 --活动版本
+	self.curStage = 0 --活动当前阶段
+	self.stageLimit = 0 --活动总阶段数
+	self.stageState = 0 --阶段状态 准备阶段/防御阶段
+	self.stageEndTime_server = 0 --阶段结束时间戳
+	self.stageTime = 0 --阶段总时间
+	
+	self.fight_union = 0 --公会贡献总战力
+	self.fight_self = 0 --个人贡献战力
+	self.fight_self_equip = 0 --个人装备捐献贡献战力
+	self.teamEquipsNum = 0 --个人装备贡献总数量
+	
+	self.heroFightDatas = {} -- 小队配置
+	self.fight_self_hero = 0 --个人英雄小队捐献贡献战力
+	self.itemFightDatas = {} -- 道具配置
+	self.fightPoint_self_items = 0 --个人道具捐献战力百分比 100 = 1%
+	
+	self.heroTeamLimit = 5 --英雄小队上限
+	self.itemTeamLimit = 5 --道具数量上限
+	self.equipTeamNum = 0 --当前装备配置数量
+	self.equipTeamLimit = 40 --装备配置上限
+	
+	self.score_self = 0 --当前个人积分
+	self.score_union = 0 --当前公会总积分
+	
+	self.scoreRewardList = {} --积分等级达到奖励列表
+	self.curBossInfo = { icon = "", name = "无敌霹雳霸王僵尸" , hpLimit = 1000 , curHp = 500  } --当前boss信息
+	
+	
+	self.stringList = {} --各个地方显示的语句
+
+end
+
+function Activity_DeadRisingDataProxy:Init()
+	
+	self:init()
+	
+	self.endTimer = 0
+	
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Dragon_CheckData_Cmd,
+		function(resp)
+			print("Response_Dragon_CheckData success", resp)
+			self:GetDragonCheckDataResp(resp)
+		end,
+		function(code)
+			print("Response_Dragon_CheckData fail --- code", code)
+		end
+	)
+	
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Dragon_SetHero_Cmd,
+		function(resp)
+			print("Response_Dragon_SetHero success", resp)
+			self:GetDragonSetHeroResp(resp)
+		end,
+		function(code)
+			print("Response_Dragon_SetHero fail --- code", code)
+		end
+	)
+	
+	
+	
+end
+
+function Activity_DeadRisingDataProxy:Clear()
+
+end
+
+function Activity_DeadRisingDataProxy:setEndtimeTimer()
+	
+	self:clearEndTimeTimer()
+
+	if (self.endtime_server < CS_GameTimerInst.serverNow) then
+		return
+	end
+
+	local remainTime = self.endtime_server - CS_GameTimerInst.serverNow
+	self.endTimer = CS_GameTimerInst:AddTimer(remainTime,1,function()
+			self:endtimeTimerMethod()
+		end,CS.GameTimerType.byServerTime)
+	
+end
+
+function Activity_DeadRisingDataProxy:endtimeTimerMethod()
+	
+	local remainTime = self.endtime_server - CS_GameTimerInst.serverNow
+
+	if remainTime > 0 then
+		self.endTimer = CS_GameTimerInst:AddTimer(remainTime,1,function()
+				self:endtimeTimerMethod()
+			end,CS.GameTimerType.byServerTime)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_DataCheck)
+	end
+	
+end
+
+function Activity_DeadRisingDataProxy:clearEndTimeTimer()
+
+	if self.endTimer ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.endTimer)
+		self.endTimer = 0
+	end
+	
+end
+
+function Activity_DeadRisingDataProxy:calFight_self_hero() --计算自己的英雄小队所加战力
+	
+	--TODO
+	self.fight_self_hero = 0
+	
+end
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+function Activity_DeadRisingDataProxy:GetDragonCheckDataResp(respData)
+
+	local data = MsgType.Response_Dragon_CheckData:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	self.flag = data.activityFlag == 1
+	self.version = data.version
+	self.endtime_server = CS_GameTimerInst.serverNow + data.remainTime
+	self.curStage = data.currentIndex
+	self.stageLimit = data.totalCount
+	self.stageState = data.stageState
+	self.stageEndTime_server = CS_GameTimerInst.serverNow + data.stageRemainTime
+	--self.stageTime = 
+	
+	self.fight_union = data.unionFightPoint
+	self.fight_self = data.fightPoint
+	self.fight_self_equip = data.equipPoint
+	
+	self.heroFightDatas = data.heroList
+	self.itemFightDatas = data.itemList
+	--self.equipTeamNums = 
+	
+	self.teamEquipsNum = data.equipCount
+	
+	self.score_self = data.userPoint
+	self.score_union = data.unionPoint
+	
+	
+	self.stringList = data.stringList
+	
+	if self.flag then
+		self:setEndtimeTimer()
+	else
+		self:clearEndTimeTimer()
+	end
+
+	self:calFight_self_hero()
+
+	--TODO update UI
+	
+	
+	
+
+end
+
+function Activity_DeadRisingDataProxy:GetDragonSetHeroResp(respData)
+	
+	local data = MsgType.Response_Dragon_SetHero:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+	
+	self.heroFightDatas = data.heroList
+	self.fight_self = data.fightPoint
+	self.fight_union = data.unionFightPoint
+	
+	self:calFight_self_hero()
+
+	--TODO update UI
+			
+	
+end
+
+--------------------------------------------------------------------------------------------------------------------------------------------

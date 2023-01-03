@@ -1,0 +1,77 @@
+
+-- Activity_DeadRising_SelectItemItem
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local btn_self
+local btn_info
+local icon_item
+local tx_name
+local tx_num
+local tx_des
+
+local data
+
+
+function InitComp()
+
+	btn_self = self:GetButton("btn_self")
+	btn_info = self:GetButton("btn_info")
+	icon_item = self:GetGUIIcon("icon_item")
+	tx_name = self:GetText("tx_name")
+	tx_num = self:GetText("tx_num")
+	tx_des = self:GetText("tx_des")
+
+	btn_self.onClick:AddListener(function ()
+			onSelfBtnClick()
+		end)
+
+	btn_info.onClick:AddListener(function ()
+			onInfoBtnClick()
+		end)
+
+
+end
+
+
+function SetData(_data)
+
+	data = _data
+
+	icon_item:SetSprite(data.itemConfig.atlas, data.itemConfig.icon)
+	tx_name.text = CS_LanguageManagerInst:GetValueByKey(data.itemConfig.name);
+	tx_num.text = tostring(math.floor(data.count))
+	tx_des.text = CS_LanguageManagerInst:GetValueByKey(data.itemConfig.desc);
+
+end
+
+function onSelfBtnClick()
+
+	if data == nil then return end
+	
+	if #Activity_DeadRisingDataProxy.inst.itemFightDatas >= Activity_DeadRisingDataProxy.inst.itemTeamLimit then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("道具已满"),"FF2828")
+	else
+		EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelItem, data.itemConfig.id, 0)
+	end
+
+end
+
+function onInfoBtnClick()
+
+	if data == nil then return end
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.Int32)
+	func(
+		CS_EventControllerInst,
+		CS_GameEventType.BagEvent.BAG_SHOW_ITEMINFO,
+		data.itemConfig.id
+	)
+
+end
+

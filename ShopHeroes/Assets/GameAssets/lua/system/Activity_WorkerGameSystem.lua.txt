@@ -1,0 +1,343 @@
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("config/SystemUnlockConfigManager")
+
+require("ui/view/Activity/WorkerGame/Activity_WorkerGamePanel")
+require("ui/view/Activity/WorkerGame/Activity_WorkerGameScoreRewardPanel")
+require("ui/view/Activity/WorkerGame/Activity_WorkerGame_RefeshExchangeDataConfirmUI")
+require("ui/view/Activity/WorkerGame/Activity_WorkerGame_ExchangeItemDesUI")
+require("ui/view/Activity/WorkerGame/WorkerGameCoinGiftsUI")
+require("ui/view/Activity/WorkerGame/Activity_WorkerGame_messRankUI")
+
+local EventDispatcherInis = require("event/EventDispatcher")
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+Activity_WorkerGameSystem = class(BaseSystem)
+Activity_WorkerGameSystem.super = BaseSystem
+
+function Activity_WorkerGameSystem:ctor()
+end
+
+function Activity_WorkerGameSystem:AddListeners()
+
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGamePanel,self,self.showActivity_WorkerGamePanel)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGameScoreRewardPanel,self,self.showActivity_WorkerGameScoreRewardPanel)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_RefeshExchangeDataConfirmUI,self,self.showUI_Activity_WorkerGame_RefeshExchangeDataConfirmUI)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_ExchangeItemDesUI,self,self.showUI_Activity_WorkerGame_ExchangeItemDesUI)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_WorkerGameCoinGiftsUI,self,self.showUI_WorkerGameCoinGiftsUI)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.RefreshUI_WorkerGameCoinGiftsUI,self,self.refreshUI_WorkerGameCoinGiftsUI)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_MakingActivityDataChanged,self,self.refreshUI_Activity_WorkerGamePanel_MakingActivityData)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_WorkerGameScoreRewardPanel,self,self.refreshUI_Activity_WorkerGameScoreRewardPanel)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_WorkerGamePanel_ExchangeData,self,self.refreshUI_Activity_WorkerGamePanel_ExchangeData)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,self,self.refrshActivity_WorkerGameState)
+
+	--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_DataCheck,self,self.request_OperatingActivity_DataCheck)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Check,self,self.request_OperatingActivity_Check)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_CheckReward,self,self.request_OperatingActivity_CheckReward)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_CheckExchange,self,self.request_OperatingActivity_CheckExchange)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Reward,self,self.request_OperatingActivity_Reward)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Exchange,self,self.request_OperatingActivity_Exchange)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UpdateInfo,self,self.request_OperatingActivity_UpdateInfo)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UpdateExchange,self,self.request_OperatingActivity_UpdateExchange)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_DailyCoin,self,self.request_OperatingActivity_DailyCoin)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_Pay_OperatingActivityPurchase,self,self.request_Pay_OperatingActivityPurchase)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UnionRankList,self,self.request_OperatingActivity_UnionRankList)
+
+
+	--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.RefreshRedPoint_Activity_WorkerGame_ScoreCanReward,self,self.refreshWorkerGameRedPoint)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.CS_RefreshRedPoint_Activity_WorkerGame_ScoreCanReward,self,self.cs_refreshWorkerGameRedPoint)
+
+	--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_messRankUI,self,self.showActivity_WorkerGame_messRankUI)
+	EventDispatcherInis:addEvent(GameEvent.Activity_WorkerGameEvent.Activity_WorkerGame_GetUnionMemberRankMess,self,self.activity_WorkerGame_messRankUI_refreshRankList)
+
+
+
+end
+
+function Activity_WorkerGameSystem:RemoveListeners()
+
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGamePanel,self,self.showActivity_WorkerGamePanel)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGameScoreRewardPanel,self,self.showActivity_WorkerGameScoreRewardPanel)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_RefeshExchangeDataConfirmUI,self,self.showUI_Activity_WorkerGame_RefeshExchangeDataConfirmUI)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_ExchangeItemDesUI,self,self.showUI_Activity_WorkerGame_ExchangeItemDesUI)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_WorkerGameCoinGiftsUI,self,self.showUI_WorkerGameCoinGiftsUI)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.RefreshUI_WorkerGameCoinGiftsUI,self,self.refreshUI_WorkerGameCoinGiftsUI)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_MakingActivityDataChanged,self,self.refreshUI_Activity_WorkerGamePanel_MakingActivityData)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_WorkerGameScoreRewardPanel,self,self.refreshUI_Activity_WorkerGameScoreRewardPanel)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_WorkerGamePanel_ExchangeData,self,self.refreshUI_Activity_WorkerGamePanel_ExchangeData)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,self,self.refrshActivity_WorkerGameState)
+
+	--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_DataCheck,self,self.request_OperatingActivity_DataCheck)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Check,self,self.request_OperatingActivity_Check)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_CheckReward,self,self.request_OperatingActivity_CheckReward)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_CheckExchange,self,self.request_OperatingActivity_CheckExchange)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Reward,self,self.request_OperatingActivity_Reward)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Exchange,self,self.request_OperatingActivity_Exchange)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UpdateInfo,self,self.request_OperatingActivity_UpdateInfo)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UpdateExchange,self,self.request_OperatingActivity_UpdateExchange)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_DailyCoin,self,self.request_OperatingActivity_DailyCoin)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_Pay_OperatingActivityPurchase,self,self.request_Pay_OperatingActivityPurchase)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UnionRankList,self,self.request_OperatingActivity_UnionRankList)
+
+	--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.RefreshRedPoint_Activity_WorkerGame_ScoreCanReward,self,self.refreshWorkerGameRedPoint)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.CS_RefreshRedPoint_Activity_WorkerGame_ScoreCanReward,self,self.cs_refreshWorkerGameRedPoint)
+
+	--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_messRankUI,self,self.showActivity_WorkerGame_messRankUI)
+	EventDispatcherInis:removeEvent(GameEvent.Activity_WorkerGameEvent.Activity_WorkerGame_GetUnionMemberRankMess,self,self.activity_WorkerGame_messRankUI_refreshRankList)
+
+end
+
+function Activity_WorkerGameSystem:OnEnter()
+	Activity_WorkerGameSystem.super.OnEnter(self)
+end
+
+function Activity_WorkerGameSystem:OnExit()
+	Activity_WorkerGameSystem.super.OnExit(self)
+end
+
+function Activity_WorkerGameSystem:showActivity_WorkerGamePanel()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_WorkerGamePanel,
+		function (view)
+		end)
+
+end
+
+function Activity_WorkerGameSystem:showActivity_WorkerGameScoreRewardPanel(lv)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_WorkerGameScoreRewardPanel,
+		function (view)
+			view:ShowByRewardLv(lv)
+		end)
+
+end
+
+function Activity_WorkerGameSystem:showUI_Activity_WorkerGame_RefeshExchangeDataConfirmUI()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_WorkerGame_RefeshExchangeDataConfirmUI,
+		function (view)
+
+		end)
+
+end
+
+function Activity_WorkerGameSystem:showUI_Activity_WorkerGame_ExchangeItemDesUI(exchangeItemData)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_WorkerGame_ExchangeItemDesUI,
+		function (view)
+			view:SetData(exchangeItemData)
+		end)
+
+end
+
+function Activity_WorkerGameSystem:showUI_WorkerGameCoinGiftsUI()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.WorkerGameCoinGiftsUI,
+		function (view)
+
+		end)
+
+end
+
+function Activity_WorkerGameSystem:refreshUI_Activity_WorkerGamePanel_MakingActivityData(index)
+
+	local activity_WorkerGamePanel = GUIManager.inst:GetWindow(Constants.ViewName.Activity_WorkerGamePanel, false)
+
+	if 	activity_WorkerGamePanel ~=nil and activity_WorkerGamePanel.isShowing == true then
+		activity_WorkerGamePanel:SetOneMakingActivityDataByIndex(index)
+	end
+
+	--刷新制作界面列表
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.EquipEvent.EQUIP_SHOWREFRESH);
+
+end
+
+function Activity_WorkerGameSystem:refreshUI_Activity_WorkerGameScoreRewardPanel()
+
+	local activity_WorkerGameScoreRewardPanel = GUIManager.inst:GetWindow(Constants.ViewName.Activity_WorkerGameScoreRewardPanel)
+
+	if 	activity_WorkerGameScoreRewardPanel ~=nil and activity_WorkerGameScoreRewardPanel.isShowing == true then
+		activity_WorkerGameScoreRewardPanel:Refresh()
+	end
+
+end
+
+function Activity_WorkerGameSystem:refreshUI_Activity_WorkerGamePanel_ExchangeData()
+
+	local activity_WorkerGamePanel = GUIManager.inst:GetWindow(Constants.ViewName.Activity_WorkerGamePanel, false)
+
+	if 	activity_WorkerGamePanel ~= nil and activity_WorkerGamePanel.isShowing == true then
+		activity_WorkerGamePanel:RefreshExchangeData()
+	end
+
+end
+
+function Activity_WorkerGameSystem:refreshUI_WorkerGameCoinGiftsUI()
+
+	local workerGameCoinGiftsUI = GUIManager.inst:GetWindow(Constants.ViewName.WorkerGameCoinGiftsUI, false)
+
+	if workerGameCoinGiftsUI ~= nil and workerGameCoinGiftsUI.isShowing == true then
+		workerGameCoinGiftsUI:Refresh()
+	end
+
+end
+
+xlua.private_accessible(CS.EquipListUIView)
+
+function Activity_WorkerGameSystem:refrshActivity_WorkerGameState(flag)
+
+	if not flag then --关闭所有打开的界面
+
+		--GUIManager.inst:HideView(Constants.ViewName.Activity_WorkerGameScoreRewardPanel)
+		GUIManager.inst:HideView(Constants.ViewName.Activity_WorkerGamePanel)
+		GUIManager.inst:HideView(Constants.ViewName.WorkerGameCoinGiftsUI)
+		
+		local equipMakeUI = GUIManager.inst:GetWindowCs(typeof(CS.EquipListUIView),false)
+		
+		if equipMakeUI ~= nil and equipMakeUI.isShowing then
+			equipMakeUI:updateTypePanle()
+		end
+		
+		--CS_EventControllerInst:TriggerEvent(CS_GameEventType.EquipEvent.EQUIP_SHOWREFRESH); --刷新制作界面列表
+
+	end
+
+end
+
+function Activity_WorkerGameSystem:refreshWorkerGameRedPoint(flag)
+
+	local workerGameUI = GUIManager.inst:GetWindow(Constants.ViewName.Activity_WorkerGamePanel, false)
+
+	if workerGameUI ~= nil and workerGameUI.isShowing == true then
+		workerGameUI:refreshRedPoint(flag)
+	end
+
+end
+
+function Activity_WorkerGameSystem:cs_refreshWorkerGameRedPoint()
+
+	EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.RefreshRedPoint_Activity_WorkerGame_ScoreCanReward,self.scoreCanRewardCount > 0)
+
+end
+
+function Activity_WorkerGameSystem:showActivity_WorkerGame_messRankUI()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_WorkerGame_messRankUI,
+		function (view)
+
+		end)
+
+end
+
+function Activity_WorkerGameSystem:activity_WorkerGame_messRankUI_refreshRankList(rankList)
+
+	local activity_WorkerGame_messRankUI = GUIManager.inst:GetWindow(Constants.ViewName.Activity_WorkerGame_messRankUI, false)
+
+	if activity_WorkerGame_messRankUI ~= nil and activity_WorkerGame_messRankUI.isShowing == true then
+		activity_WorkerGame_messRankUI:getMemberRankList(rankList)
+	end
+
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+function Activity_WorkerGameSystem:request_OperatingActivity_DataCheck()
+
+	local req = MsgType.Request_OperatingActivity_DataCheck:New()
+	req:Send()
+
+end
+
+function Activity_WorkerGameSystem:request_OperatingActivity_Check()
+
+	local req = MsgType.Request_OperatingActivity_Check:New()
+	req:Send()
+end
+
+function Activity_WorkerGameSystem:request_OperatingActivity_CheckReward()
+
+	local req = MsgType.Request_OperatingActivity_CheckReward:New()
+	req:Send()
+
+end
+
+function Activity_WorkerGameSystem:request_OperatingActivity_CheckExchange()
+
+	local req = MsgType.Request_OperatingActivity_CheckExchange:New()
+	req:Send()
+
+end
+
+function Activity_WorkerGameSystem:request_OperatingActivity_Reward(groupId,id)
+
+	local req = MsgType.Request_OperatingActivity_Reward:New()
+	req.groupId = groupId
+	req.id = id
+	req:Send()
+
+end
+
+function Activity_WorkerGameSystem:request_OperatingActivity_Exchange(index)
+
+	local req = MsgType.Request_OperatingActivity_Exchange:New()
+	req.index = index
+	req:Send()
+
+end
+
+function Activity_WorkerGameSystem:request_OperatingActivity_UpdateInfo(rowId,index)
+
+	local req = MsgType.Request_OperatingActivity_UpdateInfo:New()
+	req.rowId = rowId
+	req.index = index
+	req:Send()
+
+end
+
+function Activity_WorkerGameSystem:request_OperatingActivity_UpdateExchange(coinFlag,autoFlag)
+
+	local req = MsgType.Request_OperatingActivity_UpdateExchange:New()
+	req.coinFlag = coinFlag
+	req.autoFlag = autoFlag
+	req:Send()
+
+end
+
+function Activity_WorkerGameSystem:request_OperatingActivity_DailyCoin()
+
+	local req = MsgType.Request_OperatingActivity_DailyCoin:New()
+	req:Send()
+
+end
+
+function Activity_WorkerGameSystem:request_Pay_OperatingActivityPurchase()
+
+	local req = MsgType.Request_Pay_OperatingActivityPurchase:New()
+	req:Send()
+
+end
+
+
+function Activity_WorkerGameSystem:request_OperatingActivity_UnionRankList()
+
+	local req = MsgType.Request_OperatingActivity_UnionRankList:New()
+	req:Send()
+
+end

@@ -1,0 +1,81 @@
+--GameStateUnion
+
+require("class")
+require("utils/XLuaUtils")
+local BaseState = require("state/BaseState")
+local coroutine_cs = require("coroutine_cs")
+local EventDispatcher = require("event/EventDispatcher")
+
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local csSceneManager = CS.UnityEngine.SceneManagement.SceneManager
+local csGameTimer = CS.GameTimer
+local csAudioManager = CS.AudioManager
+local csFGUI = CS.FGUI
+local csManagerBinder = CS.ManagerBinder
+
+local csAccountDataProxy = CS.AccountDataProxy
+
+local GameStateUnion = class(BaseState)
+
+local startLoadScene = false
+
+function GameStateUnion:onEnter(transition)
+	print("enter GameStateUnion")
+	CS.ManagerBinder.inst.mGameState = CS.kGameState.Union
+	
+	--获取公会相关数据
+	if CS_UserDataProxyInst.playerData.hasUnion then
+		
+		--援助
+		if CS_UserDataProxyInst.union_needRequest_MemberHelp == 1 then
+			CS_UserDataProxyInst.union_needRequest_MemberHelp = 0
+			csEventControllerInst:TriggerEvent(csGameEventType.UnionEvent.UNION_REQUEST_MEMBERHELPLIST);
+		end
+		
+	end
+	
+	startLoadScene = false
+
+	GameStateUnion:loadUnionScene()
+	
+end
+
+function GameStateUnion:loadUnionScene()
+	print("GameStateUnion:loadUnionScene")
+	coroutine_cs.start(
+		function()
+			if (startLoadScene == false) then
+				startLoadScene = true
+
+				local aop = csManagerBinder.inst.mSceneMgr:loadScene("UnionScene")
+				coroutine.yield(aop)
+				coroutine_cs.wait(0.6)
+
+				csAudioManager.inst:PlayMusic(2)
+				csFGUI.inst:StartExcessAnimation(false, false)
+				
+				csEventControllerInst:TriggerEvent(csGameEventType.UnionEvent.SHOWUI_UNIONMAIN)
+				csEventControllerInst:TriggerEvent(csGameEventType.UnionEvent.UNION_REQUEST_MSGINFOREFRESH);
+				
+				CS.ManagerBinder.inst.stateIsChanging = false
+
+			end
+			CS.ManagerBinder.inst:GC();
+		end
+	)
+end
+
+
+
+function GameStateUnion:onExit()
+	print("exit GameStateUnion")
+	startLoadScene = false
+
+
+	csSceneManager.UnloadSceneAsync("UnionScene")
+	csEventControllerInst:TriggerEvent(csGameEventType.UnionEvent.HIDEUI_UNIONMAIN)
+end
+
+return GameStateUnion

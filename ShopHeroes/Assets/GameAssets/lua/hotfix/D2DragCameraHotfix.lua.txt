@@ -1,0 +1,13 @@
+--xlua.private_accessible(CS.D2DragCamera)
+--xlua.hotfix(
+	--CS.D2DragCamera,
+	--"updateCameMaxZoom",
+	--function(self, lv, type)
+		--if (CS.CameraMoveConfigManager.inst ~= nil) then
+			
+				--local _cfg = CS.CameraMoveConfigManager.inst:GetConfg(type, lv);
+				--self.maxZoom = _cfg.zoom1 / 100.0;
+				--self.currentDistance = self.maxZoom;
+		--end
+	--end
+--)

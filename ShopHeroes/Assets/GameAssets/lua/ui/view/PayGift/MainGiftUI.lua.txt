@@ -1,0 +1,213 @@
+--MainGiftUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local luaClass_CommonGift =  require("ui/view/PayGift/CommonGift")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_ToggleGroupMarget = typeof(CS.ToggleGroupMarget)
+local CS_type_ObjList = typeof(CS.ObjList)
+
+local CS_GameObject = CS.UnityEngine.GameObject
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+MainGiftUI = class(ViewBase)
+
+function MainGiftUI:ctor()
+	self.viewID = Constants.ViewName.MainGiftUI
+	MainGiftUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	--self.isShowResPanel = true
+	--self.topResPanelType = CS.TopPlayerShowType.noSetting
+end
+------------------------------------------------
+
+--[[
+
+closeBtn
+superList
+
+--]]
+
+function MainGiftUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn =  contentPane:GetButton("closeBtn");
+	self.stateGroup = contentPane:GetObjByName("stateGroup"):GetComponent(CS_type_ToggleGroupMarget)
+	self.toggleLinkObjs = contentPane:GetObjByName("toggleLinkObjs"):GetComponent(CS_type_ObjList).objList
+
+
+	--hotGift
+	self.hotGift_scrollRect = contentPane:GetObjByName("scrollRect"):GetComponent("ScrollRect")
+	self.hotGift_upTipsImgObj = contentPane:GetObjByName("upTipsImgObj")
+	self.hotGift_downTipsImgObj = contentPane:GetObjByName("downTipsImgObj")
+	
+	self.hot_content = contentPane:GetObjByName("hot_content"):GetComponent("RectTransform")
+
+	--一般礼包
+	self.commonGiftParent = contentPane:GetObjByName("commonGiftParent"):GetComponent("Transform")
+	self.commonGiftPfb = contentPane:GetObjByName("commonGiftPfb")
+
+
+	------------------------------------------------------------------------------------------------------------------------------
+
+	--growthFund
+
+
+	------------------------------------------------------------------------------------------------------------------------------
+
+	--gatePass
+
+	------------------------------------------------------------------------------------------------------------------------------
+
+end
+
+
+function MainGiftUI:onInit()
+
+	self:initComp()
+
+	self.index = 0
+
+	self.commonGiftList = {}
+
+
+	self.stateGroup.OnSelectedIndexValueChange = function (index)
+		self:onSelectedIndexValueChange(index)
+	end
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	------------------------------------------------------------------------------------------------
+
+	self.hotGift_scrollRect.onValueChanged:AddListener(function (v2)
+
+
+			if self.hotGift_scrollRect.verticalNormalizedPosition <= 0 then
+				self.hotGift_upTipsImgObj:SetActive(true)
+				self.hotGift_downTipsImgObj:SetActive(false)
+
+			elseif self.hotGift_scrollRect.verticalNormalizedPosition >= 1 then
+				self.hotGift_upTipsImgObj:SetActive(false)
+				self.hotGift_downTipsImgObj:SetActive(true)
+
+			else
+
+				self.hotGift_upTipsImgObj:SetActive(true)
+				self.hotGift_downTipsImgObj:SetActive(true)
+
+			end
+
+		end)
+
+
+	------------------------------------------------------------------------------------------------
+
+
+
+	------------------------------------------------------------------------------------------------
+
+
+end
+
+function MainGiftUI:onSelectedIndexValueChange(index)
+
+	self.index = index
+
+	for i = 0,self.toggleLinkObjs.Count - 1 do
+		self.toggleLinkObjs[i]:SetActive(false)
+	end
+
+	self.toggleLinkObjs[index]:SetActive(true)
+
+	self:setState(index)
+
+end
+
+function MainGiftUI:setState(index)
+
+
+	if 	index == 0 then --推荐
+
+
+		--self.hotGift_scrollRect.verticalNormalizedPosition = 1
+
+		--一般礼包
+
+		for i = 1, #self.commonGiftList do
+			self.commonGiftList[i].gameObject:SetActive(false)
+		end
+
+
+		for i = 1, 10 do
+
+			if 	i <= #self.commonGiftList then
+
+				local commonGift = self.commonGiftList[i]
+				commonGift:SetData()
+				commonGift.gameObject:SetActive(true)
+
+			else
+
+				local obj = CS_GameObject.Instantiate(self.commonGiftPfb,self.commonGiftParent)
+
+				local commonGift = luaClass_CommonGift.new()
+				commonGift:init(obj)
+
+				self.commonGiftList[#self.commonGiftList + 1] = commonGift
+
+				commonGift:SetData()
+				commonGift.gameObject:SetActive(true)
+
+			end
+
+		end
+
+		CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.hot_content)
+		
+		
+
+	elseif index == 1 then --
+
+	elseif index == 2 then --
+
+	end
+
+end
+
+function  MainGiftUI:onShowed()
+	print("MainGiftUI onShowed")
+
+	self.stateGroup:OnEnableMethod(self.index)
+
+end
+
+function MainGiftUI:onHide()
+	print("MainGiftUI onHide")
+end
+
+function MainGiftUI:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function MainGiftUI:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function MainGiftUI:closeBtnClick()
+	self:hide()
+end
+
+------------------------------------------------

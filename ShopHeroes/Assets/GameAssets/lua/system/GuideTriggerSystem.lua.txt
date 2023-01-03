@@ -1,0 +1,782 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/GuideTrigger/GuideTriggerUIView")
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameTimerInst = CS.GameTimer.inst
+local csGameEventType = CS.GameEventType
+local csVector3 = CS.UnityEngine.Vector3
+
+GuideTriggerSystem = class(BaseSystem)
+GuideTriggerSystem.super = BaseSystem
+
+local guideTriggerUIView
+
+function GuideTriggerSystem:ctor()
+end
+
+function GuideTriggerSystem:AddListeners()
+	--EventDispatcherInis:addEvent(GameEvent.DailySignEvent.ShowUI_DailySignUI,self,self.openDailySignUI)
+
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.SelectNormal, self, self.findTagetObj)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.SelectSceneFurn, self, self.selectSceneFurn)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.SelectPanelFurn, self, self.selectUIFurn)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.SelectShopperPopup, self, self.clickShopperPop)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.SelectTargetWorker, self, self.selectTargetWorker)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.SelectTargetEquip, self, self.selectTargetEquip)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.SelectUpgradingFurnHelp, self, self.selectUpgradingAid)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.SelectUpgradingFurn, self, self.selectUpgradingFurn)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.OpenPanelByType, self, self.openGuideTriggerUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.HidePanelByType, self, self.hideGuideTriggerUIByType)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.HideGuideTriggerUI, self, self.hideGuideTriggerUI)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.ShowMask, self, self.showMask)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.ShowGMask, self, self.showGMask)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.HideFinger, self, self.hideGuideFinger)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.HideFingerFromTouch, self, self.hideGuideFingerFromTouch)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.CheckGuideTrigger, self, self.checkGuideTrigger)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.StartGuideTrigger, self, self.startGuideTrigger)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.Request_GuideTrigger, self, self.requestGuideTrigger)
+	EventDispatcherInis:addEvent(
+		GameEvent.GuideTrigger.Request_GuideTriggerFurnUpgrade,
+		self,
+		self.requestGuideTriggerFurnitureUpgrade
+	)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.SetPreMaskState, self, self.SetPreMaskStateFunc)
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.SetAllMaskState, self, self.SetAllMaskStateFunc)
+
+	EventDispatcherInis:addEvent(GameEvent.GuideTrigger.GuideTriggerTest, self, self.Test)
+end
+
+function GuideTriggerSystem:RemoveListeners()
+	--EventDispatcherInis:removeEvent(GameEvent.DailySignEvent.ShowUI_DailySignUI,self.openDailySignUI)
+
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.SelectNormal, self.findTagetObj)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.SelectSceneFurn, self.selectSceneFurn)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.SelectPanelFurn, self.selectUIFurn)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.SelectShopperPopup, self.clickShopperPop)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.SelectTargetWorker, self.selectTargetWorker)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.SelectTargetEquip, self.selectTargetEquip)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.SelectUpgradingFurnHelp, self.selectUpgradingAid)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.SelectUpgradingFurn, self.selectUpgradingFurn)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.OpenPanelByType, self.openGuideTriggerUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.HidePanelByType, self.hideGuideTriggerUIByType)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.HideGuideTriggerUI, self.hideGuideTriggerUI)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.ShowMask, self.showMask)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.ShowGMask, self.showGMask)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.HideFinger, self.hideGuideFinger)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.HideFingerFromTouch, self.hideGuideFingerFromTouch)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.CheckGuideTrigger, self.checkGuideTrigger)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.StartGuideTrigger, self.startGuideTrigger)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.Request_GuideTrigger, self.requestGuideTrigger)
+	EventDispatcherInis:removeEvent(
+		GameEvent.GuideTrigger.Request_GuideTriggerFurnUpgrade,
+		self.requestGuideTriggerFurnitureUpgrade
+	)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.SetPreMaskState, self.SetPreMaskStateFunc)
+	EventDispatcherInis:removeEvent(GameEvent.GuideTrigger.SetAllMaskState, self.SetAllMaskStateFunc)
+end
+
+function GuideTriggerSystem:SetAllMaskStateFunc(isActive)
+	local guideTriggerUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTriggerUIView, false)
+	if guideTriggerUIView ~= nil and guideTriggerUIView.isShowing then
+		guideTriggerUIView:SetAllMask(isActive)
+	end
+end
+
+function GuideTriggerSystem:SetPreMaskStateFunc(isActive)
+	local guideTriggerUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTriggerUIView, false)
+	if guideTriggerUIView ~= nil and guideTriggerUIView.isShowing then
+		guideTriggerUIView:setPreMaskState(isActive)
+	end
+end
+
+function GuideTriggerSystem:requestGuideTriggerFurnitureUpgrade()
+	local rep = MsgType.Request_User_TriggerGuideFurnitureUpgrade:New()
+	
+	rep.groupId = GuideTriggerManager.inst.curData.group_id
+	rep.furnitureUid = GuideTriggerManager.inst.furnUid
+	local furnData = CS.UserDataProxy.inst:GetFuriture(GuideTriggerManager.inst.furnUid)
+	if (furnData ~= nil) then
+		rep.designType = furnData.type
+	end
+	rep:Send()
+end
+
+function GuideTriggerSystem:requestGuideTrigger(groupId)
+	local rep = MsgType.Request_User_CheckTriggerGuide:New()
+	rep.groupId = groupId
+	rep:Send()
+end
+
+function GuideTriggerSystem:startGuideTrigger(groupId)
+	GuideTriggerManager.inst:StartGuideTrigger(groupId)
+end
+
+function GuideTriggerSystem:checkGuideTrigger(triggerType, triggerVal)
+	GuideTriggerManager.inst:CheckGuideTrigger(triggerType, triggerVal)
+end
+
+function GuideTriggerSystem:hideGuideFinger()
+	local guideTriggerUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTriggerUIView, false)
+	if guideTriggerUIView ~= nil and guideTriggerUIView.isShowing then
+		guideTriggerUIView:hideFinger()
+	end
+end
+
+function GuideTriggerSystem:hideGuideFingerFromTouch()
+	local guideTriggerUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTriggerUIView, false)
+	if guideTriggerUIView ~= nil and guideTriggerUIView.isShowing then
+		guideTriggerUIView:hideFingerFromTouch()
+	end
+end
+
+function GuideTriggerSystem:Test(groupId)
+	GuideTriggerManager.inst:StartGuideTrigger(groupId)
+	--GuideTriggerManager:CheckGuideTrigger(1,1)
+end
+
+function GuideTriggerSystem:showMask(panelName, targetTrans)
+	local guideTriggerUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTriggerUIView, false)
+	if (guideTriggerUIView == nil) then
+		GUIManager.inst:OpenView(
+			Constants.ViewName.GuideTriggerUIView,
+			function(view)
+				guideTriggerUIView = view
+				guideTriggerUIView:SetMask(panelName, targetTrans)
+			end
+		)
+	elseif guideTriggerUIView ~= nil and guideTriggerUIView.isShowing then
+		guideTriggerUIView:SetMask(panelName, targetTrans)
+	end
+end
+
+function GuideTriggerSystem:showGMask(targetRect)
+	local guideTriggerUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTriggerUIView, false)
+
+	if (guideTriggerUIView == nil) then
+
+		GUIManager.inst:OpenView(
+			Constants.ViewName.GuideTriggerUIView,
+			function(view)
+				guideTriggerUIView = view
+				guideTriggerUIView:SetGMask(targetRect)
+			end
+		)
+	elseif guideTriggerUIView ~= nil and guideTriggerUIView.isShowing then
+
+		guideTriggerUIView:SetGMask(targetRect)
+	end
+
+end
+
+function GuideTriggerSystem:hideGuideTriggerUI()
+
+	--guideTriggerUIView = nil
+	GUIManager.inst:HideView(Constants.ViewName.GuideTriggerUIView)
+end
+
+--function GuideTriggerSystem:refreshGuideTriggerUI()
+--if(guideTriggerUIView ~= nil and guideTriggerUIView.isShowing)then
+----guideTriggerUIView:SetUIData()
+--end
+--end
+
+function GuideTriggerSystem:hideGuideTriggerUIByType(panelType)
+	local guideTriggerUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTriggerUIView, false)
+	if guideTriggerUIView ~= nil and guideTriggerUIView.isShowing then
+		guideTriggerUIView:HidePanelByType(panelType)
+	end
+end
+
+function GuideTriggerSystem:openGuideTriggerUI(panelType, data)
+	local guideTriggerUIView = GUIManager.inst:GetWindow(Constants.ViewName.GuideTriggerUIView, false)
+	if (guideTriggerUIView == nil) then
+		GUIManager.inst:OpenView(
+			Constants.ViewName.GuideTriggerUIView,
+			function(view)
+				guideTriggerUIView = view
+				guideTriggerUIView:OpenPanelByType(panelType, data)
+			end
+		)
+	elseif guideTriggerUIView ~= nil and guideTriggerUIView.isShowing then
+		guideTriggerUIView:OpenPanelByType(panelType, data)
+	elseif guideTriggerUIView ~= nil and not guideTriggerUIView.isShowing then
+		GUIManager.inst:OpenView(
+			Constants.ViewName.GuideTriggerUIView,
+			function(view)
+				guideTriggerUIView = view
+				guideTriggerUIView:OpenPanelByType(panelType, data)
+			end
+		)
+	end
+end
+
+function GuideTriggerSystem:OnEnter()
+	GuideTriggerSystem.super.OnEnter(self)
+end
+
+function GuideTriggerSystem:OnExit()
+	GuideTriggerSystem.super.OnExit(self)
+end
+
+local timerId = nil
+local targetObj = nil
+
+local findTimes = 20
+-- 正常选择按钮
+function GuideTriggerSystem:findTagetObj(panelName, btnName, isConstraint)
+	if (timerId ~= nil) then
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = nil
+	end
+	findTimes = 10
+	timerId =
+	csGameTimerInst:AddTimer(
+		0.1,
+		function()
+			if (not CS.ManagerBinder.inst.stateIsChanging and GUIManager.inst:CurrWindowViewID() ~= nil) then
+				local currviewname = GUIManager.inst:CurrWindowViewID()
+				print(
+					"待办任务触发式",
+					currviewname,
+					"    ",
+					panelName,
+					"       ",
+					CS.FGUI.inst.uiRootTF:Find(panelName),
+					" 要这个按钮     ",
+					btnName
+				)
+				if (currviewname == panelName or CS.FGUI.inst.uiRootTF:Find(panelName) ~= nil) then
+					local panel = CS.FGUI.inst.uiRootTF:Find(panelName)
+					if (panel ~= nil) then
+						panel = panel.gameObject
+
+						local targetGo = panel:FindHideChildGameObject(btnName)
+						if (targetGo ~= nil) then
+							print("找到btnName =" .. btnName)
+							targetObj = targetGo
+							self:setComponent()
+							-- 挖孔 手指
+							if (isConstraint) then
+								local targetRect = targetObj:GetComponent("RectTransform")
+								if (targetRect ~= nil) then
+									self:showGMask(targetRect)
+								else
+									self:showMask(panelName, targetObj.transform)
+								end
+							else
+								self:showMask(panelName, targetObj.transform)
+							end
+							csGameTimerInst:RemoveTimer(timerId)
+							timerId = nil
+						else
+							print("没有找到btnName =" .. btnName)
+							findTimes = findTimes - 1
+							if (findTimes > 0) then
+								return
+							end
+							--这里要加跳过当前引导
+							csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON)
+							--关闭界面
+							EventDispatcherInis:dispatchEvent(GameEvent.GuideTrigger.HideGuideTriggerUI)
+
+							csGameTimerInst:RemoveTimer(timerId)
+							timerId = nil
+						end
+					else
+						findTimes = findTimes - 1
+						if (findTimes > 0) then
+							return
+						end
+						--这里要加跳过当前引导
+						csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON)
+						--关闭界面
+						EventDispatcherInis:dispatchEvent(GameEvent.GuideTrigger.HideGuideTriggerUI)
+
+						csGameTimerInst:RemoveTimer(timerId)
+						timerId = nil
+					end
+				end
+
+			end
+		end
+	)
+end
+
+local sceneTimerId = nil
+local targetFurn = nil
+local cosType = ""
+-- 点击场景中指定家具
+function GuideTriggerSystem:selectSceneFurn(furnId, isConstraint)
+	if (sceneTimerId ~= nil) then
+		csGameTimerInst:RemoveTimer(sceneTimerId)
+		sceneTimerId = nil
+	end
+
+	furnId = tonumber(furnId)
+
+	sceneTimerId =
+	csGameTimerInst:AddTimer(
+		0.1,
+		function()
+			if (not CS.ManagerBinder.inst.stateIsChanging and CS.IndoorMap.inst ~= nil and CS.IndoorMap.inst.isInit) then
+				local allFurn = CS.IndoorMap.inst.IndoorFunituresList
+				for i = 0, allFurn.Count - 1 do
+					local curFurn = allFurn[i]
+					if (curFurn.id == furnId) then
+						local eventListener = curFurn:GetComponentInChildren(typeof(CS.InputEventListener))
+						if (eventListener ~= nil) then
+							self:SetConstraint(isConstraint)
+							if (isConstraint) then
+								CS.IndoorMap.inst.indoorMask:SetActive(true)
+								CS.IndoorMap.inst.indoorMask.transform.position =
+								csVector3(
+									CS.IndoorMap.inst.indoorMask.transform.position.x,
+									CS.IndoorMap.inst.indoorMask.transform.position.y,
+									-10
+								)
+								cosType = "IndoorEvent"
+							else
+								CS.IndoorMap.inst.indoorMask:SetActive(false)
+								cosType = ""
+							end
+							GuideTriggerManager.inst.furnUid = curFurn.uid
+							targetObj = eventListener.gameObject
+							targetFurn = curFurn.gameObject
+							targetFurn.transform.position = csVector3(targetFurn.transform.position.x, targetFurn.transform.position.y, -11)
+							CS.D2DragCamera.inst:LookToPosition(
+								curFurn.PopUIRoot.position,
+								function()
+									self:cameraMoveEndToSetFurnFinger(1)
+								end
+							)
+						end
+					end
+				end
+				csGameTimerInst:RemoveTimer(sceneTimerId)
+				sceneTimerId = nil
+			end
+		end
+	)
+end
+
+function GuideTriggerSystem:cameraMoveEndToSetFurnFinger(fromType) -- 1 - 家具 2 - 顾客 3 - 援助
+	if (targetObj == nil) then
+		return
+	end
+	-- 设置手指
+	if (fromType == 1) then
+		self:showMask(cosType, targetFurn:GetComponent("Furniture").PopUIRoot)
+	else
+		self:showMask(cosType, targetObj.transform)
+	end
+
+	self:setComponent()
+end
+
+-- 点击界面上指定家具(包含跳转指定类型操作)
+function GuideTriggerSystem:selectUIFurn(panelName, btnName, isConstraint)
+	local furnCfg = CS.FurnitureConfigManager.inst:getConfig(tonumber(btnName))
+	if (furnCfg ~= nil) then
+		local typeId = 0
+
+		if (furnCfg.type_1 == 3) then
+			typeId = 4
+		elseif furnCfg.type_1 == 4 then
+			typeId = 2
+		elseif furnCfg.type_1 == 5 then
+			typeId = 2
+		elseif furnCfg.type_1 == 7 then
+			typeId = 0
+		elseif furnCfg.type_1 == 8 then
+			typeId = 0
+		elseif furnCfg.type_1 == 9 then
+			typeId = 1
+		elseif furnCfg.type_1 == 10 then
+			typeId = 3
+		end
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.Int16, CS.System.Int32)
+		func(csEventControllerInst, csGameEventType.SHOWUI_TARGETFURN, typeId, tonumber(btnName))
+
+		self:findTagetObj(panelName, btnName, isConstraint)
+	end
+end
+
+local shopperTimerId = nil
+local targetShopper = nil
+-- 点击顾客气泡
+function GuideTriggerSystem:clickShopperPop(targetShopperId, isConstraint)
+	if (shopperTimerId ~= nil) then
+		csGameTimerInst:RemoveTimer(shopperTimerId)
+		shopperTimerId = nil
+	end
+
+	targetShopperId = tonumber(targetShopperId)
+
+	shopperTimerId =
+	csGameTimerInst:AddTimer(
+		0.1,
+		function()
+			if (not CS.ManagerBinder.inst.stateIsChanging) then
+				local allShopper = CS.IndoorRoleSystem.inst:GetAllShopperList()
+				for i = 0, allShopper.Count - 1 do
+					if
+						(allShopper[i].shopperData.data.shopperGuideTaskId == targetShopperId and
+							allShopper[i].shopperData.data.shopperState == 99 and
+							not allShopper[i].isMoving)
+						then
+						self:SetConstraint(isConstraint)
+						if (isConstraint) then
+							if (CS.IndoorMap.inst ~= nil) then
+								CS.IndoorMap.inst.indoorMask:SetActive(true)
+								CS.IndoorMap.inst.indoorMask.transform.position =
+								csVector3(
+									CS.IndoorMap.inst.indoorMask.transform.position.x,
+									CS.IndoorMap.inst.indoorMask.transform.position.y,
+									-10
+								)
+							end
+							cosType = "IndoorEvent"
+						else
+							if (CS.IndoorMap.inst ~= nil) then
+								CS.IndoorMap.inst.indoorMask:SetActive(false)
+							end
+							cosType = ""
+						end
+						targetObj = allShopper[i].Attacher.spRoot
+						targetShopper = allShopper[i].gameObject
+						targetShopper.transform.position =
+						csVector3(targetShopper.transform.position.x, targetShopper.transform.position.y, -11)
+						CS.D2DragCamera.inst:LookToPosition(
+							targetObj.transform.position,
+							function()
+								self:cameraMoveEndToSetFurnFinger(2)
+							end
+						)
+						--self:showMask("mainUI",targetObj.transform)
+						csGameTimerInst:RemoveTimer(shopperTimerId)
+						shopperTimerId = nil
+					end
+				end
+			end
+		end
+	)
+end
+
+-- 选中指定工匠
+function GuideTriggerSystem:selectTargetWorker(panelName, btnName, isConstraint)
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.Int32)
+	func(csEventControllerInst, csGameEventType.RoleEvent.RESPONSE_HEROTYPECHANGE, 1)
+
+	self:findTagetObj(panelName, btnName, isConstraint)
+end
+
+-- 选中指定的装备
+function GuideTriggerSystem:selectTargetEquip(panelName, btnName, isConstraint)
+	self:findTagetObj(panelName, btnName, isConstraint)
+end
+
+-- 找到正在升级的家具 头上的援助
+function GuideTriggerSystem:selectUpgradingAid(isConstraint)
+	if (sceneTimerId ~= nil) then
+		csGameTimerInst:RemoveTimer(sceneTimerId)
+		sceneTimerId = nil
+	end
+	sceneTimerId =
+	csGameTimerInst:AddTimer(
+		0.1,
+		function()
+			if (not CS.ManagerBinder.inst.stateIsChanging and CS.IndoorMap.inst ~= nil and CS.IndoorMap.inst.isInit) then
+				local furnUid = CS.UserDataProxy.inst:GetCurrentUpgradefurniture()
+				local isSuccess, furnEntity = CS.IndoorMap.inst:GetFurnituresByUid(furnUid)
+
+				if (isSuccess) then
+					local eventListener = furnEntity.upgradeAttacher.askAidListener:GetComponent("InputEventListener")
+					if (eventListener ~= nil) then
+						self:SetConstraint(isConstraint)
+						if (isConstraint) then
+							CS.IndoorMap.inst.indoorMask:SetActive(true)
+							CS.IndoorMap.inst.indoorMask.transform.position =
+							csVector3(
+								CS.IndoorMap.inst.indoorMask.transform.position.x,
+								CS.IndoorMap.inst.indoorMask.transform.position.y,
+								-10
+							)
+							cosType = "IndoorEvent"
+						else
+							CS.IndoorMap.inst.indoorMask:SetActive(false)
+							cosType = ""
+						end
+
+						targetObj = eventListener.gameObject
+						targetFurn = targetObj.gameObject
+						targetFurn.transform.position = csVector3(targetFurn.transform.position.x, targetFurn.transform.position.y, -11)
+						CS.D2DragCamera.inst:LookToPosition(
+							targetObj.transform.position,
+							function()
+								self:cameraMoveEndToSetFurnFinger(3)
+							end
+						)
+					end
+				end
+				csGameTimerInst:RemoveTimer(sceneTimerId)
+				sceneTimerId = nil
+			end
+		end
+	)
+end
+
+local tmpListenerList
+local tmpEvent
+-- 找到正在升级的家具
+function GuideTriggerSystem:selectUpgradingFurn(isConstraint)
+	if (sceneTimerId ~= nil) then
+		csGameTimerInst:RemoveTimer(sceneTimerId)
+		sceneTimerId = nil
+	end
+	sceneTimerId =
+	csGameTimerInst:AddTimer(
+		0.1,
+		function()
+			if (not CS.ManagerBinder.inst.stateIsChanging and CS.IndoorMap.inst ~= nil and CS.IndoorMap.inst.isInit) then
+				local furnUid = CS.UserDataProxy.inst:GetCurrentUpgradefurniture()
+				local isSuccess, furnEntity = CS.IndoorMap.inst:GetFurnituresByUid(furnUid)
+
+				if (isSuccess) then
+					tmpListenerList = furnEntity:GetComponentsInChildren(typeof(CS.InputEventListener))
+					if (isConstraint) then
+						CS.IndoorMap.inst.indoorMask:SetActive(true)
+						CS.IndoorMap.inst.indoorMask.transform.position =
+						csVector3(
+							CS.IndoorMap.inst.indoorMask.transform.position.x,
+							CS.IndoorMap.inst.indoorMask.transform.position.y,
+							-10
+						)
+						cosType = "IndoorEvent"
+					else
+						CS.IndoorMap.inst.indoorMask:SetActive(false)
+						cosType = ""
+					end
+					self:SetConstraint(isConstraint)
+					targetFurn = furnEntity.gameObject
+					targetFurn.transform.position = csVector3(targetFurn.transform.position.x, targetFurn.transform.position.y, -11)
+					if (tmpListenerList ~= nil and tmpListenerList.Length > 0) then
+						if (tmpListenerList.Length == 1) then
+							targetObj = tmpListenerList.gameObject
+							CS.D2DragCamera.inst:LookToPosition(
+								furnEntity.PopUIRoot.position,
+								function()
+									self:cameraMoveEndToSetFurnFinger(1)
+								end
+							)
+						elseif (tmpListenerList.Length > 1) then
+							targetObj = tmpListenerList[0].gameObject
+							self:showMask(cosType, targetObj.transform)
+							tmpEvent = function(v3)
+								self:listenerClickToNext(v3)
+							end
+							for i = 0, tmpListenerList.Length - 1 do
+								tmpListenerList[i].OnClick = tmpListenerList[i].OnClick - tmpEvent
+								tmpListenerList[i].OnClick = tmpListenerList[i].OnClick + tmpEvent
+							end
+						end
+					end
+				end
+				csGameTimerInst:RemoveTimer(sceneTimerId)
+				sceneTimerId = nil
+			end
+		end
+	)
+end
+
+function GuideTriggerSystem:SetConstraint(isConstraint)
+	local mainUI = GUIManager.inst:GetViewByViewIDLUA(CS.ViewPrefabName.MainUI)
+	local topUI = GUIManager.inst:GetViewByViewIDLUA(CS.ViewPrefabName.TopPlayerInfoPanel)
+
+	if (isConstraint) then
+		EventDispatcherInis:dispatchEvent(GameEvent.GuideTask.HideUI_GuideTask)
+		if (mainUI ~= nil) then
+			mainUI:shiftOut()
+		end
+		if (topUI ~= nil) then
+			topUI:shiftOut()
+		end
+	else
+		EventDispatcherInis:dispatchEvent(GameEvent.GuideTask.ShowUI_GuideTask)
+		if (mainUI ~= nil) then
+			mainUI:shiftIn()
+		end
+		if (topUI ~= nil) then
+			topUI:shiftIn()
+		end
+	end
+end
+
+local btnEvent = nil
+local toggleEvent = nil
+local inputEvent = nil
+local triggerEventDown = nil
+local triggerEventUp = nil
+local triggerEventDrag = nil
+function GuideTriggerSystem:setComponent()
+	if (btnEvent == nil) then
+		btnEvent = function()
+			self:buttonClickToNext()
+		end
+	end
+
+	if (toggleEvent == nil) then
+		toggleEvent = function(isOn)
+			self:toggleClickToNext(isOn)
+		end
+	end
+
+	if (inputEvent == nil) then
+		inputEvent = function(v3)
+			self:listenerClickToNext(v3)
+		end
+	end
+
+	if (triggerEventDown == nil) then
+		triggerEventDown = function(go)
+			self:itemOnPointerDown(go)
+		end
+	end
+
+	if (triggerEventUp == nil) then
+		triggerEventUp = function(go)
+			self:itemOnPointerUp(go)
+		end
+	end
+
+	if (triggerEventDrag == nil) then
+		triggerEventDrag = function(go)
+			self:itemOnDrag(go)
+		end
+	end
+
+	if (targetObj ~= nil) then
+		local targetBtn = targetObj:GetComponent("Button")
+		if (targetBtn ~= nil) then
+			targetBtn.onClick:RemoveListener(btnEvent)
+			targetBtn.onClick:AddListener(btnEvent)
+		end
+		local targetToggle = targetObj:GetComponent("Toggle")
+		if (targetToggle ~= nil) then
+			targetToggle.onValueChanged:RemoveListener(toggleEvent)
+			targetToggle.onValueChanged:AddListener(toggleEvent)
+		end
+		local targetEvent = targetObj:GetComponent("InputEventListener")
+		if (targetEvent ~= nil) then
+			targetEvent.OnClick = targetEvent.OnClick - inputEvent
+			targetEvent.OnClick = targetEvent.OnClick + inputEvent
+		end
+		local targetTrigger = targetObj:GetComponent("EventTriggerListener")
+		if (targetTrigger ~= nil) then
+			targetTrigger.onDown = targetTrigger.onDown - triggerEventDown
+			targetTrigger.onDown = targetTrigger.onDown + triggerEventDown
+			targetTrigger.onUp = targetTrigger.onUp - triggerEventUp
+			targetTrigger.onUp = targetTrigger.onUp + triggerEventUp
+			targetTrigger.onDrag = targetTrigger.onDrag - triggerEventDrag
+			targetTrigger.onDrag = targetTrigger.onDrag + triggerEventDrag
+		end
+	end
+end
+
+function GuideTriggerSystem:buttonClickToNext()
+	if (targetObj == nil) then
+		return
+	end
+
+	local button = targetObj:GetComponent("Button")
+	if (button ~= nil) then
+		button.onClick:RemoveListener(btnEvent)
+	end
+
+	GuideTriggerManager.inst:nextGuideTrigger()
+end
+
+function GuideTriggerSystem:toggleClickToNext(isOn)
+	if (targetObj == nil) then
+		return
+	end
+
+	local toggle = targetObj:GetComponent("Toggle")
+	if (toggle ~= nil) then
+		toggle.onValueChanged:RemoveListener(toggleEvent)
+	end
+	self:hideGuideFinger()
+	GuideTriggerManager.inst:nextGuideTrigger()
+end
+
+function GuideTriggerSystem:listenerClickToNext(v3)
+	if (targetObj == nil) then
+		return
+	end
+	local listener = targetObj:GetComponent("InputEventListener")
+	if (listener ~= nil) then
+		listener.OnClick = listener.OnClick - inputEvent
+		if (targetFurn ~= nil) then
+			targetFurn.transform.position = csVector3(targetFurn.transform.position.x, targetFurn.transform.position.y, 0)
+			targetFurn = nil
+		end
+		if (targetShopper ~= nil) then
+			targetShopper.transform.position =
+			csVector3(targetShopper.transform.position.x, targetShopper.transform.position.y, 0)
+			targetShopper = nil
+		end
+
+		if (CS.IndoorMap.inst ~= nil) then
+			CS.IndoorMap.inst.indoorMask:SetActive(false)
+		end
+	end
+
+	if (tmpListenerList ~= nil and tmpListenerList.Length > 0) then
+		for i = 0, tmpListenerList.Length - 1 do
+			tmpListenerList[i].OnClick = tmpListenerList[i].OnClick - tmpEvent
+		end
+		tmpListenerList = nil
+	end
+	self:hideGuideFinger()
+	GuideTriggerManager.inst:nextGuideTrigger()
+end
+
+function GuideTriggerSystem:triggerClickToNext(go)
+	if (targetObj == nil) then
+		return
+	end
+
+	local listener = targetObj:GetComponent("EventTriggerListener")
+	if (listener ~= nil) then
+		listener.onDown = listener.onDown - triggerEventDown
+		listener.onUp = listener.onUp - triggerEventUp
+		listener.onDrag = listener.onDrag - triggerEventDrag
+	end
+	self:hideGuideFinger()
+	GuideTriggerManager.inst:nextGuideTrigger()
+end
+
+local currSelectItemDown
+function GuideTriggerSystem:itemOnPointerDown(go)
+	currSelectItemDown = go
+end
+
+function GuideTriggerSystem:itemOnPointerUp(go)
+	if (currSelectItemDown == go) then
+		self:triggerClickToNext(go)
+		currSelectItemDown = nil
+	end
+end
+
+function GuideTriggerSystem:itemOnDrag(go)
+	if (currSelectItemDown ~= nil) then
+		currSelectItemDown = nil
+	end
+end

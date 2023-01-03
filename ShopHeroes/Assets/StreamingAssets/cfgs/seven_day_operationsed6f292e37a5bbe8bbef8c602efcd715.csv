@@ -1,0 +1,30 @@
+id,type,if_strong,type_des,group,group_des,index,scene,main_interface,child_interface,if_btn,btn
+v:number,v:number,v:number,v:string,v:number,v:string,v:number,v:string,v:string,v:string,v:number,v:string
+id,类型：大类,是否强制引导 1强制 ,描述,类型细分：1前往界面；2引导点击,描述,序号,场景,界面,子界面,按键修饰0正常按键，1动态生成按键,按键
+2101,2,0,制作界面,1,前往：制作界面,1,IndoorScene,ShopDesignUI,,,
+3101,3,0,家具界面,1,前往 : 家具界面,1,IndoorScene,FurnitureSelectionUI,,,
+5101,5,0,英雄界面,1,前往 : 英雄界面,1,IndoorScene,,,,
+3201,3,0,点击初级热武器架,2,引导 : 点击初级热武器架,1,IndoorScene,FurnitureSelectionUI,0,1,29001
+1201,1,0,点击购买装备的顾客,2,引导 : 点击购买装备的顾客,1,IndoorScene,,,,
+3102,3,0,相应家具升级界面,1,前往 : 相应家具升级界面,2,IndoorScene,FurnitureUpgradePanel,,,
+3103,3,0,引导点击家具升级,1,前往 : 引导点击家具升级,3,IndoorScene,FurnitureUpgradePanel,,0,UpGrade
+4101,4,0,搜索公会界面,1,前往：搜索公会界面,1,CityScene,CityUI,,0,公会按钮
+4201,4,0,点击加入公会,2,引导：点击加入公会,1,CityScene,UnionFindToolUI,unionHotItem1,0,joinBtn
+6201,6,0,扩建按钮,2,引导 : 扩建按钮,1,IndoorScene,IndoorMap,,0,zhizuo_ziyuanjindu3
+7101,7,0,招募英雄,1,前往 : 招募英雄,1,IndoorScene,RoleRecruitBarPanel,,,
+7201,7,0,引导点击购买英雄,2,引导 : 引导点击购买英雄,1,IndoorScene,RoleRecruitBarPanel,hero1,0,recruitBtn
+8101,8,0,城市改造,1,前往 : 城市改造,1,CityScene,CityBuildingInvestUI,,,
+8201,8,0,引导点击投资,2,引导 : 引导点击投资,2,CityScene,CityBuildingInvestUI,,0,goldButton
+12101,12,0,前往英雄详情界面,1,前往 : 前往英雄详情界面,1,IndoorScene,RoleHeroInfoPanel,,,
+12201,12,0,引导点击一键优化,2,引导 : 引导点击一键优化,1,IndoorScene,RoleHeroInfoPanel,,,allWearBtn
+12202,12,0,引导转职,2,引导 : 引导转职,2,IndoorScene,RoleHeroInfoPanel,,0,useLevelItemBtn
+13101,13,0,前往选择副本界面,1,前往 : 前往选择副本界面,1,CityScene,ExplorePanelUI,,,
+2201,2,0,引导制作装备,2,引导 : 引导制作装备,1,IndoorScene,ShopDesignUI,,1,1010
+21101,21,0,科技界面,1,前往 : 英雄之家,1,CityScene,citymap,,0,英雄之家
+21201,21,0,点击投资,2,引导 : 点击投资,1,CityScene,ScienceLabUI,,1,3600
+22201,22,0,市场界面,2,前往 : 市场界面,1,CityScene,CityUI,,0,市场按钮
+23101,23,0,打开出售界面,1,前往 : 出售界面,1,IndoorScene,NewShopper,,1,sp_popup
+23201,23,0,引导点击升价,2,前往 : 出售界面,1,IndoorScene,ShopperUI,,0,DiscountBtn
+23202,23,0,引导点击降价,2,前往 : 出售界面,1,IndoorScene,ShopperUI,,0,DoubleBtn
+24101,24,0,等待顾客,1,等待顾客,1,,,,,
+25101,25,0,点击家具升级,1,引导点击升级,1,IndoorScene,ShopDesignUI,,0,btn_upgrade

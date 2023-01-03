@@ -1,0 +1,86 @@
+
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+
+-- TopplayerCommonTaskProgressAnim
+
+local TopplayerCommonTaskProgressAnim = class()
+
+function TopplayerCommonTaskProgressAnim:ctor()
+
+	self.startPos_y = 300
+	self.endPos_y = -80
+	self.isPlayAnim = false
+
+end
+
+function TopplayerCommonTaskProgressAnim:Init(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.rectTf = obj:GetComponent("RectTransform")
+	self.contentPane = obj:GetComponent(CS_type_LuaBehaviour)
+
+	self.button = obj:GetComponent("Button")
+	self.icon_tips = self.contentPane:GetGUIIcon("icon_tips")
+	self.icon_task = self.contentPane:GetGUIIcon("icon_task")
+	self.tx_taskContent = self.contentPane:GetText("tx_taskContent")
+
+end
+
+function TopplayerCommonTaskProgressAnim:SetAnimData(data)
+
+	local tipsIconUrl = data.tipsIconUrl
+	local taskIcon_atlas = data.taskIcon_atlas
+	local taskIcon_name = data.taskIcon_name
+	local taskContent = data.taskContent
+	local clickCallback = data.clickCallback
+
+	self.button.onClick:RemoveAllListeners()
+	if clickCallback ~= nil then
+		self.button.onClick:AddListener(function ()
+				if(CS.ManagerBinder.inst.stateIsChanging) then return end
+				if CS.ManagerBinder.inst.mGameState == CS.kGameState.Town or CS.ManagerBinder.inst.mGameState == CS.kGameState.Shop then
+					clickCallback()
+				end
+			end)
+	end
+
+	if tipsIconUrl ~= nil then
+		--self.icon_tips:SetSpriteURL(tipsIconUrl)
+		self.icon_task:SetSpriteURL(tipsIconUrl)
+	end
+
+	--if taskIcon_atlas ~= nil and taskIcon_name ~= nil then
+	--	self.icon_task:SetSprite(taskIcon_atlas,taskIcon_name)
+	--end
+
+	if taskContent ~= nil then
+		self.tx_taskContent.text = taskContent
+	end
+
+end
+
+function TopplayerCommonTaskProgressAnim:PlayAnim()
+
+	self.isPlayAnim = true
+	self.gameObject:SetActive(true)
+
+	self.rectTf:DOAnchorPos3DY(self.endPos_y, 0.3):From(self.startPos_y):OnComplete(function ()
+
+			self.rectTf:DOAnchorPos3DY(self.startPos_y, 0.3):From(self.endPos_y):OnComplete(function ()
+
+					self.gameObject:SetActive(false)
+					self.isPlayAnim = false
+					EventDispatcher:dispatchEvent(GameEvent.OnSomeOneTaskFinishGameEvent.GoOnCommonTaskFinishProgressAnim)
+
+				end):SetDelay(2)
+
+		end)
+
+end
+
+return TopplayerCommonTaskProgressAnim
+

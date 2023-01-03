@@ -1,0 +1,213 @@
+---------------------------------------------------------------------
+
+require("class")
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_PayInst = CS.GamePay.inst
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+--CommonGift
+
+CommonGift = class()
+----
+
+function CommonGift:ctor()
+end
+
+function CommonGift:initComp(obj)
+	
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.icon_banner = self.contentPane:GetGUIIcon("icon_banner")
+	self.tx_banner = self.contentPane:GetText("tx_banner")
+	self.icon_bg = self.contentPane:GetGUIIcon("icon_bg")
+	self.tf_role = self.contentPane:GetObjByName("tf_role"):GetComponent("RectTransform")
+	self.obj_tag = self.contentPane:GetObjByName("obj_tag")
+	self.tx_tag = self.contentPane:GetText("tx_tag")
+	
+	self.goods_1Tf = self.contentPane:GetObjByName("goods_1"):GetComponent("RectTransform")
+	self.goods_1Icon = self.contentPane:GetObjByName("goods_1"):GetComponent(CS_type_GUIIcon)
+
+	self.goods_2Tf = self.contentPane:GetObjByName("goods_2"):GetComponent("RectTransform")
+	self.goods_2Icon = self.contentPane:GetObjByName("goods_2"):GetComponent(CS_type_GUIIcon)
+
+	self.accessories = {}
+	local objList = self.contentPane:GetObjByName("goods_1"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList.Count - 1 do
+		self.accessories[#self.accessories + 1] = objList[i].transform:GetComponent(CS_type_LuaListItem)
+	end
+
+	objList = self.contentPane:GetObjByName("goods_2"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList.Count - 1 do
+		self.accessories[#self.accessories + 1] = objList[i].transform:GetComponent(CS_type_LuaListItem)
+	end
+
+	self.tx_LB_title = self.contentPane:GetText("tx_LB_title")
+	self.tx_LB_des = self.contentPane:GetText("tx_LB_des")
+	self.tx_RB_price = self.contentPane:GetText("tx_RB_price")
+	self.rtf_RB_imgRedLine = self.contentPane:GetObjByName("rtf_RB_imgRedLine"):GetComponent("RectTransform")
+	self.btn_RB_buy = self.contentPane:GetButton("btn_RB_buy")
+	self.tx_buyBtnPrice = self.contentPane:GetText("tx_buyBtnPrice")
+	self.tx_discounts = self.contentPane:GetText("tx_discounts")
+
+end
+
+function CommonGift:init(obj)
+	
+	self:initComp(obj)
+	self.graphicCharacter = nil
+
+	self.btn_RB_buy:ButtonClickTween(
+		function()
+			self:onBuyBtnClick()
+		end
+	)
+	
+end
+
+function CommonGift:SetData(giftData)
+	self.directPurchaseData = giftData
+
+	self.icon_bg:SetSpriteURL(giftData.data.pic2)
+	self.icon_banner:SetSprite(giftData.data.atlasIcon, giftData.data.icon2)
+	self.tx_banner.text = CS_LanguageManagerInst:GetValueByKey(giftData.data.name)
+	self.tx_tag.text = CS_LanguageManagerInst:GetValueByKey(giftData.data.tag)
+	self.goods_1Icon:SetSprite(giftData.data.atlasIcon, giftData.data.icon3)
+	self.goods_2Icon:SetSprite(giftData.data.atlasIcon, giftData.data.icon3)
+	self.tx_LB_title.text = CS_LanguageManagerInst:GetValueByKey(giftData.data.title)
+	self.tx_LB_des.text = CS_LanguageManagerInst:GetValueByKey(giftData.data.slogan)
+
+	if self.graphicCharacter == nil then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		func(CS_CharacterManagerInst,giftData.data.roleImgIcon,nil,CS.EGender.Male,0.14,false,function (system)
+				self.graphicCharacter = system
+				system.transform:SetParent(self.tf_role)
+				system.transform.localScale = Vector3.one * 0.6
+				system.transform.localPosition = Vector3.zero
+
+				self.graphicCharacter:Play("idle",true)
+
+			end,nil)
+	else
+		CS_CharacterManagerInst:ReSetCharacter(self.graphicCharacter,giftData.data.roleImgIcon,nil,CS.EGender.Male,false)
+		self.graphicCharacter:Play("idle",true)
+	end
+	
+	local salePriceStr = CS_PayInst:GetProductPrice(giftData.data.payProduct.productId)
+	local splitIndex = 1
+	for i = 1, #salePriceStr do
+		if(tonumber(string.sub(salePriceStr,i,i)) ~= nil)then
+			splitIndex = i
+			break
+		end
+	end
+	local monetaryUnit = string.sub(salePriceStr, 1, splitIndex - 1)
+	local salePrice = tonumber(string.sub(salePriceStr, splitIndex, -1))
+	local originalPrice = ""
+	if salePrice ~= nil then
+		originalPrice = monetaryUnit .. math.ceil(salePrice * giftData.data.value / 10000)
+	end
+
+	self.tx_RB_price.text = originalPrice
+	self.rtf_RB_imgRedLine.sizeDelta = Vector2(math.max(self.tx_RB_price.preferredWidth,115),16)
+	self.tx_buyBtnPrice.text = salePriceStr
+
+	--local discounts = tostring(math.ceil(100 - 100 / giftData.data.value * 100))
+	self.tx_discounts.text = CS_LanguageManagerInst:GetValueByKey("收益").."\n"..math.ceil(giftData.data.value / 100).."%!"--CS_LanguageManagerInst:GetValueByKey("优惠") .."\n".. discounts.."%!"
+
+	if #giftData.data.itemList > 3 then
+		--两排
+		self.goods_2Tf.gameObject:SetActive(true)
+
+		self.goods_1Tf.anchoredPosition = Vector2(216, 118)
+		self.goods_2Tf.anchoredPosition = Vector2(216, -30)
+	else
+		--一排
+		self.goods_2Tf.gameObject:SetActive(false)
+		self.goods_1Tf.anchoredPosition = Vector2(216, 60)
+	end
+
+	for i = 1, #self.accessories do
+		if (i <= #giftData.accessories) then
+			self.accessories[i].gameObject:SetActive(true)
+			self.accessories[i]:SetData(giftData.accessories[i])
+		else
+			self.accessories[i].gameObject:SetActive(false)
+		end
+	end
+
+	--if giftData.needCountdown then
+		--self:SetTimer()
+	--else
+		--self:ClearTimer()
+	--end
+	
+end
+
+function CommonGift:onBuyBtnClick()
+
+	CS_PayInst:Pay(
+		self.directPurchaseData.data.payProduct.priceId,
+		self.directPurchaseData.data.payProduct.productId,
+		self.directPurchaseData.data.payProduct.payActivityType,
+		self.directPurchaseData.data.payProduct.payActivityId,
+		function(isSuccess)
+			if (isSuccess) then
+				--print("充值成功")
+			end
+		end
+	)
+	
+end
+
+function CommonGift:SetTimer()
+	
+end
+
+function CommonGift:ClearTimer()
+
+end
+
+
+local ctrl_commonGift
+
+
+function SetData(data)
+	
+	if ctrl_commonGift == nil then
+		ctrl_commonGift = CommonGift.new()
+		ctrl_commonGift:init(data.obj)
+	end
+	
+	ctrl_commonGift:SetData(data.giftData)
+	
+end
+
+function onDestroy()
+	
+	if ctrl_commonGift ~= nil then
+		ctrl_commonGift:ClearTimer()
+		ctrl_commonGift = nil
+	end
+	
+end
+
+
+return CommonGift

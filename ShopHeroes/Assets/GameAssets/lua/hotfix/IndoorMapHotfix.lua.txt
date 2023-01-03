@@ -1,0 +1,91 @@
+
+require("utils/XLuaUtils")
+
+local Vector3Int = CS.UnityEngine.Vector3Int
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+
+--IndoorMapHotfix C#已同步逻辑 新包需要
+
+xlua.private_accessible(CS.IndoorMap)
+xlua.hotfix(
+	CS.IndoorMap,
+	"AddFurnituresToMap",
+	function(self, item, select, isCreatFurniture, isInit)
+
+		
+	
+		
+		local indoor = CS.kTileGroupType.__CastFrom(item.type) ~= CS.kTileGroupType.OutdoorFurniture;
+		local position = Vector3Int.zero
+
+		if select then
+
+			if CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver then
+
+				local pos = split(CS.GuideDataProxy.inst.CurInfo.m_curCfg.conditon_param_4,'|')
+				position = Vector3Int(tonumber(pos[1]) - CS.StaticConstants.IndoorOffsetX, tonumber(pos[2]) - CS.StaticConstants.IndoorOffsetY, 0);
+
+			else
+
+				position = self:FindFreeCell(item.sizeX, item.sizeY, indoor);
+
+			end
+
+		else
+
+			position.x = item.x
+			position.y = item.y
+
+		end
+
+		if not self.indoorFurnitures:ContainsKey(item.uid) then
+
+			if isInit then
+
+				if not indoor and ( position.x < 0 or position.x >= CS.StaticConstants.OutDoorMaxX or position.y < 0 or position.y >= CS.StaticConstants.OutDoorMaxY) then
+
+					CS.IndoorMapEditSys.inst:storeItem(item.uid,item.type);
+					return;
+
+				end
+				
+				if CS.kTileGroupType.__CastFrom(item.type) == CS.kTileGroupType.Shelf or CS.kTileGroupType.__CastFrom(item.type) == CS.kTileGroupType.Trunk or CS.kTileGroupType.__CastFrom(item.type) == CS.kTileGroupType.ResourceBin then
+					
+					local count = CS_UserDataProxyInst.shopData:indoorMapFurniture()
+					local furnitureLimit = CS_UserDataProxyInst.shopData:furnitureLimit()
+
+					if count > furnitureLimit then
+
+						CS.IndoorMapEditSys.inst:storeItem(item.uid,item.type);
+						return;
+
+					end
+					
+				end
+
+			end
+
+			local furnitureGo = self:NewFurnitureGO(item.uid, item.id, item.dir, item.type, position.x, position.y, isCreatFurniture);
+			if isInit then
+				furnitureGo:SetFurnitureId(item.id)
+			else
+				furnitureGo:create();
+			end
+
+			self.indoorFurnitures:Add(item.uid, furnitureGo);
+
+		end
+		
+		if select then
+			
+			self:OnFurnituresSelect(item.uid);
+			if CS.D2DragCamera.inst ~= nil then
+				
+				CS.D2DragCamera.inst:LookToPosition(CS.MapUtils.CellPosToWorldPos(indoor and CS.MapUtils.IndoorCellposToMapCellPos(Vector3Int(position.x, position.y, 0)) or Vector3Int(position.x, position.y, 0)), true, CS.D2DragCamera.inst.camera.orthographicSize);
+				
+			end
+			
+		end
+
+	end
+)

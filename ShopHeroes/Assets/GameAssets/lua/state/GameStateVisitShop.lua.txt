@@ -1,0 +1,51 @@
+require("class")
+require("event/GameEvent")
+
+local coroutine_cs = require("coroutine_cs")
+local BaseState = require("state/BaseState")
+local csSceneManager = CS.UnityEngine.SceneManagement.SceneManager
+local GameStateVisitShop = class(BaseState)
+local EventDispatcherInis = require("event/EventDispatcher")
+
+local startLoadScene = false
+
+function GameStateVisitShop:onEnter(transition)
+	CS.ManagerBinder.inst.mGameState = CS.kGameState.VisitShop
+	startLoadScene = false
+	self:loadScene()
+end
+
+function GameStateVisitShop:onExit()
+	startLoadScene = false
+	CS.ManagerBinder.inst.mSceneMgr:UnLoadScene("VisitShopMap")
+end
+
+
+
+function GameStateVisitShop:loadScene()
+	print("GameStateVisitShop loadScene")
+	if (CS.IndoorEnvironmentObjVisibleClr.inst ~= nil) then
+		CS.IndoorEnvironmentObjVisibleClr.inst:setVisible(false)
+	end
+	coroutine_cs.start(
+		function ()
+			if(startLoadScene == false) then
+				startLoadScene = true
+				
+				local aop = CS.ManagerBinder.inst.mSceneMgr:loadScene("VisitShopMap", "IndoorEnvironment");
+				coroutine.yield(aop)
+				coroutine_cs.wait(0.6)
+				CS.AudioManager.inst:PlayMusic(2)
+				
+				CS.FGUI.inst:StartExcessAnimation(false, false)
+				coroutine_cs.wait(0.5)
+				--拜访界面
+				EventDispatcherInis:dispatchEvent(GameEvent.Show_VisitShopUI)
+				CS.ManagerBinder.inst.stateIsChanging = false
+			end
+		end
+		
+		)
+end
+
+return GameStateVisitShop

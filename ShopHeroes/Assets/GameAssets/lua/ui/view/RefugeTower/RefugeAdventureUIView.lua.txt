@@ -1,0 +1,255 @@
+--RefugeAdventureUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/RefugeTowerDataProxy")
+require("config/RefugeFloorConfigManager")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local CS_type_luaList = typeof(CS.LuaListItem)
+local csGameTimerInst = CS.GameTimer.inst
+local csTimeUtils = CS.TimeUtils
+
+local data
+local cfg
+local remainTime
+local tempComp = nil
+local canQuicken
+
+RefugeAdventureUIView = class(ViewBase)
+
+function RefugeAdventureUIView:ctor()
+	self.viewID = Constants.ViewName.RefugeAdventureUIView
+	RefugeAdventureUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.noRoleAndSettingAndEnergy
+end
+
+function RefugeAdventureUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.adventureIcon = contentPane:GetGUIIcon("adventureIcon")
+	self.allHeroes = {}
+	local index = 0
+	self.hero1 = contentPane:GetObjByName("hero1"):GetComponent("RoleAdventureItemUI")
+	if(self.hero1 ~= nil)then
+		self.allHeroes[index] = self.hero1
+		index = index + 1
+	end
+	self.hero2 = contentPane:GetObjByName("hero2"):GetComponent("RoleAdventureItemUI")
+	if(self.hero2 ~= nil)then
+		self.allHeroes[index] = self.hero2
+		index = index + 1
+	end
+	self.hero3 = contentPane:GetObjByName("hero3"):GetComponent("RoleAdventureItemUI")
+	if(self.hero3 ~= nil)then
+		self.allHeroes[index] = self.hero3
+		index = index + 1
+	end
+	self.hero4 = contentPane:GetObjByName("hero4"):GetComponent("RoleAdventureItemUI")
+	if(self.hero4 ~= nil)then
+		self.allHeroes[index] = self.hero4
+		index = index + 1
+	end
+	self.hero5 = contentPane:GetObjByName("hero5"):GetComponent("RoleAdventureItemUI")
+	if(self.hero5 ~= nil)then
+		self.allHeroes[index] = self.hero5
+		index = index + 1
+	end
+
+	self.levelText = contentPane:GetText("levelText")
+	self.dungeonSlider = contentPane:GetObjByName("dungeonSlider"):GetComponent("Slider")
+	self.residueText = contentPane:GetText("residueText")
+	self.finishTip = contentPane:GetText("finishTip")
+	self.gemBtn = contentPane:GetButton("gemBtn")
+	self.confirmObj = contentPane:GetObjByName("confirmObj")
+	self.gemTx = contentPane:GetText("gemTx")
+	self.finishBtn = contentPane:GetButton("finishBtn")
+	self.bgBtn = contentPane:GetButton("bg")
+	
+	self.uiAnimator = contentPane.uiAnimator
+end
+
+function RefugeAdventureUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+	
+	self.bgBtn.onClick:AddListener(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.finishBtn:ButtonClickTween(
+		function ()
+			if(data.exploreState == 2)then
+				self:hide()
+				-- 副本结束协议
+				CS.GUIManager.BackMainView()
+				EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Request_RefugeEnd,data.slotId)
+			end
+		end
+	)
+
+	self.gemBtn:ButtonClickTween(
+		function ()
+			if(not canQuicken and CS.UserDataProxy.inst.playerData.exploreImmediatelyFreeCount <= 0)then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+				func(
+					csEventControllerInst,
+					csGameEventType.SHOWUI_TEXTMSGTIP,
+					cs_LanguageManagerInst:GetValueByKey("金条不足"),
+					csGUIHelper.GetColorByColorHex("FF2828")
+				)
+				return
+			end
+
+			if(self.confirmObj.activeSelf)then
+				self.confirmObj:SetActive(false)
+				-- 副本加速
+				EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Request_RefugeImmediately,data.slotId)
+			else
+				self.confirmObj:SetActive(true)
+			end
+			--EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.ShowUI_RefugePanelUI)
+			--self:closeBtnClick()
+		end
+	)
+end
+
+function RefugeAdventureUIView:DoShowAnimation()
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+end
+
+function RefugeAdventureUIView:DoHideAnimation()
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	csGameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end
+	)
+end
+
+function RefugeAdventureUIView:onHide()
+	--print("RefugeAdventureUIView onHide")
+end
+
+function  RefugeAdventureUIView:onShowed()
+	--print("RefugeAdventureUIView onShowed")
+end
+
+function RefugeAdventureUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function RefugeAdventureUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RefugeAdventureUIView:closeBtnClick()
+	self:hide()
+end
+
+function RefugeAdventureUIView:SetUIData(slotId)
+	data = CS.ExploreDataProxy.inst:GetSlotDataById(slotId)
+	cfg = CS.ExploreInstanceConfigManager.inst:GetConfig(data.exploreId)
+	local rankData = RefugeTowerDataProxy.inst.refugeData
+	self.adventureIcon:SetSprite(rankData.atlas_icon, rankData.icon)
+	self.dungeonSlider.maxValue = data.exploreTotalTime
+	local tempConfig = RefugeFloorConfigManager:GetConfigByInstanceId(data.exploreId)
+	if(tempConfig ~= nil)then
+		self.levelText.text = cs_LanguageManagerInst:GetValueByKey("{0}层",tostring(tempConfig.floor_index))
+	end
+
+	if(tempComp ~= nil)then
+		csGameTimerInst:removeLoopTimer(tempComp)
+		tempComp = nil
+	end
+	if data.exploreState == 1 and data.exploringRemainTime > 0 then
+		self.dungeonSlider.value = data.exploreTotalTime - data.exploringRemainTime
+		self.residueText.text = csTimeUtils.timeSpanStrip(data.exploringRemainTime)
+		local result = CS.DiamondCountUtils.GetExploreOrMakeEquipUpgradeDiamonds(data.exploringRemainTime)
+		self.gemTx.text = tostring(result)
+		if(CS.UserDataProxy.inst.playerData.gem >= result) then
+			self.gemTx.color = CS.UnityEngine.Color.white
+		else
+			self.gemTx.color = CS.UnityEngine.Color.red
+		end
+		canQuicken = CS.UserDataProxy.inst.playerData.gem >= result
+
+		tempComp = csGameTimerInst:AddLoopTimerComp(self.contentObject,1,function ()
+				if (data.exploringRemainTime <= 0) then
+					self.residueText.text = "0" .. cs_LanguageManagerInst:GetValueByKey("秒")
+					csGameTimerInst:removeLoopTimer(tempComp)
+					tempComp = nil
+				else
+					result = CS.DiamondCountUtils.GetExploreOrMakeEquipUpgradeDiamonds(data.exploringRemainTime)
+					self.gemTx.text = tostring(result)
+					if(CS.UserDataProxy.inst.playerData.gem >= result) then
+						self.gemTx.color = CS.UnityEngine.Color.white
+					else
+						self.gemTx.color = CS.UnityEngine.Color.red
+					end
+					canQuicken = CS.UserDataProxy.inst.playerData.gem >= result
+					self.dungeonSlider.value = data.exploreTotalTime - data.exploringRemainTime
+					self.residueText.text = csTimeUtils.timeSpanStrip(data.exploringRemainTime)
+				end
+			end)
+	elseif data.exploreState == 2 then
+		self.dungeonSlider.maxValue = 1
+		self.dungeonSlider.value = 1
+	end
+
+	self:setState()
+	self:setHeroData()
+end
+
+function RefugeAdventureUIView:setState()
+	if (data.exploreState == 2) then
+		self.residueText.gameObject:SetActive(false)
+		self.finishTip.enabled = true
+		self.finishBtn.gameObject:SetActive(true)
+	elseif (data.exploreState == 1) then
+		self.residueText.gameObject:SetActive(true)
+		self.finishTip.enabled = false
+		self.finishBtn.gameObject:SetActive(false)
+	end
+end
+
+function RefugeAdventureUIView:setHeroData()
+	for i = 0,#self.allHeroes  do
+		local index = i
+		if (index < data.heroInfoUIds.Count) then
+			self.allHeroes[index].gameObject:SetActive(true)
+			local tempData = CS.RoleDataProxy.inst:GetHeroDataByUid(data.heroInfoUIds[index])
+			local upgradeCfg = CS.heroupgradeconfigManager.inst:GetHeroUpgradeConfig(tempData.level + 1)
+			self.allHeroes[index]:setData(tempData, upgradeCfg)
+		else
+			self.allHeroes[index].gameObject:SetActive(false)
+		end
+	end
+end
+------------------------------------------------

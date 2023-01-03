@@ -1,0 +1,574 @@
+--RuinsPrepareUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local EventDispatcher = require("event/EventDispatcher")
+local GameTimerInst = CS.GameTimer.inst
+local csTimeUtils = CS.TimeUtils
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+
+RuinsPrepareUIView = class(ViewBase)
+
+function RuinsPrepareUIView:ctor()
+	self.viewID = Constants.ViewName.RuinsPrepareUIView
+	RuinsPrepareUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function RuinsPrepareUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.nameText = contentPane:GetText("nameText")
+	self.icon = contentPane:GetGUIIcon("icon")
+	self.adoptScheduleText = contentPane:GetText("adoptScheduleText")
+	self.bossIcon = contentPane:GetGUIIcon("bossIcon")
+	self.remainEnemyText = contentPane:GetText("remainEnemyText")
+	self.remainHpText = contentPane:GetText("remainHpText")
+	self.enemyHpSlider = contentPane:GetObjByName("enemyHpSlider"):GetComponent("Slider")
+	self.suggestFightingText = contentPane:GetText("suggestFightingText")
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.remainNumText = contentPane:GetText("remainNumText")
+	self.exploreBtn = contentPane:GetButton("exploreBtn")
+	self.heroCanvas = contentPane:GetObjByName("allHeroes"):GetComponent("Canvas")
+	self.remainTimeText = contentPane:GetText("enemyRefreshTimeText")
+	self.bgBigIcon = contentPane:GetGUIIcon("bigBgIcon")
+	self.exploreBtnText = contentPane:GetText("exploreBtnText")
+	self.tipBtn = contentPane:GetButton("tipBtn")
+	
+	self.showTalentObj = contentPane:GetButton("showTalentObj")
+	self.showTalentIcon = contentPane:GetGUIIcon("showTalentIcon")
+	self.showItemObj = contentPane:GetButton("showItemObj")
+	self.showItemIcon = contentPane:GetGUIIcon("showItemIcon")
+	self.talentTipObj = contentPane:GetButton("talentTipObj")
+	self.talentNameText = contentPane:GetText("talentNameText")
+	self.talentDescText = contentPane:GetText("talentDescText")
+	
+	local allHeroPosCom = contentPane:GetObjByName("allHeroes"):GetComponent("ObjList")
+	if(allHeroPosCom ~= nil)then
+		self.allHeroPos = {}
+		local allHeroPosObj = allHeroPosCom.objList
+		for i = 0,allHeroPosObj.Count - 1  do
+			local index = i
+			self.allHeroPos[index + 1] = allHeroPosObj[index]:GetComponent("RuinsPosItem")
+		end
+	end
+	local allAwardsCom = contentPane:GetObjByName("allAwards"):GetComponent("ObjList")
+	if(allAwardsCom ~= nil)then
+		self.allAwards = allAwardsCom.objList
+	end
+	self.scrollView = contentPane:GetObjByName("scrollView"):GetComponent("DynamicScrollView")
+end
+
+function RuinsPrepareUIView:onInit()
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function()
+			self:hide()
+			EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.OpenUI_RuinsMainUI)
+		end
+	)
+
+	self.tipBtn:ButtonClickTween(
+		function ()
+			EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.OpenUI_RuinsTipUI,2)
+		end
+	)
+
+	self.exploreBtn:ButtonClickTween(
+		function()
+			if(RuinsDataProxy.inst:GetIdleHeroCount() <= 0)then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+				func(
+					csEventControllerInst,
+					csGameEventType.SHOWUI_TEXTMSGTIP,
+					cs_LanguageManagerInst:GetValueByKey("英雄已全部阵亡，待明日重置"),
+					csGUIHelper.GetColorByColorHex("FF2828")
+				)
+				return
+			end
+			local heroSumCount = 0
+
+			local combatHeroList = ""
+			for i = 1, #self.allHeroPos do
+				local index = i
+				if(self.allHeroPos[index].data ~= nil)then
+					if(index == 1)then
+						combatHeroList = tostring(self.allHeroPos[index].data.uid)
+					else
+						combatHeroList = combatHeroList .. ":" .. self.allHeroPos[index].data.uid
+					end
+					heroSumCount = heroSumCount + 1
+				else
+					if(index == 1) then
+						combatHeroList = "0"
+					else
+						combatHeroList = combatHeroList .. ":" .. "0"
+					end
+				end
+			end
+
+			if(heroSumCount <= 0)then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+				func(
+					csEventControllerInst,
+					csGameEventType.SHOWUI_TEXTMSGTIP,
+					cs_LanguageManagerInst:GetValueByKey("请先选择英雄参战"),
+					csGUIHelper.GetColorByColorHex("FF2828")
+				)
+				return
+			end
+
+			--print("输出",combatHeroList)
+			local dateTime = csTimeUtils.getDateTimeBySecs(GameTimerInst.serverNow)
+			CS.SaveManager.inst:SaveString(CS_AccountDataProxyInst.account.."RuinsHeroList"..tostring(dateTime.Year)..tostring(dateTime.Month)..tostring(dateTime.Day),combatHeroList,true)
+			EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.Request_RuinsBattle,combatHeroList)
+		end
+	)
+	
+	self.showTalentObj:ButtonClickTween(
+		function ()
+			if(self.selectTalent == nil)then return end
+
+			self.talentTipObj.gameObject:SetActive(true)
+			self.talentDescText.text = cs_LanguageManagerInst:GetValueByKey(CS.HeroBuffConfigManager.inst:GetConfig(self.selectTalent.type).name, tostring(math.floor(self.selectTalent.value)))
+			self.talentNameText.text = cs_LanguageManagerInst:GetValueByKey(self.selectTalent.talentDesc)
+		end
+	)
+
+	self.showItemObj:ButtonClickTween(
+		function ()
+			if(self.selectItem == nil)then return end
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+			local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+			local commonData = CS.CommonRewardData(self.selectItem.id,1,1,self.selectItem.type)
+			func(csEventControllerInst, csGameEventType.CommonEvent.COMMONTIPS_SETINFO, commonData, self.showItemObj.transform)
+		end
+	)
+
+	self.talentTipObj:ButtonClickTween(
+		function ()
+			self.talentTipObj.gameObject:SetActive(false)
+		end
+	)
+
+	self.scrollView.itemRenderer = function(index, item)
+		self:ListItemRenderer(index, item)
+	end
+
+	for i = 1, #self.allHeroPos do
+		local index = i
+
+		self.allHeroPos[index]:InitItem(index)
+	end
+
+	self.curCfg = nil
+	self.listItemCount = 0
+	self.allHeroes = {}
+	self.sumFighitCount = 0
+	self.timerId = nil
+	self.selectTalent = nil
+end
+
+function RuinsPrepareUIView:SortAllHero()
+	table.sort(self.allHeroPos,function (a,b)
+			if(a.index < b.index)then
+				return true
+			end
+
+			return false
+		end)
+	
+	self.talentTipObj.gameObject:SetActive(false)
+
+	self:RefreshShowTalent()
+end
+
+function RuinsPrepareUIView:RemoveHeroCom(heroUid, index)
+	local heroData = RuinsDataProxy.inst:GetHeroDataByUid(heroUid)
+	if(heroData == nil) then return end
+	heroData.isSelect = false
+	self.allHeroPos[index]:clearHeroData()
+	self.sumFighitCount = self.sumFighitCount - heroData.fightingNum
+
+	for i = 1, #self.allHeroPos do
+		local index = i
+
+		if(self.allHeroPos[index].data ~= nil)then
+			self.allHeroPos[index]:setFaceState(self.curCfg.recommend_power,self.sumFighitCount,self.curCfg.team_strength)
+		end
+	end
+	--setFightChange();
+	
+	self:RefreshShowTalent()
+end
+
+function RuinsPrepareUIView:AddHeroCom(heroUid)
+	local isFull = true
+	for i = 1, #self.allHeroPos do
+		local index = i
+
+		if(self.allHeroPos[index].data == nil)then
+			isFull = false
+			break
+		end
+	end
+
+	if(isFull)then
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+		func(
+			csEventControllerInst,
+			csGameEventType.SHOWUI_TEXTMSGTIP,
+			cs_LanguageManagerInst:GetValueByKey("出战人数已达上限"),
+			csGUIHelper.GetColorByColorHex("FF2828")
+		)
+		return
+	end
+
+	local heroData = RuinsDataProxy.inst:GetHeroDataByUid(heroUid)
+	if(heroData == nil) then return end
+
+	if(heroData.isSelect)then
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+		func(
+			csEventControllerInst,
+			csGameEventType.SHOWUI_TEXTMSGTIP,
+			cs_LanguageManagerInst:GetValueByKey("英雄已上阵"),
+			csGUIHelper.GetColorByColorHex("FF2828")
+		)
+		return
+	end
+	if(heroData.config.type == 1)then
+		for i = 1, #self.allHeroPos do
+			local index = i
+
+			if(heroData ~= nil and self.allHeroPos[index].data == nil)then
+				heroData.isSelect = true
+				self.allHeroPos[index]:setData(heroData,self._uiCanvas.sortingLayerName,self._uiCanvas.sortingOrder)
+				self.sumFighitCount = self.sumFighitCount + heroData.fightingNum
+				break
+			end
+		end
+	else
+		for i = #self.allHeroPos, 1,-1 do
+			local index = i
+
+			if(heroData ~= nil and self.allHeroPos[index].data == nil)then
+				heroData.isSelect = true
+				self.allHeroPos[index]:setData(heroData,self._uiCanvas.sortingLayerName,self._uiCanvas.sortingOrder)
+				self.sumFighitCount = self.sumFighitCount + heroData.fightingNum
+				break
+			end
+		end
+	end
+
+	for i = 1, #self.allHeroPos do
+		local index = i
+
+		if(self.allHeroPos[index].data ~= nil)then
+			self.allHeroPos[index]:setFaceState(self.curCfg.recommend_power,self.sumFighitCount,self.curCfg.team_strength)
+		end
+	end
+	
+	self:RefreshShowTalent()
+
+	EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.Ruins_AddHeroComItem,heroUid)
+end
+
+function RuinsPrepareUIView:RefreshShowTalent()
+	local heroTypes = {}
+	heroTypes[1] = 0
+	heroTypes[2] = 0
+	heroTypes[3] = 0
+
+	self.selectTalent = nil
+
+	for i = 1, #self.allHeroPos do
+		local heroIndex = i
+		if self.allHeroPos[heroIndex].data ~= nil then
+			heroTypes[self.allHeroPos[heroIndex].data.config.type] = heroTypes[self.allHeroPos[heroIndex].data.config.type] + 1
+		end
+	end
+	
+	for i = #self.allHeroPos, 1 ,-1 do
+		local heroIndex = i
+
+		if(self.allHeroPos[heroIndex].data ~= nil)then
+			local curTalentData = self.allHeroPos[heroIndex].data.talentConfig:GetRingVal()
+			if (curTalentData ~= nil)then
+				if (heroTypes[curTalentData:GetRingHeroType()] >= 3) then
+					self.selectTalent = curTalentData
+					self.selectTalent.isOpen = true
+				end
+			end
+		end
+	end
+	
+	if (self.selectTalent ~= nil) then
+		self.showTalentObj.gameObject:SetActive(self.selectTalent.isOpen)
+		if (self.selectTalent.isOpen) then
+			local skillShowCfg = CS.HeroSkillShowConfigManager.inst:GetConfig(self.selectTalent.talentId)
+			if (skillShowCfg ~= null) then
+				self.showTalentIcon:SetSprite(skillShowCfg.skill_atlas, skillShowCfg.skill_icon)
+			end
+		end
+	else
+		self.showTalentObj.gameObject:SetActive(false)
+	end
+end
+
+function RuinsPrepareUIView:ListItemRenderer(index, item)
+	local itemScript = item
+
+	for i = 1, 3 do
+		local itemIndex = index * 3 + i
+		local smallObj = itemScript.objList[i - 1].gameObject
+
+		if (itemIndex <= self.listItemCount) then
+			smallObj:SetActive(true)
+			local smallItem = smallObj:GetComponent("LuaListItem")
+			smallItem:SetData(self.allHeroes[itemIndex])
+		else
+			smallObj:SetActive(false)
+		end
+
+	end
+end
+
+function RuinsPrepareUIView:SetListItemTotalCount(count)
+
+	self.listItemCount = count
+	if (self.listItemCount < 0) then
+		self.listItemCount = 0
+	end
+	local count1 = math.floor(self.listItemCount / 3)
+	if (self.listItemCount % 3 > 0) then
+		count1 = count1 + 1
+	end
+	self.scrollView.totalItemCount = count1
+end
+
+function RuinsPrepareUIView:onHide()
+	RuinsDataProxy.inst:ClearAllHeadPool()
+
+	for i = 1, #self.allHeroPos do
+		local index = i
+
+		if(self.allHeroPos[index].data ~= nil)then
+			self.allHeroPos[index].data.isSelect = false
+		end
+		self.allHeroPos[index]:clearHeroData()
+	end
+
+	self.sumFighitCount = 0
+	
+	self.showTalentObj.gameObject:SetActive(false)
+	self.showItemObj.gameObject:SetActive(false)
+	self.talentTipObj.gameObject:SetActive(false)
+	
+	self.selectTalent = nil
+
+	if (self.timerId ~= nil) then
+		GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = nil
+	end
+end
+
+function RuinsPrepareUIView:onShowed()
+	if(CS.RuinsMap.inst ~= nil)then
+		CS.RuinsMap.inst:setIsInMain(false)
+	end
+	
+	self.showItemObj.gameObject:SetActive(false)
+	self.talentTipObj.gameObject:SetActive(false)
+
+	self.heroCanvas.sortingOrder = self._uiCanvas.sortingOrder + 2
+end
+
+function RuinsPrepareUIView:SetData()
+	self.curCfg = RuinsDataProxy.inst.curRuinsCfg
+
+	if(self.curCfg == nil) then return end
+
+	local sumNum = RuinsConfigManager:GetNumByHouseId(tonumber(self.curCfg.instance_group))
+
+	self.nameText.text = cs_LanguageManagerInst:GetValueByKey(self.curCfg.instance_name)
+	self.icon:SetSprite(self.curCfg.instance_atlas,self.curCfg.instance_icon)
+	self.adoptScheduleText.text = cs_LanguageManagerInst:GetValueByKey("已通过 {0}",("<Color=#57ff3b>" .. tonumber(self.curCfg.group_index) - 1 .. "</Color>" .. "/" .. sumNum))
+	self.bgBigIcon:SetSpriteURL(self.curCfg.instance_bg,"",false,true)
+
+	local monsterCfg = CS.MonsterConfigManager.inst:GetConfig(self.curCfg.boss_id)
+
+	if(monsterCfg ~= nil)then
+		self.bossIcon:SetSprite(monsterCfg.monster_atlas,monsterCfg.monster_icon)
+	end
+
+	self.remainEnemyText.text = cs_LanguageManagerInst:GetValueByKey("剩余怪物数量：{0}",tostring(RuinsDataProxy.inst.enemyRemainCount))
+	self.remainHpText.text = tostring(math.floor(tonumber(RuinsDataProxy.inst.enemyRemainCount) / tonumber(RuinsDataProxy.inst.sumEnemyCount) * 100)) .. "%"
+	self.enemyHpSlider.maxValue = tonumber(RuinsDataProxy.inst.sumEnemyCount)
+	self.enemyHpSlider.value = tonumber(RuinsDataProxy.inst.enemyRemainCount)
+	self.suggestFightingText.text = cs_LanguageManagerInst:GetValueByKey("怪物平均战力：<Color=#57FF3B>{0}</Color>",tostring(self.curCfg.recommend_power))
+
+	RuinsDataProxy.inst:SetAllHeadPool()
+	self.allHeroes = RuinsDataProxy.inst:GetAllHero()
+	self.remainNumText.text = cs_LanguageManagerInst:GetValueByKey("剩余英雄：{0}",(RuinsDataProxy.inst:GetIdleHeroCount() .. "/" .. #self.allHeroes))
+
+	local idleCount = RuinsDataProxy.inst:GetIdleHeroCount()
+	csGUIHelper.SetUIGray(self.exploreBtn.transform,idleCount <= 0)
+	if(idleCount > 0)then
+		self.exploreBtnText.text = cs_LanguageManagerInst:GetValueByKey("开始挑战")
+	else
+		self.exploreBtnText.text = cs_LanguageManagerInst:GetValueByKey("明日重置")
+	end
+
+
+	self:SetListItemTotalCount(#self.allHeroes)
+
+	self:SetRewardData()
+	self:AutoSetHeroPos()
+	self:SetRemainTime()
+end
+
+function RuinsPrepareUIView:SetRemainTime()
+	if (self.timerId ~= nil) then
+		GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = nil
+	end
+
+	if(RuinsDataProxy.inst.remainTime > 0)then
+		self.remainTimeText.text = csTimeUtils.timeSpan3Str(RuinsDataProxy.inst.remainTime)
+		self.timerId =
+		GameTimerInst:AddTimer(
+			1,
+			RuinsDataProxy.inst.remainTime,
+			function()
+				if RuinsDataProxy.inst.remainTime > 0 then
+					self.remainTimeText.text = csTimeUtils.timeSpan3Str(RuinsDataProxy.inst.remainTime)
+				else
+					self.remainTimeText.text = cs_LanguageManagerInst:GetValueByKey("请重置")
+					GameTimerInst:RemoveTimer(self.timerId)
+					self.timerId = nil
+				end
+			end
+		)
+	else
+		self.remainTimeText.text = cs_LanguageManagerInst:GetValueByKey("请重置")
+	end
+end
+
+function RuinsPrepareUIView:SetRewardData()
+	local ids = {}
+	local types = {}
+	local counts = {}
+
+	if(self.curCfg.reward_id ~= nil)then
+		ids = split(self.curCfg.reward_id,":")
+	end
+
+	if(self.curCfg.reward_type ~= nil)then
+		types = split(self.curCfg.reward_type,":")
+	end
+
+	if(self.curCfg.reward_num ~= nil)then
+		counts = split(self.curCfg.reward_num,":")
+	end
+
+	for i = 0, self.allAwards.Count - 1 do
+		local index = i
+
+		if(i < #ids)then
+			local curItem = self.allAwards[index]:GetComponent("LuaListItem")
+
+			if(curItem ~= nil)then
+				self.allAwards[index]:SetActive(true)
+				local commonData = CS.CommonRewardData(tonumber(ids[index + 1]),tonumber(counts[index + 1]),0,tonumber(types[index + 1]))
+				curItem:SetData(commonData)
+			else
+				self.allAwards[index]:SetActive(false)
+			end
+		else
+			self.allAwards[index]:SetActive(false)
+		end
+
+	end
+end
+
+function RuinsPrepareUIView:AutoSetHeroPos()
+	local dateTime = csTimeUtils.getDateTimeBySecs(GameTimerInst.serverNow)
+	local heroListStr = CS.SaveManager.inst:GetString(CS_AccountDataProxyInst.account.."RuinsHeroList"..tostring(dateTime.Year)..tostring(dateTime.Month)..tostring(dateTime.Day),true)
+	local startedHeroList = {}
+	if(heroListStr ~= nil and string.len(heroListStr) > 0)then
+		local listStr = split(heroListStr,":")
+		if(listStr ~= nil and #listStr > 0)then
+			startedHeroList = listStr
+		end
+	end
+	for i = 1, #startedHeroList do
+		local index = i
+		local curData = RuinsDataProxy.inst:GetHeroDataByUid(tonumber(startedHeroList[index]))
+		if(curData ~= nil and curData.currentState ~= 3)then
+			startedHeroList[index] = curData
+			curData.isSelect = true
+		else
+			startedHeroList[index] = nil
+		end
+	end
+	self.sumFighitCount = 0
+	for i = 1, #self.allHeroPos do
+		local index = i
+		if(startedHeroList[index] ~= nil)then
+			local heroData = startedHeroList[index]
+			if(heroData ~= nil)then
+				heroData.isSelect = true
+				self.allHeroPos[index]:setData(heroData,self._uiCanvas.sortingLayerName,self._uiCanvas.sortingOrder)
+				self.sumFighitCount = self.sumFighitCount + heroData.fightingNum
+			end
+		else
+			local heroUid = RuinsDataProxy.inst:GetAutoBattleHero(index)
+			if(heroUid ~= -1)then
+				local heroData = RuinsDataProxy.inst:GetHeroDataByUid(heroUid)
+				if(heroData ~= nil)then
+					heroData.isSelect = true
+					self.allHeroPos[index]:setData(heroData,self._uiCanvas.sortingLayerName,self._uiCanvas.sortingOrder)
+					self.sumFighitCount = self.sumFighitCount + heroData.fightingNum
+				end
+			end
+		end
+	end
+
+	for i = 1, #self.allHeroPos do
+		local index = i
+		if(self.allHeroPos[index].data ~= nil)then
+			self.allHeroPos[index]:setFaceState(self.curCfg.recommend_power,self.sumFighitCount,self.curCfg.team_strength)
+		end
+	end
+	
+	self:RefreshShowTalent()
+
+	self.scrollView:refresh()
+end
+
+function RuinsPrepareUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function RuinsPrepareUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RuinsPrepareUIView:closeBtnClick()
+	self:hide()
+end
+------------------------------------------------

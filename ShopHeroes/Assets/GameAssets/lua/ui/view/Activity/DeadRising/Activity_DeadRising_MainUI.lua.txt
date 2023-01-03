@@ -1,0 +1,193 @@
+
+--Activity_DeadRising_MainUI
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_GUIHelper = CS.GUIHelper
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+Activity_DeadRising_MainUI = class(ViewBase)
+
+function Activity_DeadRising_MainUI:ctor()
+	self.viewID = Constants.ViewName.Activity_DeadRising_MainUI
+	Activity_DeadRising_MainUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+	self.topResPanelType = CS.TopPlayerShowType.none
+end
+------------------------------------------------
+
+function Activity_DeadRising_MainUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.icon_boss = contentPane:GetGUIIcon("icon_boss")
+	self.tx_bossName = contentPane:GetText("tx_bossName")
+	self.slider_bossHP = contentPane:GetObjByName("slider_bossHP"):GetComponent("Slider")
+	self.tx_bossHp = contentPane:GetText("tx_bossHp")
+	self.btn_scoreReward = contentPane:GetButton("btn_scoreReward");
+	self.btn_close = contentPane:GetButton("btn_close");
+	self.tx_activityName = contentPane:GetText("tx_activityName");
+	self.tx_countdown = contentPane:GetText("tx_countdown");
+	self.btn_info = contentPane:GetButton("btn_info");
+	self.tx_StageTips1 = contentPane:GetText("tx_StageTips1")
+	self.tx_stage1 = contentPane:GetText("tx_stage1")
+	self.tx_StageTips2 = contentPane:GetText("tx_StageTips2")
+	self.tx_stageCountdown = contentPane:GetText("tx_stageCountdown")
+	self.tx_content = contentPane:GetText("tx_content")
+	self.tx_stage2 = contentPane:GetText("tx_stage2")
+	self.tx_allFight = contentPane:GetText("tx_allFight")
+	self.tx_selfFight = contentPane:GetText("tx_selfFight")
+	self.icon_fight1 = contentPane:GetGUIIcon("icon_fight1")
+	self.icon_fight2 = contentPane:GetGUIIcon("icon_fight2")
+	
+	
+	self.btn_heroTeam = contentPane:GetButton("btn_heroTeam")
+	self.tx_heroTeamNum = contentPane:GetText("tx_heroTeamNum")
+	self.btn_teamEquips = contentPane:GetButton("btn_teamEquips")
+	self.tx_teamEquipsNum = contentPane:GetText("tx_teamEquipsNum")
+
+	self.btn_mortarShop = contentPane:GetButton("btn_mortarShop")
+	self.tx_mortarShopCountdown = contentPane:GetText("tx_mortarShopCountdown")
+	self.tx_mortarName = contentPane:GetText("tx_mortarName")
+
+
+
+end
+
+
+function Activity_DeadRising_MainUI:onInit()
+
+	self:initComp()
+	
+	self.endTimerComp = nil
+	self.stageEndTimerComp = nil
+
+	self.btn_close:ButtonClickTween(
+		function ()
+			self:hide()
+		end
+	)
+
+	self.btn_info:ButtonClickTween(function ()
+			EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_messRankUI,0)
+		end)
+
+	self.btn_scoreReward:ButtonClickTween(function ()
+			EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_ScoreRewardUI)
+		end)
+
+	self.btn_heroTeam:ButtonClickTween(function ()
+			self:onHeroTeamBtnClick()
+		end)
+
+	self.btn_teamEquips:ButtonClickTween(function ()
+			self:onTeamEqiupsBtnClick()
+		end)
+
+	self.btn_mortarShop:ButtonClickTween(function ()
+			EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_MortarShopUI)
+		end)
+
+end
+
+function Activity_DeadRising_MainUI:setTimer()
+	
+	self:clearTimer()
+	
+	self.tx_countdown.text = CS_TimeUtils.timeSpanStrip(Activity_DeadRisingDataProxy.inst.endtime_server - CS_GameTimerInst.serverNow)
+	self.endTimerComp = CS_GameTimerInst:AddLoopTimerComp(self.tx_countdown.gameObject,1,function()
+			self.tx_countdown.text = CS_TimeUtils.timeSpanStrip(Activity_DeadRisingDataProxy.inst.endtime_server - CS_GameTimerInst.serverNow)
+		end)
+	
+	self.tx_stageCountdown.text = CS_TimeUtils.timeSpanStrip(Activity_DeadRisingDataProxy.inst.stageEndTime_server - CS_GameTimerInst.serverNow)
+	self.stageEndTimerComp = CS_GameTimerInst:AddLoopTimerComp(self.tx_stageCountdown.gameObject,1,function()
+			self.tx_stageCountdown.text = CS_TimeUtils.timeSpanStrip(Activity_DeadRisingDataProxy.inst.stageEndTime_server - CS_GameTimerInst.serverNow)
+		end)
+	
+	
+end
+
+function Activity_DeadRising_MainUI:clearTimer()
+	
+	if self.endTimerComp ~= nil then
+		
+		CS_GameTimerInst:removeLoopTimer(self.endTimerComp)
+		self.endTimerComp = nil
+		
+	end
+	
+	if self.stageEndTimerComp ~= nil then
+
+		CS_GameTimerInst:removeLoopTimer(self.stageEndTimerComp)
+		self.stageEndTimerComp = nil
+
+	end
+	
+end
+
+
+function Activity_DeadRising_MainUI:onShowed()
+
+	self:setTimer()
+	
+	--self.tx_activityName.text = CS_LanguageManagerInst:GetValueByKey()
+	local stageState = Activity_DeadRisingDataProxy.inst.stageState
+	self.tx_StageTips1.text = stageState == 0 and CS_LanguageManagerInst:GetValueByKey("准备阶段") or CS_LanguageManagerInst:GetValueByKey("防御阶段")
+	self.tx_StageTips2.text = stageState == 0 and CS_LanguageManagerInst:GetValueByKey("准备倒计时：") or CS_LanguageManagerInst:GetValueByKey("防御倒计时：")
+	
+	self.tx_stage1.text = CS_LanguageManagerInst:GetValueByKey("第 {0}/{1} 轮", tostring(Activity_DeadRisingDataProxy.inst.curStage), tostring(Activity_DeadRisingDataProxy.inst.stageLimit))
+	self.tx_stage2.text = CS_LanguageManagerInst:GetValueByKey("第 {0}/{1} 轮", tostring(Activity_DeadRisingDataProxy.inst.curStage), tostring(Activity_DeadRisingDataProxy.inst.stageLimit))
+	
+	self.icon_fight1:SetSprite("","")
+	self.icon_fight2:SetSprite("","")
+	
+	self.tx_allFight.text = CS.System.String.Format("{0:N0}", Activity_DeadRisingDataProxy.inst.fight_union)
+	self.tx_selfFight.text = CS_LanguageManagerInst:GetValueByKey("你贡献了") .. "<color=#FFFFFF>".. tostring(Activity_DeadRisingDataProxy.inst.fight_self) .."</color>"
+	
+	self:RefeshHeroTeamNumTx()
+	self:RefreshTeamEquipsNumTx()
+	
+end
+
+function Activity_DeadRising_MainUI:RefeshHeroTeamNumTx()
+	
+	self.tx_heroTeamNum.text = tostring(#Activity_DeadRisingDataProxy.inst.heroFightDatas) .. "/" .. tostring(Activity_DeadRisingDataProxy.inst.heroTeamLimit)
+	self.tx_heroTeamNum.color = #Activity_DeadRisingDataProxy.inst.heroFightDatas >= Activity_DeadRisingDataProxy.inst.heroTeamLimit and CS_GUIHelper.GetColorByColorHex("#7deb60") or CS_GUIHelper.GetColorByColorHex("#ffffff")
+	
+end
+
+function Activity_DeadRising_MainUI:RefreshTeamEquipsNumTx()
+	
+	self.tx_teamEquipsNum.text = tostring(Activity_DeadRisingDataProxy.inst.teamEquipsNum) .. "/" .. tostring(Activity_DeadRisingDataProxy.inst.equipTeamLimit)
+	self.tx_teamEquipsNum.color = Activity_DeadRisingDataProxy.inst.teamEquipsNum >= Activity_DeadRisingDataProxy.inst.equipTeamLimit and CS_GUIHelper.GetColorByColorHex("#7deb60") or CS_GUIHelper.GetColorByColorHex("#ffffff")
+	
+end
+
+
+function Activity_DeadRising_MainUI:onHide()
+
+	self:clearTimer()
+	
+end
+
+function Activity_DeadRising_MainUI:onHeroTeamBtnClick()
+
+	EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_HeroTeamUI)
+
+end
+
+function Activity_DeadRising_MainUI:onTeamEqiupsBtnClick()
+
+	EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_TeamEquipsUI)
+
+end
+
+

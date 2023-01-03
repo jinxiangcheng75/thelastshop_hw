@@ -1,0 +1,490 @@
+
+--DirectPurchaseProxy
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_ItemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_WorkerConfigManagerInst = CS.WorkerConfigManager.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_ItemType = CS.ItemType
+local CS_TimeUtils = CS.TimeUtils
+
+
+DirectPurchaseProxy = class(BaseDataProxy)
+
+DirectPurchaseProxy.inst = DirectPurchaseProxy:new()
+
+
+function DirectPurchaseProxy:Init()
+
+	self.DirectPurchaseList = {}
+	self.isFirst = true
+
+	NetworkEvent:SetCallback(MsgTypeCmd.Response_Pay_DirectPurchase_Cmd,
+		function (resp)
+			print("Response_Pay_DirectPurchase success",resp)
+			self:GetDirectPurchaseData(resp)
+		end,
+		function (code)
+			print("Response_Pay_DirectPurchase fail --- code",code)
+			CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_MSGBOX,"获取直购礼包列表数据失败!")
+		end
+	)
+
+end
+
+--根据uid获取礼包信息
+function DirectPurchaseProxy:GetDirectPurchaseDataByUid(uid)
+
+	local data = nil
+
+	for i = 1, #self.DirectPurchaseList do
+
+		local directPurchaseData = self.DirectPurchaseList[i]
+
+		if directPurchaseData.data.uid == uid then
+			data = directPurchaseData
+			break
+		end
+
+	end
+
+	return data
+
+end
+
+--根据id获取礼包信息
+function DirectPurchaseProxy:GetDirectPurchaseDataById(id)
+
+	local data = nil
+
+	for i = 1, #self.DirectPurchaseList do
+
+		local directPurchaseData = self.DirectPurchaseList[i]
+
+		if directPurchaseData.data.id == id then
+			data = directPurchaseData
+			break
+		end
+
+	end
+
+	return data
+
+end
+
+function DirectPurchaseProxy:GetGiftsList(packMallTab) --1 每日特惠（特惠在MallDataProxy.inst.dailySaleList.saleList） 2 限时礼包 3 传奇礼包 4 等级礼包
+
+	local list = {}
+
+	for i = 1, #self.DirectPurchaseList do
+
+		local directPurchaseData = self.DirectPurchaseList[i]
+
+		if directPurchaseData.data.packMallTab == packMallTab and directPurchaseData.data.mallOn == 1 then --并且在商城展示
+
+			list[#list + 1] = directPurchaseData
+
+		end
+
+	end
+
+	return list
+
+end
+
+
+--获取主界面直接展示的礼包列表
+function DirectPurchaseProxy:GetMainShowList()
+
+	local list = {}
+
+	for i = 1, #self.DirectPurchaseList do
+
+		local directPurchaseData = self.DirectPurchaseList[i]
+
+		if directPurchaseData.data.quickOn == 1 then
+
+			--local storyNpcCfg =  StoryNpcConfigManager:GetConfig(2,directPurchaseData.data.id)
+			--local isShow = storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"-1") == "-1"
+			--isShow = not isShow
+
+			--if isShow then
+				list[#list + 1] = directPurchaseData
+			--end
+
+			if #list == 2 then
+				break
+			end
+
+		end
+
+	end
+
+	return list
+
+end
+
+--获取商城界面展示的礼包列表
+function DirectPurchaseProxy:GetMallShowList()
+
+	local list = {}
+
+	for i = 1, #self.DirectPurchaseList do
+
+		local directPurchaseData = self.DirectPurchaseList[i]
+
+		if directPurchaseData.data.mallOn == 1 then
+			list[#list + 1] = directPurchaseData
+		end
+
+	end
+
+	return list
+
+end
+
+function DirectPurchaseProxy:GetDirectPurchaseData(respData)
+
+	local lastGiftUids = {}
+	local curGiftUids = {}
+
+	--先清空先有的timer 和缓存
+	for i = 1, #self.DirectPurchaseList do
+		self.DirectPurchaseList[i]:Clear()
+		lastGiftUids[i] = self.DirectPurchaseList[i].data.uid
+	end
+	self.DirectPurchaseList = {}
+
+
+	local data = MsgType.Response_Pay_DirectPurchase:New(respData)
+
+	for i = 1, #data.directPurchaseList.purchaseList do
+		local item = DirectPurchaseData:new()
+		item:SetData(data.directPurchaseList.purchaseList[i])
+		self.DirectPurchaseList[#self.DirectPurchaseList + 1] = item
+		curGiftUids[i] = item.data.uid
+	end
+
+	--根据优先级排序
+
+	if #self.DirectPurchaseList > 1 then
+
+		table.sort(self.DirectPurchaseList,function (a,b)
+
+				if a == nil or b == nil or a.data == nil or b.data == nil then
+					return false
+				end
+
+				if a.data.priority < b.data.priority then
+					return true
+				elseif a.data.priority == b.data.priority then
+					return false
+				else
+					return false
+				end
+			end)
+
+	end
+
+
+	EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.onDirectPurchaseDataChged)
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.MenuEvent.REFRESHMAINUIPAYGIFTBTNS)
+
+	--解锁推出礼包弹窗
+	if not self.isFirst then
+		self:unlockPushDetails(lastGiftUids,curGiftUids)
+	end
+
+	self.isFirst = false;
+
+end
+
+
+function DirectPurchaseProxy:unlockPushDetails(lastGiftUids,curGiftUids)
+
+	--如果不在主界面 不弹
+	local mainUI = GUIManager.inst:GetWindowCs(typeof(CS.MenuUIView))
+	if 	mainUI == nil or mainUI.isShowing == false then
+		return
+	end
+
+
+	local filter = {}
+
+	for i = 1, #curGiftUids do
+
+		local uid = curGiftUids[i]
+		local contains = false
+
+		for k = 1, #lastGiftUids do
+
+			if lastGiftUids[k] == uid then
+				contains = true
+				break
+			end
+
+		end
+
+		if (not contains) then
+			filter[#filter + 1] = uid
+		end
+
+	end
+
+	local dateTime = CS_TimeUtils.getDateTimeBySecs(CS_GameTimerInst.serverNow)
+
+	for i = 1, #filter do
+
+		local uid = filter[i]
+
+		local data = self:GetDirectPurchaseDataByUid(uid)
+
+		local isPushShow = false
+
+		for i = 1, #data.data.pushType do
+
+			if data.data.pushType[i] == 1 and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account .."_Directpurchase_" .. tostring(dateTime.Year) .. tostring(dateTime.Month) .. tostring(dateTime.Day) .."_"..data.data.uid,"-1") == "-1" then --解锁即弹出详细界面
+				isPushShow = true
+				break
+			end
+
+		end
+
+		if isPushShow then
+			--data.popShow = true
+			data.detailShowType = 1
+
+			local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(350)
+			local showToggleLevel = 12
+			if worldParCfg ~= nil then
+				showToggleLevel = tonumber(worldParCfg.parameters)
+			end
+
+			local storyNpcCfg =  StoryNpcConfigManager:GetConfig(2,data.data.id)
+
+			if storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"-1") == "-1" then
+
+				EventDispatcher:dispatchEvent(GameEvent.EventSystem.AddEvent,GameEvent.StoryRoleEvent.AddStoryRole,{storyType = 2,parame = data.data.id,callback = function()
+							CS_PlayerPrefs.SetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"1")
+							EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,uid,CS_UserDataProxyInst.playerData.level >= showToggleLevel)
+							CS_EventControllerInst:TriggerEvent(CS_GameEventType.MenuEvent.REFRESHMAINUIPAYGIFTBTNS)
+							CS.GoOperationManager.inst.isDoing = false
+							CS.FGUI.inst:SetAllUIInteractable(true)
+							CS.FGUI.inst:SetAllUIAlpha(1)
+							EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+							EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+						end},ExecuteType.queueup,kGameState.Shop)
+
+			else
+				data.detailShowType = 1
+				EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,uid,CS_UserDataProxyInst.playerData.level >= showToggleLevel)
+			end
+
+		end
+
+	end
+
+end
+
+
+function DirectPurchaseProxy:Clear()
+
+end
+
+
+
+----------------------------------------------------------------------------------------------------
+
+DirectPurchaseData = class()
+
+--[[
+id
+quickOn
+mallOn
+remainTime
+name
+tag
+title
+slogan
+atlasIcon
+icon1
+icon2
+icon3
+icon4
+icon4Atlas
+pic1
+pic2
+pic3 --背景
+pic4 --边框
+pic5 --光晕
+pic6 --特效
+roleImgAtlas
+roleImgIcon
+value
+itemList
+buyCount
+buyCountLimit
+payProduct
+pushType
+priority
+uid
+pushParam
+packMallTab  --1 每日特惠 2 限时礼包 3 传奇礼包 4 等级礼包
+--]]
+function DirectPurchaseData:SetData(itemData)
+	self.data = itemData
+	self.timerId = 0
+	self.needCountdown = self.data.remainTime > 0
+	self.btnIconAtlas = ""
+	self.btnIcon = ""
+	self.accessories = {}
+	--self.popShow = false --登录时弹出判定 pushtype包含2的
+	self.endTime = CS_GameTimerInst.serverNow + self.data.remainTime
+	self.detailShowType = 0 -- 0 none 1 self 2 today
+
+	self:GetBtnIconAndAtlas()
+	self:GetAccessories()
+
+	if self.needCountdown then
+		self:SetTimer()
+	end
+
+end
+
+function DirectPurchaseData:GetBtnIconAndAtlas()
+
+
+
+	if self.data.icon4 ~= "-1" then
+
+		self.btnIconAtlas = self.data.icon4Atlas
+		self.btnIcon = self.data.icon4
+		return
+
+	end
+
+
+	if 	#self.data.itemList >= 1 then
+
+		local accessory = self.data.itemList[1]
+
+		local itemCfg = CS_ItemConfigManagerInst:GetConfig(accessory.itemId)
+
+		if (itemCfg == nil) then
+
+			local qualityCfg = CS_EquipConfigManagerInst:GetEquipDrawingsCfgByEquipId(accessory.itemId)
+			self.btnIconAtlas = qualityCfg.atlas
+			self.btnIcon = qualityCfg.icon
+
+		else
+
+			if (CS_ItemType.__CastFrom(itemCfg.type) == CS_ItemType.EquipmentDrawing) then
+
+				local equipCfg = CS_EquipConfigManagerInst:GetEquipDrawingsCfg(itemCfg.effect)
+				self.btnIconAtlas = equipCfg.atlas
+				self.btnIcon = equipCfg.icon
+
+			elseif(CS_ItemType.__CastFrom(itemCfg.type) == CS_ItemType.Equip)then
+				local eqcfg = CS_EquipConfigManagerInst:GetEquipQualityConfig(itemCfg.effect)
+				self.btnIconAtlas = eqcfg.equipDrawingsConfig.atlas
+				self.btnIcon = eqcfg.equipDrawingsConfig.icon
+			else
+				self.btnIconAtlas = itemCfg.atlas
+				self.btnIcon = itemCfg.icon
+			end
+		end
+
+	end
+
+end
+
+function DirectPurchaseData:GetAccessories()
+
+
+	if 	#self.data.itemList >= 1 then
+
+		local data = self.data.itemList[1]
+
+		if data.itemType == 14 then --工匠
+
+			local itemCfg = CS_ItemConfigManagerInst:GetConfig(data.itemId)
+			local workerCfg = CS_WorkerConfigManagerInst:GetConfig(itemCfg.effect)
+
+			for i = 0, workerCfg.equipment_id.Length - 1 do
+
+				local item = MsgType.OneRewardItem:New()
+				item.itemType = 1600
+				item.itemId = workerCfg.equipment_id[i] --equipDrawingId
+				item.count = 1
+
+				self.accessories[#self.accessories + 1] = item
+
+			end
+
+			for i = 1 + 1, #self.data.itemList do
+				self.accessories[#self.accessories + 1] = self.data.itemList[i]
+			end
+
+		else
+
+			for i = 1, #self.data.itemList do
+				self.accessories[#self.accessories + 1] = self.data.itemList[i]
+			end
+
+		end
+
+	end
+
+end
+
+function DirectPurchaseData:ClearTimer()
+
+	if self.timerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+
+end
+
+function DirectPurchaseData:SetTimer()
+
+	self:ClearTimer()
+
+	self.data.remainTime = self.endTime - CS_GameTimerInst.serverNow
+	self.timerId = CS_GameTimerInst:AddTimer(self.data.remainTime,1,function()
+			self:timerMethod()
+		end,CS.GameTimerType.byServerTime)
+
+end
+
+function DirectPurchaseData:timerMethod()
+
+	self.data.remainTime = self.endTime - CS_GameTimerInst.serverNow
+	if self.data.remainTime > 0 then
+		self.timerId = CS_GameTimerInst:AddTimer(self.data.remainTime,1,function()
+				self:timerMethod()
+			end,CS.GameTimerType.byServerTime)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.Request_Pay_DirectPurchase)
+	end
+
+end
+
+
+function DirectPurchaseData:Clear()
+
+	self:ClearTimer()
+
+end

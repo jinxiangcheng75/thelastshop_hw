@@ -1,0 +1,447 @@
+--MallDataProxy
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGameTimerInst = CS.GameTimer.inst
+
+local vipTimerId
+local refreshTimerId
+local dealTimerId
+
+local realRemainTime = 0
+local realStoreRemainTime = 0
+
+MallDataProxy = class(BaseDataProxy)
+
+MallDataProxy.LvGrowthRewardData = {flag = "", rewardList = {}, orderID = "", payActivityId = 0}
+
+MallDataProxy.inst = MallDataProxy:new()
+
+function MallDataProxy:Init()
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Pay_StoreList_Cmd,
+		function(resp)
+			print("Response_Pay_StoreList success", resp)
+			self:GetMallData(resp)
+		end,
+		function(code)
+			print("Response_Pay_StoreList fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取商城数据失败!")
+		end
+	)
+
+	--NetworkEvent:SetCallback(
+		--MsgTypeCmd.Response_Pay_GemStoreList_Cmd,
+		--function(resp)
+			--print("Response_Pay_GemStoreList success", resp)
+			--self:GetGemStoreData(resp)
+		--end,
+		--function(code)
+			--print("Response_Pay_GemStoreList fail --- code", code)
+			----csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取商城数据失败!")
+		--end
+	--)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Pay_StoreRefresh_Cmd,
+		function(resp)
+			print("Response_Pay_StoreRefresh success", resp)
+			self:GetRefreshData(resp)
+		end,
+		function(code)
+			print("Response_Pay_StoreRefresh fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取商城刷新数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Pay_StoreBuy_Cmd,
+		function(resp)
+			print("Response_Pay_StoreBuy success", resp)
+			self:GetStoreBuyData(resp)
+		end,
+		function(code)
+			print("Response_Pay_StoreBuy fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取购买商城商品数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Pay_BuyVIP_Cmd,
+		function(resp)
+			print("Response_Pay_BuyVIP success", resp)
+			self:GetVipBuyData(resp)
+		end,
+		function(code)
+			print("Response_Pay_BuyVIP fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取购买特权数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Pay_GeneralPurchase_Cmd,
+		function(resp)
+			print("Response_Pay_GeneralPurchase success", resp)
+			self:GetGeneralPurchaseData(resp)
+		end,
+		function(code)
+			print("Response_Pay_GeneralPurchase fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取直充数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Pay_DailySale_Cmd,
+		function(resp)
+			print("Response_Pay_DailySale success", resp)
+			self:GetDailySaleData(resp)
+		end,
+		function(code)
+			print("Response_Pay_DailySale fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取特惠礼包数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Pay_VIPChange_Cmd,
+		function(resp)
+			print("Response_Pay_VIPChange success", resp)
+			self:GetVipChangeData(resp)
+		end,
+		function(code)
+			print("Response_Pay_VIPChange fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取vip过期数据失败!")
+		end
+	)
+
+	--等级成长数据
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Pay_ShopperLevelPurchase_Cmd,
+		function(resp)
+			print("Response_Pay_ShopperLevelPurchase_Cmd success", resp)
+			self:OnResponseShopperLevelPurchase(resp)
+		end,
+		function(code)
+			print("Response_Pay_ShopperLevelPurchase_Cmd fail --- code", code)
+			--CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_MSGBOX, CS_LanguageManagerInst:GetValueByKey("巧匠大赛数据获取失败"))
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_User_ShopperLevelPurchaseReward_Cmd,
+		function(resp)
+			print("Response_User_ShopperLevelPurchaseReward_Cmd success", resp)
+			self:OnResponseUserShopperLevelPurchaseReward(resp)
+		end,
+		function(code)
+			print("Response_User_ShopperLevelPurchaseReward_Cmd fail --- code", code)
+			--CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_MSGBOX, CS_LanguageManagerInst:GetValueByKey("巧匠大赛数据获取失败"))
+		end
+	)
+	------------------------------------------------------------------------------------------------------------------------------------------------------
+end
+
+function MallDataProxy:GetVipChangeData(respData)
+	local data = MsgType.Response_Pay_VIPChange:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+	self:SetVipData(data.vipPayInfoMonth, data.vipInfo, data.vipPayInfoYear)
+	self.needShowOverdueUI = false
+	local battleUI = GUIManager.inst:GetWindowByViewIdCs(CS.ViewPrefabName.CombatUI)
+	if (battleUI ~= nil and battleUI.isShowing) then
+		self.needShowOverdueUI = true
+	end
+	local exploreEndUI = GUIManager.inst:GetWindowByViewIdCs(CS.ViewPrefabName.ExploreCompleteUI)
+	if (exploreEndUI ~= nil and exploreEndUI.isShowing) then
+		self.needShowOverdueUI = true
+	end
+	if (GUIManager.inst:CurrWindowViewID() == CS.ViewPrefabName.GameLoginUI) then
+		self.needShowOverdueUI = true
+	end
+
+	if (not self.needShowOverdueUI) then
+		EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_BuyVipUI, 2)
+	end
+	--EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_VipOverDueUI)
+
+	self:RefreshVipPanel()
+end
+
+function MallDataProxy:GetDailySaleData(respData)
+	local data = MsgType.Response_Pay_DailySale:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+	self.dailySaleList = data.dailySaleList
+	self.dailySaleRemainTime = data.dailySaleList.remainTime
+	self.dailySaleEndTime = csGameTimerInst.serverNow + self.dailySaleRemainTime
+
+	if (dealTimerId ~= nil) then
+		csGameTimerInst:RemoveTimer(dealTimerId)
+		dealTimerId = nil
+	end
+
+	if (self.dailySaleRemainTime > 0) then
+		dealTimerId =
+		csGameTimerInst:AddTimer(
+			1,
+			self.dailySaleRemainTime,
+			function()
+				self.dailySaleRemainTime = self.dailySaleEndTime - csGameTimerInst.serverNow
+				if (self.dailySaleRemainTime > 0) then
+					self.dailySaleRemainTime = self.dailySaleRemainTime - 1
+				else
+					csGameTimerInst:RemoveTimer(dealTimerId)
+					dealTimerId = nil
+					--EventDispatcher:dispatchEvent(GameEvent.MallEvent.REQUEST_DailySale)
+				end
+			end
+		)
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.daily)
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.HideUI_DealInfoUI)
+end
+
+function MallDataProxy:GetGeneralPurchaseData(respData)
+	local data = MsgType.Response_Pay_GeneralPurchase:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+	
+	self.generalPurchaseList = data.generalPurchaseList
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.store)
+	
+end
+
+function MallDataProxy:GetVipBuyData(respData)
+	local data = MsgType.Response_Pay_BuyVIP:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+	self:SetVipData(data.vipPayInfoMonth, data.vipInfo, data.vipPayInfoYear)
+
+	if (data.vipInfo.state == 1) then
+		--EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_VipGetRewardUI,data.vipInfo.level)
+		local valData = CS.Award_AboutVal()
+		valData.type = CS.ReceiveInfoUIType.VipBuyComplete
+		valData.val = data.vipInfo.level
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.Award_AboutVal)
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, valData)
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.HideUI_MallBuyVipUI)
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.store)
+
+	self:RefreshVipPanel()
+end
+
+function MallDataProxy:RefreshVipPanel()
+	csEventControllerInst:TriggerEvent(csGameEventType.ExploreEvent.RESPONSE_BUYVIPCOMPLETE)
+	csEventControllerInst:TriggerEvent(csGameEventType.BagEvent.BAG_DATA_UPDATE)
+	csEventControllerInst:TriggerEvent(csGameEventType.REFRESH_SELFROLEINFO)
+	csEventControllerInst:TriggerEvent(csGameEventType.RoleEvent.REFRESHUI_EQUIPDAMAGEDINFO)
+	EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.RefreshUI_RefugePanelUI)
+end
+
+function MallDataProxy:GetStoreBuyData(respData)
+	local data = MsgType.Response_Pay_StoreBuy:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.blackMarketList = data.storeItemList
+
+	local cfg = CS.ItemconfigManager.inst:GetConfig(data.reward.itemId)
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.queueItem)
+	if (cfg ~= nil) then
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", 0, data.reward.itemId, data.reward.count)
+
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	else
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", data.reward.itemId, 0, data.reward.count)
+
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.HideUI_BlackMarketUI)
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.blackmarket)
+end
+
+function MallDataProxy:GetRefreshData(respData)
+	local data = MsgType.Response_Pay_StoreRefresh:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.blackMarketList = data.storeItemList
+	self.refreshTime = data.refreshTime
+	self.refreshCost = data.refreshCost
+	self.freeRefresh = data.freeRefresh
+	self:calculateRefreshTime()
+
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.blackmarket)
+end
+
+--function MallDataProxy:GetGemStoreData(respData)
+	--local data = MsgType.Response_Pay_GemStoreList:New(respData)
+	--if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		--return
+	--end
+
+	--self.blackMarketList = data.storeItemList
+	--self.refreshTime = data.refreshTime
+	--self.refreshCost = data.refreshCost
+	--self:calculateRefreshTime()
+
+	--EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.blackmarket)
+--end
+
+function MallDataProxy:GetMallData(respData)
+	local data = MsgType.Response_Pay_StoreList:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+	self:SetVipData(data.vipPayInfoMonth, data.vipInfo, data.vipPayInfoYear)
+	
+	self.blackMarketList = data.storeItemList
+	self.refreshTime = data.refreshTime
+	self.refreshCost = data.refreshCost
+	self.freeRefresh = data.freeRefresh
+	self:calculateRefreshTime()
+
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.store)
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.blackmarket)
+end
+
+function MallDataProxy:GetBlackMarketDataByIndex(index)
+	for i, v in ipairs(self.blackMarketList) do
+		if(v ~= nil and v.index == index)then
+			return v
+		end
+	end
+	
+	return nil
+end
+
+function MallDataProxy:SetVipData(vipPayData, vipData, vipYearData)
+	self.vipData = vipData
+	self.vipPayData = vipPayData
+	self.vipYearData = vipYearData
+
+	CS.UserDataProxy.inst.playerData.vipLevel = self.vipData.level
+	CS.UserDataProxy.inst.playerData.vipState = self.vipData.state
+
+	if (vipTimerId ~= nil) then
+		csGameTimerInst:RemoveTimer(vipTimerId)
+		vipTimerId = nil
+	end
+
+	if (self.vipData.state == 1 and self.vipData.remainTime > 0) then
+		realRemainTime = csGameTimerInst.serverNow + self.vipData.remainTime
+		vipTimerId =
+		csGameTimerInst:AddTimer(
+			1,
+			function()
+				if (self.vipData.remainTime > 0) then
+					self.vipData.remainTime = realRemainTime - csGameTimerInst.serverNow
+				else
+					EventDispatcher:dispatchEvent(GameEvent.MallEvent.REQUEST_MALLLIST)
+					csGameTimerInst:RemoveTimer(vipTimerId)
+					vipTimerId = nil
+				end
+			end
+		)
+	end
+end
+
+function MallDataProxy:calculateRefreshTime()
+	if (refreshTimerId ~= nil) then
+		csGameTimerInst:RemoveTimer(refreshTimerId)
+		refreshTimerId = nil
+	end
+
+	if (self.refreshTime > 0) then
+		realStoreRemainTime = csGameTimerInst.serverNow + self.refreshTime
+		refreshTimerId =
+		csGameTimerInst:AddTimer(
+			1,
+			function()
+				if (self.refreshTime > 0) then
+					self.refreshTime = realStoreRemainTime - csGameTimerInst.serverNow
+				else
+					EventDispatcher:dispatchEvent(GameEvent.MallEvent.REQUEST_MALLLIST)
+					csGameTimerInst:RemoveTimer(refreshTimerId)
+					refreshTimerId = nil
+				end
+			end
+		)
+	end
+end
+
+function MallDataProxy:Clear()
+end
+
+function MallDataProxy:GetGoodsByIndex(needIndex)
+	for i = 1, #self.goodsList do
+		if (self.goodsList[i].index == needIndex) then
+			return self.goodsList[i]
+		end
+	end
+end
+--获得等级成长奖励数据
+function MallDataProxy:OnResponseShopperLevelPurchase(respData)
+	local data = MsgType.Response_Pay_ShopperLevelPurchase:New(respData)
+	self.LvGrowthRewardData.flag = data.flag
+	self.LvGrowthRewardData.rewardList = data.rewardList
+	self.LvGrowthRewardData.orderID = (CS.PlatformType.__CastFrom(CS.PlatformManager.inst:GetPlatformType()) ==  CS.PlatformType.IOS or CS.PlatformType.__CastFrom(CS.PlatformManager.inst:GetPlatformType()) ==  CS.PlatformType.qkgameios) and data.iosOrderInfo or data.googleOrderInfo
+	
+	self.LvGrowthRewardData.payActivityId = data.payActivityId
+	EventDispatcher:dispatchEvent(GameEvent.WelfareEvent.RefreshUI_WelfareContent,WelfareContentType.levelGrowth)
+	csEventControllerInst:TriggerEvent(csGameEventType.AcheivementEvent.ACHEIVEMENTSETDATA)
+end
+
+function MallDataProxy:OnResponseUserShopperLevelPurchaseReward(respData)
+	local data = MsgType.Response_User_ShopperLevelPurchaseReward:New(respData)
+	if (data.errorCode == nil or data.errorCode ~= 0) then
+		return
+	end
+	self.LvGrowthRewardData.rewardList = data.rewardList
+
+	EventDispatcher:dispatchEvent(GameEvent.WelfareEvent.RefreshUI_WelfareContent,WelfareContentType.levelGrowth)
+
+	--获得奖励界面
+	local tempList = {}
+	for i = 1, #data.rewardItemList do
+		local tempCommonRewardData =
+		CS.CommonRewardData(data.rewardItemList[i].itemId, data.rewardItemList[i].count, 0, data.rewardItemList[i].itemType)
+		tempList[i] = tempCommonRewardData
+	end
+	local awardItem = CS.Award_AboutCommon()
+	awardItem.type = CS.ReceiveInfoUIType.CommonReward
+	awardItem.allRewardList = tempList
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.Award_AboutCommon)
+	func(CS.EventController.inst, csGameEventType.ReceiveEvent.NEWITEM_MSG, awardItem)
+end
+function MallDataProxy:GetLVGrowthData()
+	return self.LvGrowthRewardData
+end
+
+function MallDataProxy:GetFirstGrowthReward()
+	for i = 1, #self.LvGrowthRewardData.rewardList do
+		if self.LvGrowthRewardData.rewardList[i].state == 2 then
+			return i
+		end
+	end
+	return 0
+end

@@ -1,0 +1,298 @@
+--FurnitureUpgradeFinishPanel
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local CS_GameTimerInst = CS.GameTimer.inst
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+FurnitureUpgradeFinishPanel = class(ViewBase)
+
+function FurnitureUpgradeFinishPanel:ctor()
+	self.viewID = Constants.ViewName.FurnitureUpgradeFinishPanel
+	FurnitureUpgradeFinishPanel.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+	--self.topResPanelType = CS.TopPlayerShowType.noSettingAndEnergy
+end
+
+function FurnitureUpgradeFinishPanel:initComp()
+	local contentPane = self.contentPanel
+
+	self.confirmBtn = contentPane:GetButton("confirmBtn")
+	self.nextLevelImg = contentPane:GetGUIIcon("nextLevelImg")
+	self.finishUpgradeText = contentPane:GetText("finishUpgradeText")
+	self.itemContent = contentPane:GetObjByName("itemContent")
+
+	self.itemsArray = {}
+	local itemsArrayObjs =  contentPane:GetObjByName("itemsArray"):GetComponent(CS_type_ObjList).objList
+	for i = 0, itemsArrayObjs.Count - 1 do
+		self.itemsArray[#self.itemsArray + 1] = itemsArrayObjs[i]
+	end
+
+	self.itemComps = {}
+	local itemCompsObjs =  contentPane:GetObjByName("itemComps"):GetComponent(CS_type_ObjList).objList
+	for i = 0, itemCompsObjs.Count - 1 do
+		self.itemComps[#self.itemComps + 1] = itemCompsObjs[i]:GetComponent(typeof(CS.UpgradeFinishItemComp))
+	end
+
+
+end
+
+function FurnitureUpgradeFinishPanel:onInit()
+
+	self:initComp()
+
+	self.data = nil
+	self.oldConfig = nil
+	self.itemInfoList = get_csharp_list(CS.ItemInfo)
+
+	self.confirmBtn.onClick:AddListener(function ()
+			CS.AudioManager.inst:PlaySound(62);
+			self:hide()
+		end)
+
+end
+
+function FurnitureUpgradeFinishPanel:SetData(_data)
+
+	self.data = _data
+	self.itemInfoList:Clear();
+	
+	for i = 1, #self.itemsArray do
+		self.itemsArray[i].gameObject:SetActive(false);
+	end
+	
+	self.nextLevelImg:SetSpriteURL(self.data.config.icon_big);
+	self.finishUpgradeText.text = CS_LanguageManagerInst:GetValueByKey("{0}升级到了等级{1}！", CS_LanguageManagerInst:GetValueByKey(string.sub(self.data.config.name,2 * 3 + 1)), tostring(self.data.level));
+
+	if CS.kTileGroupType.__CastFrom(self.data.config.type_1) == CS.kTileGroupType.Counter then
+		self:ShowCounterUpgradeDatas()
+	elseif CS.kTileGroupType.__CastFrom(self.data.config.type_1) == CS.kTileGroupType.ResourceBin then
+		self:ShowResourceUpgradeDatas();
+	elseif CS.kTileGroupType.__CastFrom(self.data.config.type_1) == CS.kTileGroupType.Shelf then
+		self:ShowShelfUpgradeDatas();
+	elseif CS.kTileGroupType.__CastFrom(self.data.config.type_1) == CS.kTileGroupType.Trunk then
+		self:ShowStorageUpgradeDatas()
+	end
+
+
+	if self.oldConfig ~= nil then
+
+		if (self.oldConfig.width * self.oldConfig.height < self.data.config.width * self.data.config.height) then
+
+			local itemInfo = CS.ItemInfo()
+			itemInfo.isShow = true
+			itemInfo.itemName = "大小"
+			itemInfo.atlas = CS.StaticConstants.funitureItemAtlasName
+			itemInfo.icon = CS.StaticConstants.funitureItemIcons[15]
+			itemInfo.oldValue = tostring(self.oldConfig.height).."x"..tostring(self.oldConfig.width)
+			itemInfo.newValue = tostring(self.data.config.height).."x"..tostring(self.data.config.width)
+
+			self.itemInfoList:Add(itemInfo)
+
+		end
+
+	end
+
+	for i = 0, self.itemInfoList.Count - 1 do
+
+		if i + 1 <= #self.itemComps then
+			
+			self.itemComps[i + 1].gameObject:SetActive(true);
+
+			self.itemComps[i + 1].itemIconImg:SetSprite(self.itemInfoList[i].atlas, self.itemInfoList[i].icon);
+
+			self.itemComps[i + 1].itemName.text = CS_LanguageManagerInst:GetValueByKey(self.itemInfoList[i].itemName);
+			self.itemComps[i + 1].oldValue.text = self.itemInfoList[i].oldValue;
+			self.itemComps[i + 1].newValue.text = self.itemInfoList[i].newValue;
+			
+		end
+
+	end
+
+end
+
+
+function FurnitureUpgradeFinishPanel:ShowCounterUpgradeDatas()
+
+	local lastCounterConfig = CS.FurnitureUpgradeConfigManager.inst:GetCounterUpgradeConfig(self.data.level - 1);
+	if (lastCounterConfig == nil) then
+		return
+	end
+	local nextCounterConfig = CS.FurnitureUpgradeConfigManager.inst:GetCounterUpgradeConfig(self.data.level);
+
+	if (lastCounterConfig.energy < nextCounterConfig.energy) then
+
+		local itemInfo = CS.ItemInfo()
+		itemInfo.isShow = true
+		itemInfo.itemName = "售卖获得的能量"
+		itemInfo.atlas = CS.StaticConstants.funitureItemAtlasName
+		itemInfo.icon = CS.StaticConstants.funitureItemIcons[1]
+		itemInfo.oldValue = tostring(lastCounterConfig.energy)
+		itemInfo.newValue = tostring(nextCounterConfig.energy)
+
+		self.itemInfoList:Add(itemInfo)
+
+	end
+
+	self.oldConfig = CS.FurnitureConfigManager.inst:getConfig(lastCounterConfig.furniture_id);
+
+end
+
+function FurnitureUpgradeFinishPanel:ShowResourceUpgradeDatas()
+
+	local lastResBinConfig = CS.FurnitureUpgradeConfigManager.inst:GetResourceBinUpgradeConfig(self.data.config.type_2, self.data.level - 1);
+	if (lastResBinConfig == nil) then
+		return
+	end
+	local nextResBinConfig = CS.FurnitureUpgradeConfigManager.inst:GetResourceBinUpgradeConfig(self.data.config.type_2, self.data.level);
+
+	--资源容量
+	if (lastResBinConfig.store < nextResBinConfig.store) then
+
+		local cfg = CS.FurnitureConfigManager.inst:getConfig(nextResBinConfig.furniture_id);
+		
+		local itemInfo = CS.ItemInfo()
+		itemInfo.isShow = true
+		itemInfo.itemName = "容量"
+		itemInfo.atlas = CS.StaticConstants.funitureItemAtlasName
+		itemInfo.icon = CS.StaticConstants.funitureItemIcons[cfg.iconitem_id[0]]
+		itemInfo.oldValue = tostring(lastResBinConfig.store)
+		itemInfo.newValue = tostring(nextResBinConfig.store)
+
+		self.itemInfoList:Add(itemInfo)
+
+	end
+	
+	self.oldConfig = CS.FurnitureConfigManager.inst:getConfig(lastResBinConfig.furniture_id);
+
+end
+
+function FurnitureUpgradeFinishPanel:ShowShelfUpgradeDatas()
+
+	local lastShelfConfig = CS.FurnitureUpgradeConfigManager.inst:GetShelfUpgradeConfig(self.data.config.type_2, self.data.level - 1);
+	if (lastShelfConfig == nil) then
+		return
+	end
+	local nextShelfConfig = CS.FurnitureUpgradeConfigManager.inst:GetShelfUpgradeConfig(self.data.config.type_2, self.data.level);
+
+	--能量上限
+	if lastShelfConfig.energy < nextShelfConfig.energy then
+
+		local itemInfo = CS.ItemInfo()
+		itemInfo.isShow = true
+		itemInfo.itemName = "能量上限"
+		itemInfo.atlas = CS.StaticConstants.funitureItemAtlasName
+		itemInfo.icon = CS.StaticConstants.funitureItemIcons[1]
+		itemInfo.oldValue = tostring(lastShelfConfig.energy)
+		itemInfo.newValue = tostring(nextShelfConfig.energy)
+
+		self.itemInfoList:Add(itemInfo)
+
+	end
+
+	--容量
+	if (lastShelfConfig.store < nextShelfConfig.store) then
+
+		local itemInfo = CS.ItemInfo()
+		itemInfo.isShow = true
+		itemInfo.itemName = "容量"
+		itemInfo.atlas = CS.StaticConstants.funitureItemAtlasName
+		itemInfo.icon = CS.StaticConstants.funitureItemIcons[2]
+		itemInfo.oldValue = tostring(lastShelfConfig.store)
+		itemInfo.newValue = tostring(nextShelfConfig.store)
+
+		self.itemInfoList:Add(itemInfo)
+
+	end
+
+	self.oldConfig = CS.FurnitureConfigManager.inst:getConfig(lastShelfConfig.furniture_id);
+
+end
+
+function FurnitureUpgradeFinishPanel:ShowStorageUpgradeDatas()
+
+	local lastTrunkConfig = CS.FurnitureUpgradeConfigManager.inst:GetTrunkUpgradeConfig(self.data.level - 1);
+	if (lastTrunkConfig == nil) then
+		return
+	end
+	local nextTrunkConfig = CS.FurnitureUpgradeConfigManager.inst:GetTrunkUpgradeConfig(self.data.level);
+
+	--物品栏大小
+	if lastTrunkConfig.space < nextTrunkConfig.space then
+
+		local itemInfo = CS.ItemInfo()
+		itemInfo.isShow = true
+		itemInfo.itemName = "物品栏大小"
+		itemInfo.atlas = CS.StaticConstants.funitureItemAtlasName
+		itemInfo.icon = CS.StaticConstants.funitureItemIcons[3]
+		itemInfo.oldValue = tostring(lastTrunkConfig.space)
+		itemInfo.newValue = tostring(nextTrunkConfig.space)
+
+		self.itemInfoList:Add(itemInfo)
+
+	end
+
+	--堆叠上限
+	if lastTrunkConfig.pile_space < nextTrunkConfig.pile_space then
+
+		local itemInfo = CS.ItemInfo()
+		itemInfo.isShow = true
+		itemInfo.itemName = "堆叠上限"
+		itemInfo.atlas = CS.StaticConstants.funitureItemAtlasName
+		itemInfo.icon = CS.StaticConstants.funitureItemIcons[4]
+		itemInfo.oldValue = tostring(lastTrunkConfig.pile_space)
+		itemInfo.newValue = tostring(nextTrunkConfig.pile_space)
+
+		self.itemInfoList:Add(itemInfo)
+
+	end
+
+	self.oldConfig = CS.FurnitureConfigManager.inst:getConfig(lastTrunkConfig.furniture_id);
+
+
+end
+
+
+function FurnitureUpgradeFinishPanel:DoShowAnimation()
+	self:onShowed()
+end
+
+function FurnitureUpgradeFinishPanel:DoHideAnimation()
+
+	self:HideView();
+
+end
+
+function FurnitureUpgradeFinishPanel:onShowed()
+
+	CS.AudioManager.inst:PlaySound(25);
+
+end
+
+
+function FurnitureUpgradeFinishPanel:onHide()
+
+	self.itemInfoList:Clear();
+	CS.AudioManager.inst:PlaySound(11);
+
+end
+
+function FurnitureUpgradeFinishPanel:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function FurnitureUpgradeFinishPanel:shiftOut()
+	self.contentObject:SetActive(false)
+
+end
+------------------------------------------------

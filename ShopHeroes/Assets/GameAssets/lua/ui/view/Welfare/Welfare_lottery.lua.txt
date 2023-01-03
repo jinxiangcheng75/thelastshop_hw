@@ -1,0 +1,917 @@
+
+--Welfare_lottery
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local CS_type_AwardItemUI = typeof(CS.AwardItemUI)
+local CS_type_CumulativeItemUI = typeof(CS.CumulativeItemUI)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_TimeUtils = CS.TimeUtils
+local CS_PayInst = CS.GamePay.inst
+local CS_itemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_VipLevelConfigManagerInst = CS.VipLevelConfigManager.inst
+
+local Vector3 = CS.UnityEngine.Vector3
+
+
+local CS_ItemBagProxyInst = CS.ItemBagProxy.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LotteryDataProxyInst = CS.LotteryDataProxy.inst
+
+local CS_RewardedVideoDataProxyInst = CS.RewardedVideoDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Welfare_lottery = class(luaClass_Welfare_CtrlBase)
+
+function Welfare_lottery:initComp(luaBehaviour)
+
+	local contentPane = luaBehaviour
+
+	self.tx_time = contentPane:GetText("tx_time")
+	self.tx_pay = contentPane:GetText("tx_pay")
+	self.btn_refresh = contentPane:GetButton("btn_refresh")
+
+	self.awards = {}
+	local objs_awards = contentPane:GetObjByName("objs_awards"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objs_awards.Count - 1 do
+		self.awards[#self.awards + 1] = objs_awards[i]:GetComponent(CS_type_AwardItemUI)
+	end
+
+	self.btn_single = contentPane:GetButton("btn_single")
+	self.btn_ten = contentPane:GetButton("btn_ten")
+	self.obj_singleFree = contentPane:GetObjByName("obj_singleFree")
+	self.obj_singleItem = contentPane:GetObjByName("obj_singleItem")
+	self.obj_singleGem = contentPane:GetObjByName("obj_singleGem")
+	self.obj_tenthItem = contentPane:GetObjByName("obj_tenthItem")
+	self.obj_tenthGem = contentPane:GetObjByName("obj_tenthGem")
+	self.tx_singleItemNum = contentPane:GetText("tx_singleItemNum")
+	self.tx_tenthItemNum = contentPane:GetText("tx_tenthItemNum")
+	self.tx_singleGemNum = contentPane:GetText("tx_singleGemNum")
+	self.tx_tenthGemNum = contentPane:GetText("tx_tenthGemNum")
+	self.slider_cumulative = contentPane:GetObjByName("slider_cumulative"):GetComponent("Slider")
+	self.ctrl_cumulative = contentPane:GetObjByName("ctrl_cumulative"):GetComponent(CS_type_CumulativeItemUI)
+	self.tx_firstStage = contentPane:GetText("tx_firstStage")
+	self.btn_help = contentPane:GetButton("btn_help")
+	self.btn_record = contentPane:GetButton("btn_record")
+	self.obj_freeRefresh = contentPane:GetObjByName("obj_freeRefresh")
+	self.tf_pan = contentPane:GetObjByName("tf_pan").transform
+	self.img_backBg = contentPane:GetImage("img_backBg")
+	self.tx_refresh = contentPane:GetText("tx_refresh")
+	self.anim_pan = contentPane:GetObjByName("anim_pan"):GetComponent("Animator")
+	self.icon_singleItem = contentPane:GetGUIIcon("icon_singleItem")
+	self.icon_tenthItem = contentPane:GetGUIIcon("icon_tenthItem")
+	self.obj_vip = contentPane:GetObjByName("obj_vip")
+	self.obj_singleRedPoint = contentPane:GetObjByName("obj_singleRedPoint")
+	self.obj_refreshRedPoint = contentPane:GetObjByName("obj_refreshRedPoint")
+	self.img_singleConfig = contentPane:GetImage("img_singleConfig")
+	self.img_tenConfigImg = contentPane:GetImage("img_tenConfigImg")
+	self.img_refreshConfig = contentPane:GetImage("img_refreshConfig")
+	self.img_mask = contentPane:GetImage("img_mask")
+
+end
+
+function Welfare_lottery:Init(luaBehaviour)
+
+	self:initComp(luaBehaviour)
+
+	self.singleType = CS.kSingleType.max
+	self.tenthType = CS.kTenthType.max
+	self.isLottering = false
+	self.isRefreshing = false
+	self.timeId = 0
+	self.isIdle = true
+	self.panTween = nil
+	self.tween = nil
+	self.curRotateZ = -15
+	self.needGemNum = 0
+	self.currRefreshType = 0
+
+	self.btn_single.onClick:AddListener(function ()
+			self:singleLotteryAnim()
+		end)
+
+	self.btn_ten.onClick:AddListener(function ()
+			self:tenthLotteryAnim()
+		end)
+
+	self.btn_refresh.onClick:AddListener(function ()
+			self:playRefreshAnim()
+		end)
+
+	self.btn_help:ButtonClickTween(function ()
+			EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowProbabilityPublic,1)
+		end)
+
+	self.btn_record:ButtonClickTween(function ()
+			self:onRecordBtnClick()
+		end)
+
+
+	local itemCfg = CS_itemConfigManagerInst:GetConfig(140001);
+	if itemCfg ~= nil then
+		self.icon_singleItem:SetSprite(itemCfg.atlas, itemCfg.icon)
+		self.icon_tenthItem:SetSprite(itemCfg.atlas, itemCfg.icon)
+	end
+
+	self:idleAnimPlay()
+
+
+end
+
+
+function Welfare_lottery:RefreshUIData()
+
+	if self.panTween ~= nil then
+		self.panTween:Play()
+	end
+
+	self:RefreshItemData()
+
+end
+
+--刷新奖池数据
+function Welfare_lottery:RefreshItemData()
+
+	self.obj_singleRedPoint:SetActive(CS_LotteryDataProxyInst.hasSingleRedPoint)
+	--self.obj_refreshRedPoint:SetActive(CS_LotteryDataProxyInst.hasRefreshRedPoint)
+
+	if CS_LotteryDataProxyInst.singleIsNew then
+		CS_LotteryDataProxyInst.singleIsNew = false
+	end
+
+	if CS_LotteryDataProxyInst.prizeIsNew then
+		CS_LotteryDataProxyInst.prizeIsNew = false
+	end
+
+	self:RefreshBtnText()
+	self:RefreshJackpotData()
+	self:setCumulativeSlider()
+
+end
+
+function Welfare_lottery:RefreshJackpotData()
+
+	for i = 1, #self.awards do
+
+		local data = CS_LotteryDataProxyInst:GetCorrespodingBoxNumData(i - 1)
+		if data ~= nil then
+			self.awards[i]:InitData(data)
+		end
+
+	end
+
+end
+
+function Welfare_lottery:setCumulativeSlider()
+
+	local data = CS_LotteryDataProxyInst.curCumulativeData
+
+	if data ~= nil then
+
+		self.slider_cumulative.maxValue = data.cumulative_times
+		self.slider_cumulative.value = math.max(data.cumulative_times * 0.1,CS_LotteryDataProxyInst.LotteryCount)
+		self.tx_firstStage.text = tostring(CS_LotteryDataProxyInst.LotteryCount > data.cumulative_times and data.cumulative_times or CS_LotteryDataProxyInst.LotteryCount).."/"..tostring(data.cumulative_times)
+
+		self:RefreshCumulativeAwardsData()
+
+	end
+
+end
+
+--刷新累计抽取奖品数据
+function Welfare_lottery:RefreshCumulativeAwardsData()
+
+	self.ctrl_cumulative:InitData(CS_LotteryDataProxyInst.curCumulativeData)
+
+end
+
+--刷新抽奖按钮上的文字（方式）
+function Welfare_lottery:RefreshBtnText()
+
+	self:clearTimer()
+
+	if CS_LotteryDataProxyInst.prizeCoolTime > 0 then
+
+		self.tx_time.text = CS_LanguageManagerInst:GetValueByKey("下次重置:")..CS_TimeUtils.timeSpan3Str(CS_LotteryDataProxyInst.prizeCoolTime)
+		self.timeId = CS_GameTimerInst:AddTimer(1,function()
+
+				self.tx_time.text = CS_LanguageManagerInst:GetValueByKey("下次重置:")..CS_TimeUtils.timeSpan3Str(CS_LotteryDataProxyInst.prizeCoolTime)
+				if CS_LotteryDataProxyInst.prizeCoolTime <= 0 then
+
+					local _addata = CS_RewardedVideoDataProxyInst:GetAdData("2")
+					if _addata.isVip and _addata.vipAwardCount > 0 then
+
+						self.tx_time.text = CS_LanguageManagerInst:GetValueByKey("免费重置")
+						self:clearTimer()
+
+					else
+
+						self.tx_time.text = CS_LanguageManagerInst:GetValueByKey("重置转盘")
+						self:clearTimer()
+
+					end
+
+				end
+
+
+			end)
+
+	else
+
+		local _addata = CS_RewardedVideoDataProxyInst:GetAdData("2")
+		if _addata.isVip and _addata.vipAwardCount > 0 then
+			self.tx_time.text = CS_LanguageManagerInst:GetValueByKey("免费重置")
+		else
+			self.tx_time.text = CS_LanguageManagerInst:GetValueByKey("重置转盘")
+		end
+
+	end
+
+	local adrewardeddata = CS_RewardedVideoDataProxyInst:GetAdData("2")
+	if (adrewardeddata.isVip and adrewardeddata.vipAwardCount > 0) or (not adrewardeddata.isVip and adrewardeddata.useableCount > 0) then
+		CS_LotteryDataProxyInst.prizePoolState = 1
+	else
+		CS_LotteryDataProxyInst.prizePoolState = 0
+	end
+
+	self.tx_pay.gameObject:SetActive(CS_LotteryDataProxyInst.prizePoolState == 0)
+	self.obj_freeRefresh:SetActive(CS_LotteryDataProxyInst.prizePoolState ~= 0)
+
+	self.tx_pay.text = tostring(CS_LotteryDataProxyInst.gemConsume)
+	self.tx_pay.color = CS_LotteryDataProxyInst.gemConsume > CS_UserDataProxyInst.playerData.gem and CS.UnityEngine.Color.red or CS.UnityEngine.Color.white
+
+	local luckTurntableNum = CS_ItemBagProxyInst:GetItem(140001).count
+	self:SetSingleText(luckTurntableNum)
+	self:SetTenthText(luckTurntableNum)
+
+	if CS.K_Vip_State.__CastFrom(CS_UserDataProxyInst.playerData.vipState) == CS.K_Vip_State.Vip then
+		self.obj_vip:SetActive(true)
+	else
+		self.obj_vip:SetActive(false)
+	end
+end
+
+function Welfare_lottery:SetSingleText(itemNum)
+
+	local _addata = CS_RewardedVideoDataProxyInst:GetAdData("1")
+	if (_addata.isVip and _addata.vipAwardCount > 0) or (not _addata.isVip and _addata.useableCount > 0) then
+		self.singleType = CS.kSingleType.Free
+	elseif(itemNum >= 1) then
+
+		self.singleType = CS.kSingleType.UseItem
+		self.tx_singleItemNum.text = tostring(math.ceil(itemNum)).."/1"
+		self.tx_singleItemNum.color = itemNum >= 1 and CS.UnityEngine.Color.white or CS.UnityEngine.Color.red
+
+	else
+
+		self.singleType = CS.kSingleType.UseGem
+		local needNum = CS_WorldParConfigManagerInst:GetConfig(111).parameters
+		self.tx_singleGemNum.text = tostring(math.ceil(needNum))
+		self.tx_singleGemNum.color = CS_UserDataProxyInst.playerData.gem >= needNum and CS.UnityEngine.Color.white or CS.UnityEngine.Color.red
+
+	end
+
+	self.obj_singleFree:SetActive(self.singleType == CS.kSingleType.Free)
+	self.obj_singleItem:SetActive(self.singleType == CS.kSingleType.UseItem)
+	self.obj_singleGem:SetActive(self.singleType == CS.kSingleType.UseGem)
+
+end
+
+function Welfare_lottery:SetTenthText(itemNum)
+
+	local needItemdNum = CS_WorldParConfigManagerInst:GetConfig(113).parameters
+	if itemNum >= needItemdNum then
+
+		self.tenthType = CS.kTenthType.UseItem
+		self.tx_tenthItemNum.text = tostring(math.ceil(itemNum)).."/"..tostring(math.ceil(needItemdNum))
+		self.tx_tenthItemNum.color = CS.UnityEngine.Color.white
+
+	else
+
+		self.tenthType = CS.kTenthType.UseGem
+
+		self.needGemNum = CS_WorldParConfigManagerInst:GetConfig(112).parameters
+
+		if CS.K_Vip_State.__CastFrom(CS_UserDataProxyInst.playerData.vipState) == CS.K_Vip_State.Vip then
+			local typeState = CS_VipLevelConfigManagerInst:GetValByLevelAndType(CS_UserDataProxyInst.playerData.vipLevel,CS.K_Vip_Type.LotteryTenthPriceReduce)
+			self.needGemNum = typeState ~= 0 and math.ceil(self.needGemNum * 0.9) or self.needGemNum
+		end
+
+		self.tx_tenthGemNum.text = tostring(math.ceil(self.needGemNum))
+		--self.tx_tenthGemNum.color = CS_UserDataProxyInst.playerData.gem >= self.needGemNum and CS.UnityEngine.Color.white or CS.UnityEngine.Color.red
+		--self.tx_tenthItemNum.color = CS.UnityEngine.Color.red
+
+	end
+
+	self.obj_tenthItem:SetActive(self.tenthType == CS.kTenthType.UseItem)
+	self.obj_tenthGem:SetActive(self.tenthType == CS.kTenthType.UseGem)
+
+end
+
+function Welfare_lottery:RefreshCumulativeData(isChangeNext)
+
+	local data = CS_LotteryDataProxyInst.curCumulativeData
+
+	if data == nil then
+		return
+	end
+
+	if not isChangeNext then
+
+		self.slider_cumulative.maxValue = data.cumulative_times
+		self.slider_cumulative:DOValue(CS_LotteryDataProxyInst.LotteryCount,0.7):SetEase(CS.DG.Tweening.Ease.OutCubic):OnUpdate(function ()
+				self.tx_firstStage.text = tostring(math.ceil(self.slider_cumulative.value)).."/"..tostring(data.cumulative_times)
+			end):SetDelay(0.3):OnComplete(function ()
+
+				if CS_LotteryDataProxyInst.waitWorkerId ~= 0 then
+
+					local itemCfg = CS_itemConfigManagerInst:GetConfig(CS_LotteryDataProxyInst.waitWorkerId);
+					local award_AboutWorker = CS.Award_AboutWorker()
+					award_AboutWorker.type = CS.ReceiveInfoUIType.UnlockWorker
+					award_AboutWorker.workerId = itemCfg.effect
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+					local func = funcGeneric(CS.Award_AboutWorker)
+					func(
+						CS_EventControllerInst,
+						CS_GameEventType.ReceiveEvent.NEWITEM_MSG,
+						award_AboutWorker
+					)
+					CS_LotteryDataProxyInst.waitWorkerId = 0
+
+				end
+				self.isLottering = false;
+				if not self.isRefreshing then
+					self.img_mask.enabled = false
+				end
+
+			end)
+
+	else
+
+		self.slider_cumulative:DOValue(self.slider_cumulative.maxValue,0.6):SetEase(CS.DG.Tweening.Ease.OutCubic):OnUpdate(function ()
+				self.tx_firstStage.text = tostring(math.ceil(self.slider_cumulative.value)).."/"..tostring(math.ceil(self.slider_cumulative.maxValue))
+			end):OnComplete(function ()
+
+				self.slider_cumulative.maxValue = data.cumulative_times
+				self.slider_cumulative.value = 0
+				self.slider_cumulative:DOValue(CS_LotteryDataProxyInst.LotteryCount,0.6):SetEase(CS.DG.Tweening.Ease.OutCubic):OnUpdate(function ()
+
+						self.tx_firstStage.text = tostring(math.ceil(self.slider_cumulative.value)).."/"..tostring(data.cumulative_times)
+						local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+						local func = funcGeneric(CS.System.Collections.Generic.List(CS.ShowPopupData))
+						func(
+							CS_EventControllerInst,
+							CS_GameEventType.LotteryEvent.CUMULATIVE_GET,
+							CS_LotteryDataProxyInst.tempList
+						)
+						CS_LotteryDataProxyInst.tempList:Clear()
+
+						if CS_LotteryDataProxyInst.waitWorkerId ~= 0 then
+
+							local itemCfg = CS_itemConfigManagerInst:GetConfig(CS_LotteryDataProxyInst.waitWorkerId);
+							local award_AboutWorker = CS.Award_AboutWorker()
+							award_AboutWorker.type = CS.ReceiveInfoUIType.UnlockWorker
+							award_AboutWorker.workerId = itemCfg.effect
+							funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+							func = funcGeneric(CS.Award_AboutWorker)
+							func(
+								CS_EventControllerInst,
+								CS_GameEventType.ReceiveEvent.NEWITEM_MSG,
+								award_AboutWorker
+							)
+							CS_LotteryDataProxyInst.waitWorkerId = 0
+
+						end
+
+						self.isLottering = false;
+						if not self.isRefreshing then
+							self.img_mask.enabled = false
+						end
+
+					end)
+
+			end):SetDelay(0.3)
+
+	end
+
+	self:RefreshCumulativeAwardsData()
+
+end
+
+function Welfare_lottery:idleAnimPlay()
+
+	self.isIdle = true
+	self.tween = self.tf_pan:DOLocalRotate(Vector3(0,0,self.curRotateZ + 15),5):OnComplete(function()
+
+			if self.isIdle then
+				self.panTween = self.tf_pan:DOLocalRotate(Vector3(0,0,self.curRotateZ - 15),6.5):SetEase(CS.DG.Tweening.Ease.InOutSine):SetLoops(-1, CS.DG.Tweening.LoopType.Yoyo);
+			end
+
+		end):SetEase(CS.DG.Tweening.Ease.OutSine)
+
+end
+
+function Welfare_lottery:singleLotteryAnim()
+
+	if self.isRefreshing or self.isLottering then
+		return
+	end
+
+	--判断是否有转盘广告次数
+	local _addata = CS_RewardedVideoDataProxyInst:GetAdData("1");
+	if _addata ~= nil then
+
+		if _addata.isVip and _addata.vipAwardCount > 0 then --如果是vip
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.System.Int32)
+			func(
+				CS_EventControllerInst,
+				CS_GameEventType.LotteryEvent.SINGLE_LOTTERY,
+				3
+			)
+
+			return
+
+		else
+
+			if _addata.useableCount > 0 then
+
+				local _needNum = CS_WorldParConfigManagerInst:GetConfig(111).parameters;
+				--打开广告确认界面
+
+				local admsgboxInfo = CS.admsgboxInfo()
+				admsgboxInfo.title = CS_LanguageManagerInst:GetValueByKey("转盘")
+				admsgboxInfo.msg = CS_LanguageManagerInst:GetValueByKey("选择不同的方式转动一次转盘！")
+				admsgboxInfo.adtype = 1
+				admsgboxInfo.resid = CS_ItemBagProxyInst:GetItem(140001).count < 1 and CS.StaticConstants.gemID or 140001
+				admsgboxInfo.rescount = CS_ItemBagProxyInst:GetItem(140001).count < 1 and math.ceil(_needNum) or 1
+				admsgboxInfo.lookAdCall = function()
+
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+					local func = funcGeneric(CS.System.Int32)
+					func(
+						CS_EventControllerInst,
+						CS_GameEventType.GameAdEvent.GAMEAD_START,
+						1
+					)
+
+				end
+				admsgboxInfo.useResCall = function()
+					self:lottering(2)
+				end
+
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+				local func = funcGeneric(CS.admsgboxInfo)
+				func(
+					CS_EventControllerInst,
+					CS_GameEventType.GameAdEvent.GAMEAD_SHOWADVIEW,
+					admsgboxInfo
+				)
+
+				return
+
+			end
+
+		end
+
+	end
+
+	self:lottering(1)
+
+end
+
+function Welfare_lottery:lottering(type)
+	local sigleLotteryType = self.singleType
+
+	local needNum = CS_WorldParConfigManagerInst:GetConfig(111).parameters
+	if(type == 2)then
+		if(CS_ItemBagProxyInst:GetItem(140001).count >= 1)then
+			sigleLotteryType = CS.kSingleType.UseItem
+		else
+			sigleLotteryType = CS.kSingleType.UseGem
+			self.img_singleConfig.enabled = true
+		end
+	end
+
+	if sigleLotteryType == CS.kSingleType.UseGem and CS_UserDataProxyInst.playerData.gem < needNum then
+		--EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("金条不够"),"FF2828")
+		EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,needNum - CS_UserDataProxyInst.playerData.gem)
+		return
+	end
+	if sigleLotteryType == CS.kSingleType.UseItem and CS_ItemBagProxyInst:GetItem(140001).count < 1 then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("抽奖道具不足"),"FF2828")
+		return
+	end
+
+	self.obj_singleRedPoint:SetActive(CS_LotteryDataProxyInst.hasSingleRedPoint)
+	
+	
+	if sigleLotteryType == CS.kSingleType.Free then
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.System.Int32)
+		func(
+			CS_EventControllerInst,
+			CS_GameEventType.LotteryEvent.SINGLE_LOTTERY,
+			0
+		)
+		self.isLottering = true
+		self.img_mask.enabled = true
+
+	elseif sigleLotteryType == CS.kSingleType.UseItem then
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.System.Int32)
+		func(
+			CS_EventControllerInst,
+			CS_GameEventType.LotteryEvent.SINGLE_LOTTERY,
+			1
+		)
+		self.isLottering = true
+		self.img_mask.enabled = true
+
+	elseif sigleLotteryType == CS.kSingleType.UseGem then
+		if self.img_singleConfig.enabled then
+			self.img_singleConfig.enabled = false
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.System.Int32)
+			func(
+				CS_EventControllerInst,
+				CS_GameEventType.LotteryEvent.SINGLE_LOTTERY,
+				2
+			)
+			self.isLottering = true
+			self.img_mask.enabled = true
+
+		else
+			self.img_singleConfig.enabled = true;
+		end
+
+	end
+
+end
+
+function Welfare_lottery:tenthLotteryAnim()
+
+	if self.isRefreshing or self.isLottering then
+		return
+	end
+
+
+	if self.tenthType == CS.kTenthType.UseGem and CS_UserDataProxyInst.playerData.gem < self.needGemNum then
+		--EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("金条不足"),"FF2828")
+		EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,self.needGemNum - CS_UserDataProxyInst.playerData.gem)
+		return
+	end
+	if self.tenthType == CS.kTenthType.UseItem and CS_ItemBagProxyInst:GetItem(140001).count < 9 then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("抽奖道具不足"),"FF2828")
+		return
+	end
+
+	if self.tenthType == CS.kTenthType.UseItem then
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.System.Int32)
+		func(
+			CS_EventControllerInst,
+			CS_GameEventType.LotteryEvent.TENTH_LOTTERY,
+			1
+		)
+		self.isLottering = true
+		self.img_mask.enabled = true
+
+
+	elseif self.tenthType == CS.kTenthType.UseGem then
+
+		if self.img_tenConfigImg.enabled then
+
+			self.img_tenConfigImg.enabled = false
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.System.Int32)
+			func(
+				CS_EventControllerInst,
+				CS_GameEventType.LotteryEvent.TENTH_LOTTERY,
+				2
+			)
+			self.isLottering = true
+			self.img_mask.enabled = true
+
+		else
+			self.img_tenConfigImg.enabled = true;
+		end
+
+	end
+
+
+end
+
+function Welfare_lottery:SetBtnActive(isTrue,activeType)
+
+	if activeType == 0 then
+		self.btn_refresh.enabled = isTrue
+	end
+
+	self.btn_single.enabled = isTrue
+	self.btn_ten.enabled = isTrue
+
+end
+
+
+function Welfare_lottery:RefreshLottery(type)
+
+	self.currRefreshType = type
+	
+	if self.currRefreshType == 2 and CS_LotteryDataProxyInst.gemConsume > CS_UserDataProxyInst.playerData.gem then
+
+		--EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("金条不足"),"FF2828")
+		EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,CS_LotteryDataProxyInst.gemConsume - CS_UserDataProxyInst.playerData.gem)
+		return
+
+	end
+
+	local _addata = CS_RewardedVideoDataProxyInst:GetAdData("2");
+	if self.currRefreshType == 2 and _addata ~= nil and _addata.useableCount <= 0 then
+
+		if not self.img_refreshConfig.enabled then
+			self.img_refreshConfig.enabled = true
+			return
+		end
+	end
+	
+	self.img_refreshConfig.enabled = false
+	CS.FGUI.inst:showGlobalMask(1)
+	--self.obj_refreshRedPoint:SetActive(CS_LotteryDataProxyInst.hasRefreshRedPoint)
+
+	self:PlayLotteryJump(true)
+
+end
+
+function Welfare_lottery:PlayLotteryJump(needRequest)
+
+	self.isRefreshing = true
+	self.img_mask.enabled = true
+	self:SetBtnActive(false,1)
+	if self.panTween ~= nil then
+		self.panTween:Kill()
+	end
+	if self.tween ~= nil then
+		self.tween:Kill()
+	end
+	self.isIdle = false;
+	self.anim_pan.enabled = true
+
+	self.anim_pan:CrossFade("up", 0);
+	self.anim_pan:Update(0);
+	self.anim_pan:Play("up");
+	CS.AudioManager.inst:PlaySound(105)
+
+	CS_GameTimerInst:AddTimer(self.anim_pan:GetClipLength("lottery_up") + 0.3 , 1 , function ()
+
+			if needRequest then
+
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.Int32,CS.System.Int32)
+				func(
+					CS_EventControllerInst,
+					CS_GameEventType.LotteryEvent.JACKPOT_REFRESH,
+					(self.currRefreshType ~= 3 and self.currRefreshType ~= 4) and CS_LotteryDataProxyInst.gemConsume or 0,
+					self.currRefreshType
+				)
+
+			end
+
+			self.anim_pan:CrossFade("down", 0);
+			self.anim_pan:Update(0);
+			self.anim_pan:Play("down");
+
+			CS_GameTimerInst:AddTimer(self.anim_pan:GetClipLength("lottery_down"),1,function ()
+
+					self:SetBtnActive(true, 1);
+					self.isRefreshing = false;
+					if not self.isLottering then
+						self.img_mask.enabled = false
+					end
+					self.img_backBg.gameObject:SetActive(true)
+					self.curRotateZ = self.tf_pan.localEulerAngles.z;
+					self.anim_pan.enabled = false
+					self:idleAnimPlay()
+					self.img_backBg:DOFade(1,0.5):OnComplete(function ()
+
+							self.img_backBg:DOFade(0,1):OnComplete(function ()
+									self.img_backBg.gameObject:SetActive(false)
+								end)
+
+						end)
+
+					self.tx_refresh:DOFade(1,0.5):OnComplete(function ()
+
+							self.tx_refresh:DOFade(0,1)
+
+						end)
+				end)
+
+		end)
+
+end
+
+function Welfare_lottery:playRefreshAnim()
+
+	if self.isRefreshing or self.isLottering then
+		return
+	end
+
+	--判断是否有广告重置次数
+	local _addata = CS_RewardedVideoDataProxyInst:GetAdData("2");
+
+	if _addata ~= nil then
+
+		if _addata.isVip and _addata.vipAwardCount > 0 then --vip
+
+			self:RefreshLottery(3)
+			return
+
+		else
+
+			if _addata.useableCount > 0 then
+
+				local _needNum = CS_LotteryDataProxyInst.gemConsume
+				--打开广告确认界面
+
+				local admsgboxInfo = CS.admsgboxInfo()
+				admsgboxInfo.title = CS_LanguageManagerInst:GetValueByKey("重置")
+				admsgboxInfo.msg = CS_LanguageManagerInst:GetValueByKey("选择不同的方式重置一次转盘!")
+				admsgboxInfo.adtype = 1
+				admsgboxInfo.resid = CS.StaticConstants.gemID
+				admsgboxInfo.rescount = math.ceil(_needNum)
+				admsgboxInfo.lookAdCall = function()
+
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+					local func = funcGeneric(CS.System.Int32)
+					func(
+						CS_EventControllerInst,
+						CS_GameEventType.GameAdEvent.GAMEAD_START,
+						2
+					)
+
+				end
+				admsgboxInfo.useResCall = function()
+					self:RefreshLottery(2)
+				end
+
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+				local func = funcGeneric(CS.admsgboxInfo)
+				func(
+					CS_EventControllerInst,
+					CS_GameEventType.GameAdEvent.GAMEAD_SHOWADVIEW,
+					admsgboxInfo
+				)
+
+				return
+
+			end
+
+		end
+
+	end
+
+	self:RefreshLottery(2);
+
+end
+
+--网络消息回调触发
+function Welfare_lottery:GetSingleLotteryData(datas,type)
+
+	if self.panTween ~= nil then
+		self.panTween:Kill()
+	end
+
+	self.isIdle = false
+	self.isLottering = true
+	self.img_mask.enabled = true
+	self:SetBtnActive(false , 0)
+	self:PlatLotteryAnim(datas,type)
+
+end
+
+function Welfare_lottery:PlatLotteryAnim(datas,type)
+
+	self:RefreshBtnText()
+	local topview = GUIManager.inst:GetWindowCs(typeof(CS.TopPlayerInfoView))
+	if topview ~= nil then
+		topview:UpdateShow()
+	end
+
+	local randomOffset = CS.UnityEngine.Random.Range(3,16)
+	CS.AudioManager.inst:PlaySound(108)
+
+	self.tf_pan:DOLocalRotate(Vector3(0,0,-1080),1.5,CS.DG.Tweening.RotateMode.FastBeyond360):SetEase(CS.DG.Tweening.Ease.InCirc):SetUpdate(CS.DG.Tweening.UpdateType.Normal):OnComplete(function ()
+
+			self.tf_pan:DOLocalRotate(Vector3(0,0,-1080 - (15 + 30 * datas[datas.Count - 1].boxNum + randomOffset)),4.5,CS.DG.Tweening.RotateMode.FastBeyond360):SetEase(CS.DG.Tweening.Ease.OutCirc):SetUpdate(CS.DG.Tweening.UpdateType.Normal):OnComplete(function ()
+
+					self.tf_pan:DOLocalRotate(Vector3(0,0,self.tf_pan.localEulerAngles.z + randomOffset),1):SetEase(CS.DG.Tweening.Ease.InCirc):SetUpdate(CS.DG.Tweening.UpdateType.Normal):OnComplete(function ()
+
+							CS.AudioManager.inst:PlaySound(107)
+							for i = 0, datas.Count - 1 do
+
+								if i == datas.Count - 1 then
+									self.awards[datas[i].boxNum + 1]:SetHighLight(function ()
+											self:LotteryComAnim(datas,type)
+										end)
+								else
+									self.awards[datas[i].boxNum + 1]:SetHighLight()
+								end
+
+							end
+							
+						end)
+				end)
+		end)
+
+end
+
+function Welfare_lottery:LotteryComAnim(datas,type)
+
+	if datas == nil or datas.Count <= 0 then
+		return
+	end
+
+	self:SetBtnActive(true,0)
+	if type == 0 then
+
+		local firstData = datas[0]
+		local commonData = CS.CommonRewardData(firstData.prizeId,firstData.prizeCount,firstData.rarity,firstData.type)
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.CommonRewardData)
+		func(
+			CS_EventControllerInst,
+			CS_GameEventType.LotteryEvent.LOTTERYSINGLEREWARD_SHOWUI,
+			commonData
+		)
+
+	else
+
+		local rewardList = get_csharp_list(CS.CommonRewardData)
+		for i = 0, datas.Count - 1 do
+
+			local data = datas[i]
+			local commonData = CS.CommonRewardData(data.prizeId,data.prizeCount,data.rarity,data.type)
+			rewardList:Add(commonData)
+
+		end
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.System.Collections.Generic.List(CS.CommonRewardData))
+		func(
+			CS_EventControllerInst,
+			CS_GameEventType.LotteryEvent.LOTTERYREWARD_SHOWUI,
+			rewardList
+		)
+
+	end
+
+	self.curRotateZ = self.tf_pan.localEulerAngles.z
+	self:RefreshJackpotData()
+	self:idleAnimPlay()
+
+end
+
+function Welfare_lottery:onRecordBtnClick()
+
+	if self.isRefreshing or self.isLottering then
+		return
+	end
+
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.LotteryEvent.LOTTERYRECORD_SHOWUI)
+
+end
+
+
+function Welfare_lottery:clearTimer()
+
+	if self.timeId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.timeId)
+		self.timeId = 0
+	end
+
+end
+
+function Welfare_lottery:Clear()
+
+	self:clearTimer()
+
+end
+
+return Welfare_lottery

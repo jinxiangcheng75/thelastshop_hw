@@ -1,0 +1,371 @@
+-- GuideTriggerManager
+require("config/GuideTriggerConfigManager")
+require("data/GuideTriggerDataProxy")
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+--local csGuideManager = CS.GuideManager.inst
+
+GuideTriggerManager = class()
+
+GuideTriggerManager.inst = GuideTriggerManager:new()
+--local curTriggerData = {}
+--local triggerList = {}
+--local index = 1
+
+function GuideTriggerManager:init()
+	self.curTriggerData = {}
+	self.triggerList = {}
+	self.index = 1
+end
+
+function GuideTriggerManager:StartGuideTrigger(groupId)
+	--if(GuideTriggerDataProxy.inst:CheckIsTrigger(tonumber(groupId))) then csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON) return end
+	--local checkData = GuideTriggerConfigManager:GetConfigByGroupId(groupId)
+	self.curTriggerData = GuideTriggerConfigManager:GetConfigByGroupId(groupId)
+	--print("输出 2",groupId,"      ",self.curTriggerData)
+	if(self.curTriggerData ~= nil and #self.curTriggerData > 0)then
+		if(self.furnUid == nil or tonumber(self.curTriggerData[1].trigger_type) ~= 8)then
+			self.furnUid = 0
+		end
+		self.severType = self.curTriggerData[1].server_behavior_type
+		self.severCondition = self.curTriggerData[1].behavior_value
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.System.Boolean)
+		func(csEventControllerInst, csGameEventType.MainlineTaskEvent.SETFINGTERACTIVE, false)
+		self.isInTrigger = true
+		CS.GuideManager.inst.isInTriggerGuide = true
+		self.index = 1
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.Request_GuideTrigger, groupId)
+		self:CheckScene()
+	else
+		self.isInTrigger = false
+		CS.GuideManager.inst.isInTriggerGuide = false
+	end
+end
+
+function GuideTriggerManager:CheckScene()
+	local data = GuideTriggerConfigData:new()
+	if (self.curTriggerData ~= nil and #self.curTriggerData > 0) then
+		if (self.curTriggerData[self.index].guide_scenes == "IndoorScene") then
+			if (CS.ManagerBinder.inst.mGameState == CS.kGameState.Town) then
+				data.if_constraint = 1
+				data.guide_type = 3
+				data.operations_id = 2
+				data.guide_scenes = "IndoorScene"
+				data.whether_main = 1
+				data.id = 9999
+				data.position = ""
+				data.mask_color = 55
+				table.insert(self.curTriggerData, self.index, data)
+			end
+		end
+
+		if (self.curTriggerData[self.index].guide_scenes == "CityScene") then
+			if (CS.ManagerBinder.inst.mGameState == CS.kGameState.Shop) then
+				data.if_constraint = 1
+				data.guide_type = 3
+				data.operations_id = 1
+				data.guide_scenes = "CityScene"
+				data.whether_main = 1
+				data.id = 9999
+				data.position = ""
+				data.mask_color = 55
+				table.insert(self.curTriggerData, self.index, data)
+			end
+		end
+	end
+
+	self:proceedGuideTrigger()
+end
+
+function GuideTriggerManager:proceedGuideTrigger()
+	if (self.curTriggerData == nil or #self.curTriggerData <= 0) then
+		print("触发式没有引导数据")
+		return
+	end
+	self.curData = self.curTriggerData[self.index]
+	--print("输出 当前",self.curData.id)
+
+	if (self.curData == nil) then
+		--print("触发式当前步的数据是空的")
+		return
+	end
+
+	--print("触发式 当前的id是",self.curData.id)
+
+	if(self.curData.position ~= nil and self.curData.position ~= "")then
+		CS.GuideManager.inst.triggerFurnOffset = self.curData.position
+	end
+
+	local whether = tonumber(self.curData.whether_main)
+	if(whether == 1)then
+		if self.index - 1 > 1 and self.curTriggerData[self.index - 1].operations_id ~= nil then
+			if tonumber(self.curTriggerData[self.index - 1].operations_id) == 22016 then
+				if (CS.IndoorRoleSystem.inst ~= nil) then CS.IndoorRoleSystem.inst:AllMovedShopperRefreshPos() end
+			end
+		end
+
+		CS.GUIManager.BackMainView()
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.DesignMode,CS.System.Int32)
+		func(csEventControllerInst, csGameEventType.ShopDesignEvent.EDITMODE_CHANGE, CS.DesignMode.normal,0)
+	end
+
+		--print("输出 触发式的类型是", self.curData.guide_type,"      ",self.curData.id,"    ",self.curData.condition_des)
+	self.curData.guide_type = tonumber(self.curData.guide_type)
+	EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.OpenPanelByType, self.curData.guide_type, self.curData)
+	if (self.curData.guide_type == 1) then
+
+	elseif self.curData.guide_type == 2 then
+
+	elseif self.curData.guide_type == 3 then
+		self:runOperation(self.curData)
+	elseif self.curData.guide_type == 4 then
+		self:runOperation(self.curData)
+	end
+	--print("输出 dd",#self.curTriggerData)
+end
+
+function GuideTriggerManager:runOperation(data)
+	self.operationCfg = CS.OperationConfigManager.inst:GetConfig(data.operations_id)
+	if (self.operationCfg == nil) then
+		print("输出 触发式里面的行为数据是空的行为id是",data.operations_id)
+		return
+	end
+	-- main_interface btn
+	--print("输出 触发式 run", self.operationCfg.type)
+	if (self.operationCfg.type == 0) then
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SelectNormal, self.operationCfg.main_interface,
+			self.operationCfg.btn, tonumber(data.if_constraint) == 1)
+	elseif self.operationCfg.type == 1 then
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SetAllMaskState,false)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SelectSceneFurn, data.guide_condition, tonumber(data.if_constraint) == 1)
+	elseif self.operationCfg.type == 2 then
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SelectPanelFurn, self.operationCfg.main_interface,
+			data.guide_condition, tonumber(data.if_constraint) == 1)
+	elseif self.operationCfg.type == 3 then
+	elseif self.operationCfg.type == 4 then
+	elseif self.operationCfg.type == 5 then
+	elseif self.operationCfg.type == 6 then
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SetAllMaskState,false)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SelectShopperPopup, data.guide_condition,
+			tonumber(data.if_constraint) == 1)
+	elseif self.operationCfg.type == 7 then
+	elseif self.operationCfg.type == 8 then
+	elseif self.operationCfg.type == 9 then
+	elseif self.operationCfg.type == 10 then
+	elseif self.operationCfg.type == 11 then
+	elseif self.operationCfg.type == 12 then
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SelectTargetWorker, self.operationCfg.main_interface,
+			data.guide_condition, tonumber(data.if_constraint) == 1)
+	elseif self.operationCfg.type == 13 then
+	elseif self.operationCfg.type == 14 then
+	elseif self.operationCfg.type == 15 then
+	elseif self.operationCfg.type == 16 then
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SelectTargetEquip, self.operationCfg.main_interface,
+			data.guide_condition, tonumber(data.if_constraint) == 1)
+	elseif self.operationCfg.type == 17 then
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SetAllMaskState,false)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SelectShopperPopup, data.guide_condition,
+			tonumber(data.if_constraint) == 1)
+	elseif self.operationCfg.type == 18 then
+		--帮助
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SetAllMaskState,false)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SelectUpgradingFurnHelp,tonumber(data.if_constraint) == 1)
+	elseif self.operationCfg.type == 19 then
+		--正在升级的家具
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SetAllMaskState,false)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SelectUpgradingFurn,tonumber(data.if_constraint) == 1)
+	end
+end
+
+function GuideTriggerManager:nextGuideTrigger()
+	if(self.curTriggerData == nil)then
+		--print("输出 重新赋值",self.curData.group_id)
+		self.curTriggerData = GuideTriggerConfigManager:GetConfigByGroupId(tonumber(self.curData.group_id))
+		if(self.curTriggerData == nil)then
+			if(CS.IndoorMap.inst ~= nil and CS.IndoorMap.inst.indoorMask ~= nil)then
+				CS.IndoorMap.inst.indoorMask:SetActive(false)
+			end
+			csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON)
+
+			local designUI = GUIManager.inst:GetViewByViewIDLUA(CS.ViewPrefabName.ShopDesignUI)
+			if(designUI ~= nil and designUI.isShowing)then
+
+			else
+				EventDispatcher:dispatchEvent(GameEvent.GuideTask.ShowUI_GuideTask)
+			end
+		end
+	end
+	EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.HidePanelByType, self.curTriggerData[self.index].guide_type)
+	local needCheck = self.curTriggerData[self.index].guide_scenes == ""
+	self.index = self.index + 1
+
+	--if(curTriggerData[index - 1].operations_id ~= nil and tonumber(curTriggerData[index - 1].if_constraint) == 1)then
+	--local checkOperationData = CS.OperationConfigManager.inst:GetConfig(curTriggerData[index - 1].operations_id)
+	--if(checkOperationData ~= nil and (tonumber(checkOperationData.type) == 1 or tonumber(checkOperationData.type) == 17 or tonumber(checkOperationData.type) == 18 or tonumber(checkOperationData.type) == 19))then
+	--local mainUI = GUIManager.inst:GetViewByViewIDLUA(CS.ViewPrefabName.MainUI)
+	--local topUI = GUIManager.inst:GetViewByViewIDLUA(CS.ViewPrefabName.TopPlayerInfoPanel)
+
+	--if(mainUI ~= nil)then
+	--mainUI:shiftIn()
+	--end
+	--if(topUI ~= nil)then
+	--topUI:shiftIn()
+	--end
+
+	--EventDispatcher:dispatchEvent(GameEvent.GuideTask.ShowUI_GuideTask)
+	--end
+	--end
+
+	if (self.index > #self.curTriggerData) then
+		--print("输出 触发式 最后一个行为了")
+		self.index = 1
+		-- 关闭界面
+		if(CS.IndoorMap.inst ~= nil and CS.IndoorMap.inst.indoorMask ~= nil)then
+			CS.IndoorMap.inst.indoorMask:SetActive(false)
+		end
+
+		--local mainUI = GUIManager.inst:GetViewByViewIDLUA(CS.ViewPrefabName.MainUI)
+		--local topUI = GUIManager.inst:GetViewByViewIDLUA(CS.ViewPrefabName.TopPlayerInfoPanel)
+
+		--if(mainUI ~= nil)then
+		--mainUI:shiftIn()
+		--end
+		--if(topUI ~= nil)then
+		--topUI:shiftIn()
+		--end
+
+		csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON)
+
+		local designUI = GUIManager.inst:GetViewByViewIDLUA(CS.ViewPrefabName.ShopDesignUI)
+		if(designUI ~= nil and designUI.isShowing)then
+
+		else
+			EventDispatcher:dispatchEvent(GameEvent.GuideTask.ShowUI_GuideTask)
+		end
+
+		table.remove(self.triggerList,1)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SetPreMaskState, true)
+		self:CheckGuideTrigger(8,tonumber(self.curTriggerData[self.index].group_id))
+		if(tonumber(self.curData.trigger_type) == 20)then
+			EventDispatcher:dispatchEvent(GameEvent.CreatRoleEvent.HideUI_CreatRoleUI)
+			--CS.FGUI.inst:SetBlackMaskFade(1)
+			local tempData = CS.StateTransition(CS.kGameState.Shop, false)
+			EventDispatcher:dispatchEvent(GameEvent.CSEvent.Change_State, tempData)
+		end
+		self.curTriggerData = nil
+		return
+	else
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.SetPreMaskState, true)
+	end
+
+	if (needCheck) then
+		self:CheckScene()
+	else
+		self:proceedGuideTrigger()
+	end
+end
+
+-- 1-引导id 2-没有指定货架 3-点击剧情顾客 4-待办任务组 5-能量小于百分比 6-店主达到多少级 7-剧情顾客到达柜台 8-完成触发式 9-获得指定道具id
+function GuideTriggerManager:CheckGuideTrigger(triggerType, triggerCondition)
+	if(triggerType == 7 and GameEventListControl.inst.isRunning)then
+		return
+	end
+	local allTriggerData = GuideTriggerConfigManager:GetGroupFirst()
+	for i = 1, #allTriggerData do
+		local isArrive = false
+		local hasTrigger = false
+		--GuideTriggerDataProxy.inst:CheckIsTrigger(tonumber(allTriggerData[i].group_id)) == false
+		if(GuideTriggerDataProxy.inst:CheckIsTrigger(tonumber(allTriggerData[i].group_id)) == false)then
+			if (tonumber(allTriggerData[i].trigger_type) ~= 5) then
+				if(tonumber(allTriggerData[i].trigger_type) == triggerType and tonumber(allTriggerData[i].trigger_value) ==
+						triggerCondition)then
+					isArrive = true
+					if(tonumber(allTriggerData[i].trigger_type) == 8)then
+						self.isInTrigger = true
+						CS.GuideManager.inst.isInTriggerGuide = true
+						for k = 1, #self.triggerList do
+							if(self.triggerList[k] == tonumber(allTriggerData[i].group_id))then
+								hasTrigger = true
+								break
+							end
+						end
+
+						if(not hasTrigger)then
+							table.insert(self.triggerList,1,tonumber(allTriggerData[i].group_id))
+						end
+					else
+						for k = 1, #self.triggerList do
+							if(self.triggerList[k] == tonumber(allTriggerData[i].group_id))then
+								hasTrigger = true
+								break
+							end
+						end
+						if(not hasTrigger)then
+							table.insert(self.triggerList,#self.triggerList + 1,tonumber(allTriggerData[i].group_id))
+						end
+					end
+				end
+			else
+				if(tonumber(allTriggerData[i].trigger_type) == triggerType and tonumber(allTriggerData[i].trigger_value) >
+						triggerCondition)then
+					isArrive = true
+					for k = 1, #self.triggerList do
+						if(self.triggerList[k] == tonumber(allTriggerData[i].group_id))then
+							hasTrigger = true
+							break
+						end
+					end
+
+					if(not hasTrigger)then
+						table.insert(self.triggerList,#self.triggerList + 1,tonumber(allTriggerData[i].group_id))
+					end
+				end
+			end
+
+			if(self.triggerList ~= nil and #self.triggerList > 0)then
+				if((isArrive and not self.isInTrigger))then
+					if (CS.UserDataProxy.inst.playerData.level < tonumber(allTriggerData[i].end_level)) then
+						self.isInTrigger = true
+						CS.GuideManager.inst.isInTriggerGuide = true
+						local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+						local func = funcGeneric(CS.Award_AboutVal)
+						local data = CS.Award_AboutVal()
+						data.type = CS.ReceiveInfoUIType.GuideTrigger
+						data.val = tonumber(self.triggerList[1])
+						func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, data)
+						return
+					end
+				end
+			end
+		end
+	end
+
+	if(self.triggerList ~= nil and #self.triggerList > 0)then
+		if(triggerType == 8)then
+			self.isInTrigger = true
+			CS.GuideManager.inst.isInTriggerGuide = true
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.Award_AboutVal)
+			local data = CS.Award_AboutVal()
+			data.type = CS.ReceiveInfoUIType.GuideTrigger
+			data.val = tonumber(self.triggerList[1])
+			func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, data)
+			return
+		end
+	end
+
+	if(triggerType == 8)then
+		self.isInTrigger = false
+		CS.GuideManager.inst.isInTriggerGuide = false
+		EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.HideGuideTriggerUI)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.RefreshUI_GuideTask)
+	end
+	--if(#triggerList > 0 and triggerType == 8)then
+	--self:StartGuideTrigger(triggerList[1])
+	--end
+end
+
+return GuideTriggerManager.inst

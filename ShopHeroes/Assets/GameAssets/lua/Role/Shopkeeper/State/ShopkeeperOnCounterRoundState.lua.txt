@@ -1,0 +1,151 @@
+
+local Time = CS.UnityEngine.Time
+local Helper = CS.Helper
+local CS_IndoorRoleActionConfigManagerInst = CS.IndoorRoleActionConfigManager.inst
+
+require("utils/StateBase")
+
+
+local ShopkeeperOnCounterRoundState = class(StateBase)
+
+
+function ShopkeeperOnCounterRoundState:init(shopkeeper)
+
+	self.shopkeeper = shopkeeper
+	self.isBargaining = false --是否在讨价还价
+	self.isIdle = false --是否在待机
+	self.otherIdleAnimTime = 5
+	self.timer = 0
+	self.logicTimer = 0
+	self.logicRunTime = 1
+
+end
+
+
+function ShopkeeperOnCounterRoundState:getStateType()
+
+	return MachineShopkeeperState.onCounterRound
+
+end
+
+function ShopkeeperOnCounterRoundState:onEnter(info)
+
+	if self.shopkeeper:CheckIsRoundCounter() then
+		self.shopkeeper:FaceToCounter()
+	else
+		self.shopkeeper:SetState(MachineShopkeeperState.toCounter)
+	end
+
+end
+
+
+function ShopkeeperOnCounterRoundState:onExit()
+
+end
+
+function ShopkeeperOnCounterRoundState:onUpdate()
+
+	self.logicTimer = self.logicTimer + Time.deltaTime
+
+	if self.logicTimer >= self.logicRunTime then
+
+		self.logicTimer = 0
+
+		if self:shopperIsBuy() then
+
+			if not self.isBargaining then
+				self:bargaining()
+				self.isBargaining = true
+			end
+			
+			self.isIdle = false
+			
+		else
+			
+			if not self.isIdle then
+				
+				self.shopkeeper:FaceToCounter()
+				local idleAniName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.shopkeeper.character.gender, CS.kIndoorRoleActionType.normal_standby);
+				self.shopkeeper.character:Play(idleAniName,true)
+				self.isIdle = true
+				
+			end
+			
+			self.isBargaining = false
+			
+		end
+
+	end
+	
+	if self.isIdle then
+		
+		self.timer = self.timer + Time.deltaTime
+		
+		if self.timer >= self.otherIdleAnimTime then
+			
+			self.timer = 0
+			
+			self:otherIdleAnim()
+			
+			if self.shopkeeper.isShowingAcheivement and Helper.randomResult(50) then --气泡抖动
+				
+				if self.shopkeeper.attacher.headBubbleIsShow and not self.shopkeeper.attacher.isShowTalkPop then
+					self.shopkeeper.attacher.spAnim:CrossFade("idle_2",0)
+					self.shopkeeper.attacher.spAnim:Update(0)
+					self.shopkeeper.attacher.spAnim:Play("idle_2")
+				end
+				
+			end
+			
+		end
+		
+	end
+	
+
+end
+
+
+--判断是否需要讨价还价
+function ShopkeeperOnCounterRoundState:shopperIsBuy()
+
+	local shopperUI = GUIManager.inst:GetWindowCs(typeof(CS.ShopperUIView))
+
+	if shopperUI == nil  then
+		return false
+	else
+		return shopperUI.isShowing
+	end
+
+end
+
+--讨价还价
+function ShopkeeperOnCounterRoundState:bargaining()
+
+	local bargainingAnimationName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.shopkeeper.character.gender, CS.kIndoorRoleActionType.haggle);
+	self.shopkeeper.character:Play(bargainingAnimationName,true)
+
+end
+
+--换个姿势
+function ShopkeeperOnCounterRoundState:otherIdleAnim()
+
+	if math.random(1,8) == 1 then -- 8分之1的概率
+
+		local specialIdleAnimationName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.shopkeeper.character.gender, CS.kIndoorRoleActionType.special_standby);
+		self.shopkeeper.character:Play(specialIdleAnimationName,false,1,0,function (t)
+
+				if self.shopkeeper == nil then
+					return
+				end
+
+				local idleAniName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.shopkeeper.character.gender, CS.kIndoorRoleActionType.normal_standby);
+				self.shopkeeper.character:Play(idleAniName,true)
+
+			end)
+
+	end
+
+end
+
+
+return ShopkeeperOnCounterRoundState

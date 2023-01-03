@@ -1,0 +1,41 @@
+local CSheroupgradeconfigManagerInst = CS.heroupgradeconfigManager.inst
+local CSEquipConfigManagerInst = CS.EquipConfigManager.inst
+local CSItemBagProxyInst = CS.ItemBagProxy.inst
+local CSHeroProfessionConfigManagerInst = CS.HeroProfessionConfigManager.inst
+
+-- C#已同步
+
+xlua.private_accessible(CS.RoleEquipView)
+xlua.hotfix(
+	CS.RoleEquipView,
+	"JudgeIsShowUp",
+	function(self)
+		
+		local maxLevel = CSheroupgradeconfigManagerInst:GetHeroUpgradeConfig(self.data.level).equip_lv
+		local curEquipData = CSEquipConfigManagerInst:GetEquipInfoConfig(self.equipData.equipId)
+		local currOnShelfEquips = CSItemBagProxyInst:GetEquipItemsByTypeAndMaxLevel(false, CSHeroProfessionConfigManagerInst:GetTargetFieldEquipList(self.data.id, self.equipData.equipPosId):ToArray(), maxLevel)
+
+		local haveBest = false
+
+		for i = 0, currOnShelfEquips.Count - 1 do
+			local index = i
+
+			if(currOnShelfEquips[index].equipConfig.equipDrawingsConfig.level <= self.data.level)then
+
+				if(EquipProperty_make_integral_ConfigManager:GetEquipFighting(curEquipData,self.data.talentConfig) < EquipProperty_make_integral_ConfigManager:GetEquipFighting(currOnShelfEquips[index].equipConfig,self.data.talentConfig))then
+					haveBest = true
+					break
+				end
+
+			end
+
+		end
+
+		if(haveBest)then
+			self.contentPane.newObj:SetActive(true)
+		else
+			self.contentPane.newObj:SetActive(false)
+		end
+
+	end
+)

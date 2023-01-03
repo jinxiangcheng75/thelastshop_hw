@@ -1,0 +1,242 @@
+---@class OnlineRewardDataProxy
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+OnlineRewardDataProxy = class(BaseDataProxy)
+
+OnlineRewardDataProxy.inst = OnlineRewardDataProxy:new()
+
+function OnlineRewardDataProxy:Init()
+	self.onlineDataList = {}
+	NetworkEvent:SetCallback(MsgTypeCmd.Response_User_OnlineRewardList_Cmd,
+		function (resp)
+			print("Response_User_OnlineRewardList success",resp)
+			self:GetOnlineRewardListData(resp)
+		end,
+		function (code)
+			print("Response_User_OnlineRewardList fail --- code",code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取在线领奖数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(MsgTypeCmd.Response_User_OnlineRewardListReward_Cmd,
+		function (resp)
+			print("Response_User_OnlineRewardListReward success",resp)
+			self:GetOnlineRewardListRewardData(resp)
+		end,
+		function (code)
+			print("Response_User_OnlineRewardListReward fail --- code",code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"领取在线领奖奖品失败!")
+		end
+	)
+	
+	--local temp = CS.OneOnlineRewardInfo()
+	--temp.rewardIndex = 1
+	--temp.rewardId = 1
+	--temp.rewardItemId = 10002
+	--temp.rewardType = 2
+	--temp.rewardCount = 1000
+	--temp.rewardState = 2
+	--temp.remainTime = 60
+	----temp.name = "湘诚活动"
+	--temp.startTime = 0
+	--temp.endTime = 0
+	--local temp2 = CS.OneOnlineRewardInfo()
+	--temp2.rewardIndex = 1
+	--temp2.rewardId = 1
+	--temp2.rewardItemId = 10001
+	--temp2.rewardType = 2
+	--temp2.rewardCount = 9989
+	--temp2.rewardState = 0
+	--temp2.remainTime = 600
+	----temp2.name = "湘诚活动2"
+	--temp2.startTime = 0
+	--temp2.endTime = 0
+	--local tempData = OnlineRewardData:new()
+	--tempData:SetData(temp)
+	--local tempData2 = OnlineRewardData:new()
+	--tempData2:SetData(temp2)
+	--self.onlineDataList[1] = tempData
+	--self.onlineDataList[2] = tempData2
+end
+
+function OnlineRewardDataProxy:GetOnlineRewardListData(respData)
+	local data = MsgType.Response_User_OnlineRewardList:New(respData)
+	if(CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success)then return end
+
+	for i = 1, #self.onlineDataList do
+		self.onlineDataList[i]:clearTime()
+	end
+
+	self.onlineDataList = {}
+
+	for i = 1, #data.onlineRewardList do
+		local tempData = OnlineRewardData:new()
+		tempData:SetData(data.onlineRewardList[i])
+		self.onlineDataList[i] = tempData
+	end
+
+	csEventControllerInst:TriggerEvent(csGameEventType.MenuEvent.REFRESHONLINEREWARDBTNS)
+	EventDispatcher:dispatchEvent(GameEvent.OnlineRewardEvent.RefreshUI_OnlineInfo)
+end
+
+function OnlineRewardDataProxy:GetOnlineRewardListRewardData(respData)
+	local data = MsgType.Response_User_OnlineRewardListReward:New(respData)
+	if(CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success)then return end
+
+	for i = 1, #self.onlineDataList do
+		self.onlineDataList[i]:clearTime()
+	end
+
+	self.onlineDataList = {}
+
+	for i = 1, #data.onlineRewardList do
+		local tempData = OnlineRewardData:new()
+		tempData:SetData(data.onlineRewardList[i])
+		self.onlineDataList[i] = tempData
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.OnlineRewardEvent.HideUI_OnlineInfo)
+	local cfg = CS.ItemconfigManager.inst:GetConfig(data.rewardItem.itemId)
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.queueItem)
+	if(cfg ~= nil)then
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem,"",0,data.rewardItem.itemId,data.rewardItem.count)
+
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	else
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem,"",data.rewardItem.itemId,0,data.rewardItem.count)
+
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	end
+
+	csEventControllerInst:TriggerEvent(csGameEventType.MenuEvent.REFRESHONLINEREWARDBTNS)
+end
+
+function OnlineRewardDataProxy:Clear()
+
+end
+
+function OnlineRewardDataProxy:GetDataList()
+	local index = 1
+	local tempList = {}
+	for i, v in ipairs(self.onlineDataList) do
+		tempList[index] = v
+		index = index + 1
+	end
+
+	return tempList
+end
+
+function OnlineRewardDataProxy:GetDataById(onlineId)
+	for i = 1, #self.onlineDataList do
+		if(self.onlineDataList[i].onlineId == onlineId)then
+			return self.onlineDataList[i]
+		end
+	end
+end
+
+OnlineRewardData = class()
+
+function OnlineRewardData:SetData(oneData)
+	self.onlineId = oneData.rewardIndex
+	self.id = oneData.rewardId
+	self.itemId = oneData.rewardItemId
+	self.itemType = oneData.rewardType
+	self.itemCount = oneData.rewardCount
+	self.state = oneData.rewardState
+	self.remainTime = oneData.remainTime
+	self.onlineNameCn = oneData.nameCn
+	self.onlineNameEn = oneData.nameEn
+	self.onlineNameTw = oneData.nameTw
+	self.startTime = oneData.startTime
+	self.endTime = oneData.endTime
+	self.endRemainTime = oneData.endRemainTime
+	self.onlineType = oneData.type
+
+	self.timerId = nil
+	self.remainTimerId = nil
+	self.realRemainTime = 0
+	self.onlineRemainTime = 0
+
+	if(self.state == 0)then
+		self:caculateTime()
+	end
+
+	if(self.onlineType ~= 1)then
+		--self:caculateRemainTime()
+	end
+end
+
+function OnlineRewardData:GetNameByLanguage()
+	local str = ""
+	if CS_LanguageManagerInst.curType == CS.LanguageType.SIMPLIFIED_CHINESE then
+		str = self.onlineNameCn
+	elseif CS_LanguageManagerInst.curType == CS.LanguageType.TRADITIONAL_CHINESE then
+		str = self.onlineNameTw
+	elseif CS_LanguageManagerInst.curType == CS.LanguageType.ENGLISH then
+		str = self.onlineNameEn
+	end
+	
+	return str
+end
+
+function OnlineRewardData:clearTime()
+	if(self.timerId ~= nil)then
+		csGameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = nil
+	end
+
+	if(self.remainTimerId ~= nil)then
+		csGameTimerInst:RemoveTimer(self.remainTimerId)
+		self.remainTimerId = nil
+	end
+end
+
+function OnlineRewardData:caculateTime()
+	if(self.timerId ~= nil)then
+		csGameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = nil
+	end
+	self.realRemainTime = csGameTimerInst.serverNow + self.remainTime
+	self.timerId = csGameTimerInst:AddTimer(1,
+		function()
+			if(self.remainTime > 0)then
+				self.remainTime = self.realRemainTime - csGameTimerInst.serverNow
+			else
+				-- 事件
+				EventDispatcher:dispatchEvent(GameEvent.OnlineRewardEvent.Request_OnlineList)
+				csGameTimerInst:RemoveTimer(self.timerId)
+				self.timerId = nil
+			end
+		end
+	)
+end
+
+function OnlineRewardData:caculateRemainTime()
+	if(self.remainTimerId ~= nil)then
+		csGameTimerInst:RemoveTimer(self.remainTimerId)
+		self.remainTimerId = nil
+	end
+	self.onlineRemainTime = csGameTimerInst.serverNow + self.endRemainTime
+	self.remainTimerId = csGameTimerInst:AddTimer(1,
+		function()
+			if(self.endRemainTime > 0)then
+				self.endRemainTime = self.onlineRemainTime - csGameTimerInst.serverNow
+			else
+				-- 事件
+				EventDispatcher:dispatchEvent(GameEvent.OnlineRewardEvent.Request_OnlineList)
+				csGameTimerInst:RemoveTimer(self.remainTimerId)
+				self.remainTimerId = nil
+			end
+		end
+	)
+end

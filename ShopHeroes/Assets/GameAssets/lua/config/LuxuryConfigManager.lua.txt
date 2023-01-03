@@ -1,0 +1,236 @@
+-- LuxuryConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+LuxuryConfigData =
+class(
+	{
+		level,
+		type,
+		atlas,
+		icon,
+		stars,
+		luxury_num,
+		buff_type,
+		buff_val,
+		luxury_dec
+	}
+)
+
+LuxuryConfigManager = class()
+--LuxuryConfigManager.cfgDict = {}
+local csv_name = "luxury_lv"
+
+function LuxuryConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("LuxuryConfigManager:InitCSVConfig csv:", csv)
+	local cfgs = CSVParser:parseClass(csv, 3, LuxuryConfigData)
+	LuxuryConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("LuxuryConfigManager  错误")
+	end
+end
+
+function LuxuryConfigManager:processConfigs(cfgs)
+	--print("LuxuryConfigManager:processConfigs ", cfgs, " len:", #cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		--print("LuxuryConfigManager c i:", i," c:", c, " idtype:", type(c.level))
+		self.cfgDict[tonumber(c.level)] = c
+	end
+	print("LuxuryConfigManager:processConfigs completed")
+end
+
+function LuxuryConfigManager:GetAllConfigs()
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+		tempList[index] = v
+		index = index + 1
+	end
+
+	return tempList
+end
+
+function LuxuryConfigManager:GetConfig(level)
+	return self.cfgDict[level]
+end
+
+function LuxuryConfigManager:GetNotUnlockList(level)
+	local dataList = self:GetAllConfigs()
+	local tempList = {}
+	local index = 1
+	
+	for i = 1, #dataList do
+		if(tonumber(dataList[i].level) > level)then
+			tempList[index] = dataList[i]
+			index = index + 1
+		end
+	end
+	
+	table.sort(tempList,
+		function (a,b)
+			return tonumber(a.level) < tonumber(b.level)
+		end
+	)
+	
+	return tempList
+end
+
+function LuxuryConfigManager:GetConfigByLuxuryNum(luxuryNum)
+	local data
+	for i, v in ipairs(self.cfgDict) do
+		if(tonumber(v.luxury_num) <= luxuryNum)then
+			data = v
+		else
+			return data
+		end
+	end
+
+	return data
+end
+
+function LuxuryConfigManager:GetDifferentTypeData(level)
+	level = tonumber(level)
+	local dataList = self:GetAllConfigs()
+	local tempList = {}
+	local returnList = {}
+	for i = 1, #dataList do
+		if(tempList[dataList[i].buff_type] == nil)then
+			tempList[dataList[i].buff_type] = dataList[i]
+		else
+			if(tonumber(tempList[dataList[i].buff_type].level) <= level and tonumber(dataList[i].level) <= level)then
+				tempList[dataList[i].buff_type] = dataList[i]
+			end
+		end
+	end
+
+	local index = 1
+	for i, v in pairs(tempList) do
+		returnList[index] = v
+		index = index + 1
+	end
+
+	table.sort(returnList,
+		function (a,b)
+			return a.buff_type < b.buff_type
+		end
+	)
+
+	return returnList
+end
+
+function LuxuryConfigManager:GetDescStr(type,val)
+	local str = ""
+	if(type == 1)then
+		str = "防具/散件架 升级时间减 <Color=#77DD4F>{0}%</Color>"
+	elseif type == 2 then
+		str = "冷兵器/枪械架 升级时间减 <Color=#77DD4F>{0}%</Color>"
+	elseif type == 3 then
+		str = "店内顾客上限 增加 <Color=#77DD4F>{0}</Color>"
+	elseif type == 4 then
+		str = "防具类售价 +<Color=#77DD4F>{0}%</Color>"
+	elseif type == 5 then
+		str = "武器类售价 +<Color=#77DD4F>{0}%</Color>"
+	elseif type == 6 then
+		str = "散件类售价 +<Color=#77DD4F>{0}%</Color>"
+	end
+
+	return CS.LanguageManager.inst:GetValueByKey(str,val) 
+end
+
+function LuxuryConfigManager:GetStrUp(type)
+	local str = ""
+	if(type == 1)then
+		str = "防具架/散件架"
+	elseif type == 2 then
+		str = "冷兵器架/枪械架"
+	elseif type == 3 then
+		str = "店内顾客上限"
+	elseif type == 4 then
+		str = "防具类装备"
+	elseif type == 5 then
+		str = "武器类装备"
+	elseif type == 6 then
+		str = "散件类装备"
+	end
+
+	return CS.LanguageManager.inst:GetValueByKey(str)
+end
+
+function LuxuryConfigManager:GetStrDown(type,val)
+	local str = ""
+	if(type == 1 or type == 2)then
+		str = "减少升级时间<Color=#77DD4F>{0}%</Color>"
+	elseif type == 3 then
+		str = "增加<Color=#77DD4F>{0}</Color>"
+	elseif type == 4 or type == 5 or type == 6 then
+		str = "出售价格<Color=#77DD4F>+{0}%</Color>"
+	end
+
+	return CS.LanguageManager.inst:GetValueByKey(str,val)
+end
+
+function LuxuryConfigManager:GetLuxuryBuff(subType)
+	local data = LuxuryConfigManager:GetConfigByLuxuryNum(CS.UserDataProxy.inst.playerData.prosperity)
+	if(data ~= nil)then
+		local buffType = 0
+		if(subType == 1)then
+			buffType = 5
+		elseif subType == 2 then
+			buffType = 4
+		elseif subType == 3 then
+			buffType = 6
+		end
+		if(buffType ~= 0)then
+			local list = LuxuryConfigManager:GetAllConfigs()
+			if(list ~= nil)then
+				for i = tonumber(data.level), 1,-1 do
+					if(tonumber(list[i].buff_type) == buffType)then
+						return tonumber(list[i].buff_val)
+					end
+				end
+				return -1
+			else
+				return -1
+			end
+		else
+			return -1
+		end
+	else
+		return -1
+	end
+end
+
+function LuxuryConfigManager:GetLuxuryUpgradeBuff(subType)
+	local data = LuxuryConfigManager:GetConfigByLuxuryNum(CS.UserDataProxy.inst.playerData.prosperity)
+	if(data ~= nil)then
+		local buffType = 0
+		if(subType == 1 or subType == 2)then
+			buffType = 2
+		elseif subType == 3 or subType == 4 then
+			buffType = 1
+		end
+		if(buffType ~= 0)then
+			local list = LuxuryConfigManager:GetAllConfigs()
+			if(list ~= nil)then
+				for i = tonumber(data.level), 1,-1 do
+					if(tonumber(list[i].buff_type) == buffType)then
+						return tonumber(list[i].buff_val)
+					end
+				end
+				return -1
+			else
+				return -1
+			end
+		else
+			return -1
+		end
+	else
+		return -1
+	end
+end

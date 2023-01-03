@@ -1,0 +1,154 @@
+---------------------------------------------------------------------
+
+require("class")
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_PayInst = CS.GamePay.inst
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+--WorkerGameMakeScoreItem
+
+WorkerGameMakeScoreItem = class()
+----
+
+function WorkerGameMakeScoreItem:ctor()
+end
+
+function WorkerGameMakeScoreItem:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.topTipTx = self.contentPane:GetObjByName("tx_topTip"):GetComponent("Text")
+	self.topTypeTx = self.contentPane:GetObjByName("tx_topTypeTx"):GetComponent("Text")
+	self.topDoubleTypeObj = self.contentPane:GetObjByName("obj_topDoubleType")
+	
+	self.bgIcon = self.contentPane:GetObjByName("icon_bg"):GetComponent(CS_type_GUIIcon)
+	self.allImg = self.contentPane:GetObjByName("img_all"):GetComponent("Image")
+	self.tipAllTx = self.contentPane:GetObjByName("tx_tipAll"):GetComponent("Text")
+	
+	self.targetIcon = self.contentPane:GetObjByName("icon_target"):GetComponent(CS_type_GUIIcon)
+	self.typeTwoTx = self.contentPane:GetObjByName("tx_typeTwo"):GetComponent("Text")
+	self.countdownTx = self.contentPane:GetObjByName("tx_countdown"):GetComponent("Text")
+
+end
+
+function WorkerGameMakeScoreItem:init(obj)
+	self:initComp(obj)
+	self.timerId = 0
+end
+
+
+function WorkerGameMakeScoreItem:GetBigTypeName(type)
+	
+	local result = ""
+	local icon = ""
+	
+	if type == 1 then
+		result = "武器"
+		icon = "yeqianicon_wuqi"
+	elseif type == 2 then
+		result = "防具"
+		icon = "yeqianicon_fushi"
+	elseif type == 3 then
+		result = "其他"
+		icon = "yeqianicon_qita"
+	end
+	
+	return result,icon
+	
+end
+
+
+
+function WorkerGameMakeScoreItem:SetData(makeScoreData)
+	
+	self.data = makeScoreData
+	
+	if self.data.serverData.type == MsgType.EOperatingActivityInfoType.EquipPropertyType then --装备大类
+		
+		local name,icon = self:GetBigTypeName(self.data.serverData.id)
+		
+		self.topTipTx.text = CS_LanguageManagerInst:GetValueByKey("任意1-10阶")
+		self.topTypeTx.text = CS_LanguageManagerInst:GetValueByKey(name)
+		self.topDoubleTypeObj:SetActive(false)
+		self.bgIcon:SetSprite("activity_qjds_atlas","qiaojiang_yuandi1")
+		self.allImg.enabled = true
+		self.tipAllTx.enabled = true
+		self.typeTwoTx.text = CS_LanguageManagerInst:GetValueByKey(name)
+		
+		self.targetIcon:SetSprite("activity_qjds_atlas",icon)
+		
+	elseif self.data.serverData.type == MsgType.EOperatingActivityInfoType.EquipPropertySubType then --装备小类
+		
+		local classCfg = CS_EquipConfigManagerInst:GetEquipTypeByID(self.data.serverData.id)
+		
+		self.topTipTx.text = CS_LanguageManagerInst:GetValueByKey("任意1-10阶")
+		self.topTypeTx.text = CS_LanguageManagerInst:GetValueByKey(classCfg.name)
+		self.topDoubleTypeObj:SetActive(false)
+		self.bgIcon:SetSprite("activity_qjds_atlas","qiaojiang_yuandi1")
+		self.allImg.enabled = false
+		self.tipAllTx.enabled = false
+		self.typeTwoTx.text = CS_LanguageManagerInst:GetValueByKey(classCfg.name)
+		
+		self.targetIcon:SetSprite(classCfg.Atlas,classCfg.icon)
+		
+	elseif self.data.serverData.type == MsgType.EOperatingActivityInfoType.EquipDrawingId then --指定装备id
+		
+		local equipDrawingCfg = CS_EquipConfigManagerInst:GetEquipDrawingsCfg(self.data.serverData.id)
+		
+		self.topTipTx.text = CS_LanguageManagerInst:GetValueByKey("特别嘉奖")
+		self.topTypeTx.text = ""
+		self.topDoubleTypeObj:SetActive(true)
+		self.bgIcon:SetSprite("activity_qjds_atlas","qiaojiang_yuandi2")
+		self.allImg.enabled = false
+		self.tipAllTx.enabled = false
+		self.typeTwoTx.text = CS_LanguageManagerInst:GetValueByKey(equipDrawingCfg.name)
+		
+		self.targetIcon:SetSprite(equipDrawingCfg.atlas,equipDrawingCfg.icon)
+		
+	end
+	
+	self:setTimer()
+	
+end
+
+function WorkerGameMakeScoreItem:setTimer()
+	
+	self:ClearTimer()
+	
+	local remainTime = self.data.endTime - CS_GameTimerInst.serverNow
+	self.countdownTx.text = CS_TimeUtils.timeSpanStrip(remainTime)
+	
+	self.timerId = CS_GameTimerInst:AddTimer(
+		1,
+		function()
+			local _remainTime = self.data.endTime - CS_GameTimerInst.serverNow
+			self.countdownTx.text = CS_TimeUtils.timeSpanStrip(_remainTime)
+		end
+	)
+end
+
+function WorkerGameMakeScoreItem:ClearTimer()
+	
+	if self.timerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+	
+end
+
+return WorkerGameMakeScoreItem

@@ -1,0 +1,50 @@
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+GrowThRewardCfg = class(
+	{
+		id = 0,
+		need_lv = 0,
+		reward1_type = 0,
+		reward1_id = 0,
+		reward1_num = 0,
+		reward2_type = 0,
+		reward2_id = 0,
+		reward2_num = 0,
+	}
+)
+
+GrowthRewardConfigManager = class()
+
+GrowthRewardConfigManager.cfgDict = {}
+
+local csv_name = "growth_reward"
+
+function GrowthRewardConfigManager:InitCSVConfig()
+	local csv = csCSVParser.GetCSV(csv_name)
+	
+	local cfgs = CSVParser:parseClass(csv, 3, GrowThRewardCfg)
+	
+	GrowthRewardConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("GuideTaskConfigManager  错误")
+	end
+
+end
+
+function GrowthRewardConfigManager:processConfigs(cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		self.cfgDict[tonumber(c.id)] = c
+	end
+end
+
+function GrowthRewardConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end
+
+function GrowthRewardConfigManager:GetRewardListCount()
+	return #self.cfgDict
+end

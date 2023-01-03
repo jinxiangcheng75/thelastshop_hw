@@ -1,0 +1,34 @@
+local icon
+local descText
+
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csVipState = CS.K_Vip_State
+local csVipLevelConfigManagerInst = CS.VipLevelConfigManager.inst
+local csK_Vip_Type = CS.K_Vip_Type
+
+require("data/MallDataProxy")
+
+local data
+
+function InitComp()
+	icon = self:GetObjByName("icon1"):GetComponent("GUIIcon")
+    descText = self:GetObjByName("Text"):GetComponent("Text")
+end
+
+function SetData(_data)
+	data = _data
+
+    local vipData = MallDataProxy.inst.vipData
+
+    if(data.pic_1 ~= "-1" and data.pic_2 ~= "-1")then
+        icon:SetSprite(data.pic_1,data.pic_2)
+    end
+
+    descText.text = csLanguageManagerInst:GetValueByKey(data.txt)
+    if (csVipState.__CastFrom(vipData.state) == csVipState.Vip and vipData.remainTime > 0) then
+       if(#data.active_txt > 0)then
+        local vipLvCfg = csVipLevelConfigManagerInst:GetValByLevelAndType(vipData.level, csK_Vip_Type.__CastFrom(data.active_type))
+        descText.text = csLanguageManagerInst:GetValueByKey(data.active_txt,tostring(vipLvCfg))
+       end 
+    end
+end

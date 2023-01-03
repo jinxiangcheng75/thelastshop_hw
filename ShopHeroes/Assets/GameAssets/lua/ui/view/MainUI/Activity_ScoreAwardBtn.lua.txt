@@ -1,0 +1,132 @@
+
+--Activity_ScoreAwardBtn
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+Activity_ScoreAwardBtn = class()
+----
+
+function Activity_ScoreAwardBtn:ctor()
+end
+
+function Activity_ScoreAwardBtn:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.button = self.transform:GetComponent("Button")
+	self.tx_countdown = self.contentPane:GetObjByName("tx_countdownTx"):GetComponent("Text")
+	self.tx_name = self.contentPane:GetObjByName("tx_name"):GetComponent("Text")
+	self.obj_redPoint = self.contentPane:GetObjByName("obj_redPoint")
+	self.icon = self.contentPane:GetObjByName("icon"):GetComponent("GUIIcon")
+
+end
+
+
+function Activity_ScoreAwardBtn:init(obj)
+
+	self:initComp(obj)
+
+	self.timerId = 0
+
+	self.button:ButtonClickTween(
+		function()
+			self:onButtonClick()
+		end
+	)
+
+end
+
+function Activity_ScoreAwardBtn:refreshRedPoint()
+
+	local flag = (Activity_ScoreAwardGameProxy.inst.flag and (Activity_ScoreAwardGameProxy.inst:GetScoreReallyCanRewardCount() > 0 or Activity_ScoreAwardGameProxy.inst:GetScoreAwardTaskCanRewardCount() > 0)) or Activity_ScoreAwardGameProxy.inst:GetScoreReallyCanRewardCount() > 0
+	
+	--if flag then
+		--self.gameObject:SetActive(true)
+	--end
+
+	self.obj_redPoint:SetActive(flag)
+
+	if not flag and not Activity_ScoreAwardGameProxy.inst.flag then
+
+		self:clearTimer()
+		self.gameObject:SetActive(false)
+
+	end
+
+end
+
+function Activity_ScoreAwardBtn:onButtonClick()
+
+	if Activity_ScoreAwardGameProxy.inst.flag then
+		EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_MainPanel, false)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_ScoreRewardPanel,Activity_ScoreAwardGameProxy.inst:GetCurScorePointLv())
+	end
+
+end
+
+function Activity_ScoreAwardBtn:check(flag)
+
+	self:clearTimer()
+
+	self.tx_name.text = Activity_ScoreAwardGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Name)
+	local iconUrl = Activity_ScoreAwardGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Icon)
+	if(iconUrl ~= "-暂无-")then
+		self.icon:SetSpriteURL(iconUrl)
+	end
+
+	if not flag then --积分大奖赛未开启  判断是否有可以领奖的(真正可以领取的)
+
+		self.gameObject:SetActive(false)
+		if Activity_ScoreAwardGameProxy.inst:GetScoreReallyCanRewardCount() > 0 then
+			self.tx_countdown.text = "活动已结束"
+			self.gameObject:SetActive(true)
+		else
+			self.gameObject:SetActive(false)
+		end
+
+		return
+
+	end
+
+	self:timerMethod()
+	self.timerId = CS_GameTimerInst:AddTimer(1,function ()
+
+			self:timerMethod()
+
+		end)
+
+end
+
+function Activity_ScoreAwardBtn:timerMethod()
+
+	local remainTime = Activity_ScoreAwardGameProxy.inst.endtime_serverEndtime - CS_GameTimerInst.serverNow
+	if Activity_ScoreAwardGameProxy.inst.flag == true and remainTime > 0 then --积分大奖赛开启
+		self.tx_countdown.text = CS_TimeUtils.timeSpanStrip(remainTime,true)
+		self.gameObject:SetActive(true)
+
+	else
+		self.tx_countdown.text = "活动已结束"
+		self.gameObject:SetActive(false)
+
+	end
+
+end
+
+function Activity_ScoreAwardBtn:clearTimer()
+
+	if self.timerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+
+end
+
+return Activity_ScoreAwardBtn

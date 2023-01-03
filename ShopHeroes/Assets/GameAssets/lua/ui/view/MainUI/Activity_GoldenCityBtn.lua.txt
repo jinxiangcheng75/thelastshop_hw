@@ -1,0 +1,133 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+--Activity_GoldenCityBtn
+
+Activity_GoldenCityBtn = class()
+----
+
+function Activity_GoldenCityBtn:ctor()
+end
+
+function Activity_GoldenCityBtn:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.button = self.transform:GetComponent("Button")
+	self.tx_countdown = self.contentPane:GetObjByName("tx_countdownTx"):GetComponent("Text")
+	self.tx_name = self.contentPane:GetObjByName("tx_name"):GetComponent("Text")
+	self.obj_redPoint = self.contentPane:GetObjByName("obj_redPoint")
+	self.icon = self.contentPane:GetObjByName("icon"):GetComponent("GUIIcon")
+
+end
+
+
+function Activity_GoldenCityBtn:init(obj)
+
+	self:initComp(obj)
+
+	self.timerId = 0
+
+	self.button:ButtonClickTween(
+		function()
+			self:onButtonClick()
+		end
+	)
+
+	--self:refreshRedPoint(Activity_WorkerGameProxy.inst.scoreCanRewardCount > 0 or Activity_WorkerGameProxy.inst.coinFreeFlag)
+
+end
+
+function Activity_GoldenCityBtn:refreshRedPoint(flag)
+
+	--if flag then
+		--self.gameObject:SetActive(true)
+	--end
+
+	self.obj_redPoint:SetActive(flag)
+
+	if not flag then
+		if(not GoldenCityDataProxy.inst.flag)then
+			self:clearTimer()
+			self.gameObject:SetActive(false)
+		end
+		
+		self.obj_redPoint:SetActive(not GoldenCityDataProxy.inst.dailyFlag or CS.ExploreDataProxy.inst.HasFinishExplore)
+	end
+
+end
+
+function Activity_GoldenCityBtn:onButtonClick()
+
+	if GoldenCityDataProxy.inst.flag then
+		EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityMain,0)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityRewardList,GoldenCityDataProxy.inst:GetCurScorePointLv())
+	end
+
+end
+
+function Activity_GoldenCityBtn:check(flag)
+
+	self:clearTimer()
+
+	self.tx_name.text = GoldenCityDataProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Name)
+	local iconUrl = GoldenCityDataProxy.inst:GetActivityStr(4)
+	if(iconUrl ~= "-暂无-")then
+		self.icon:SetSpriteURL(iconUrl)
+	end
+
+	if not flag then --夺宝奇兵(黄金城)未开启  判断是否有可以领奖的(真正可以领取的)
+
+		self.gameObject:SetActive(false)
+		if GoldenCityDataProxy.inst:GetScoreReallyCanRewardCount() > 0 then
+			self.tx_countdown.text = "活动已结束"
+			self.gameObject:SetActive(true)
+		else
+			self.gameObject:SetActive(false)
+		end
+
+		return
+
+	end
+
+	self:timerMethod()
+	self.timerId = CS_GameTimerInst:AddTimer(1,function ()
+
+			self:timerMethod()
+
+		end)
+
+end
+
+function Activity_GoldenCityBtn:timerMethod()
+
+	local remainTime = GoldenCityDataProxy.inst.endtime_serverEndtime - CS_GameTimerInst.serverNow
+	if GoldenCityDataProxy.inst.flag == true and remainTime > 0 then --夺宝奇兵(黄金城)开启
+		self.tx_countdown.text = CS_TimeUtils.timeSpanStrip(remainTime,true)
+		self.gameObject:SetActive(true)
+
+	else
+		self.tx_countdown.text = "活动已结束"
+		self.gameObject:SetActive(false)
+
+	end
+
+end
+
+function Activity_GoldenCityBtn:clearTimer()
+
+	if self.timerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+
+end
+
+return Activity_GoldenCityBtn

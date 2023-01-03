@@ -1,0 +1,82 @@
+
+--PetConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local CS_CSVParser = CS.CSVParser
+
+PetConfig =
+class({
+		id = 1,
+		type = 1,
+		name = "",
+		icon = "",
+		model = 1,
+		furniture_id = 1,
+		show_lv = 1,
+		unlock_level = 1,
+		unlock_type = 1,
+		unlock_sale_id = 1,
+		pet_music_id = 1,
+		unlock_money = 1,
+		unlock_diamond = 1,
+		moveSpeed = 1,
+	})
+
+PetConfigManager = class()
+--PetConfigManager.cfgDict = {}
+local csv_name = "pet"
+
+function PetConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = CS_CSVParser.GetCSV(csv_name)
+
+	local cfgs = CSVParser:parseClass(csv, 3, PetConfig)
+	PetConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("PetConfigManager  错误")
+	end
+end
+
+function PetConfigManager:processConfigs(cfgs)
+
+	for i=1, #cfgs do
+		
+		local c = cfgs[i]
+		
+		c.id = tonumber(c.id)
+		c.type = tonumber(c.type)
+		c.model = tonumber(c.model)
+		c.furniture_id = tonumber(c.furniture_id)
+		c.show_lv = tonumber(c.show_lv)
+		c.unlock_level = tonumber(c.unlock_level)
+		c.unlock_type = tonumber(c.unlock_type)
+		c.unlock_sale_id = tonumber(c.unlock_sale_id)
+		c.pet_music_id = tonumber(c.pet_music_id)
+		c.unlock_money = tonumber(c.unlock_money)
+		c.unlock_diamond = tonumber(c.unlock_diamond)
+		c.moveSpeed = tonumber(c.moveSpeed)
+		
+		self.cfgDict[tonumber(c.id)] = c
+		
+	end
+
+end
+
+function PetConfigManager:GetAllConfig()
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+		tempList[index] = v
+		index = index + 1
+	end
+
+	return tempList
+end
+
+
+
+function PetConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

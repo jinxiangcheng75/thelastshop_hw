@@ -1,0 +1,93 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+
+local luxuryCurInfoItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	luxuryCurInfoItem_dlc = LuxuryCurInfoItem_dlc.new()
+	luxuryCurInfoItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if luxuryCurInfoItem_dlc~=nil then
+		luxuryCurInfoItem_dlc:Clear()
+		luxuryCurInfoItem_dlc = nil
+	end
+end
+
+function SetData(_data)
+	if luxuryCurInfoItem_dlc~=nil then
+		luxuryCurInfoItem_dlc:SetData(_data)
+	end
+end
+
+LuxuryCurInfoItem_dlc = class()
+
+function LuxuryCurInfoItem_dlc:ctor()
+
+end
+
+function LuxuryCurInfoItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+
+	self.data = nil
+end
+
+function LuxuryCurInfoItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.selfBtn = self.gameObject:GetComponent("Button")
+	self.descText = self.contentPane:GetObjByName("descText"):GetComponent("Text")
+	self.gray = self.contentPane:GetObjByName("gray"):GetComponent("Image")
+	self.lockImage = self.contentPane:GetObjByName("lockImage"):GetComponent("Image")
+
+	self.selfBtn.onClick:AddListener(
+		function ()
+			if(self.data == nil) then return end
+
+			if(tonumber(self.data.level) > CS.UserDataProxy.inst.playerData.curLuxuryLevel)then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+				func(
+					csEventControllerInst,
+					csGameEventType.SHOWUI_TEXTMSGTIP,
+					cs_LanguageManagerInst:GetValueByKey("提升豪华度等级可解锁！"),
+					csGUIHelper.GetColorByColorHex("FF2828")
+				)
+			end
+		end
+	)
+end
+
+function LuxuryCurInfoItem_dlc:SetData(_data)
+	if(_data == nil) then return end
+	self.data = _data
+
+	local descStr = LuxuryConfigManager:GetDescStr(tonumber(self.data.buff_type),tostring(self.data.buff_val))
+	self.descText.text = descStr--cs_LanguageManagerInst:GetValueByKey(descStr,tostring(self.data.buff_val))
+	local curLevel = CS.UserDataProxy.inst.playerData.curLuxuryLevel
+	self.gray.enabled = tonumber(self.data.level) > curLevel
+	self.lockImage.enabled = tonumber(self.data.level) > curLevel
+end
+
+function LuxuryCurInfoItem_dlc:Clear()
+
+	self:removeListeners()
+
+end
+
+function LuxuryCurInfoItem_dlc:addListeners()
+
+end
+
+function LuxuryCurInfoItem_dlc:removeListeners()
+
+end

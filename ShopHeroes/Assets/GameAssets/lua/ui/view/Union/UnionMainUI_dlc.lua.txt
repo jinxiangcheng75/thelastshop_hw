@@ -1,0 +1,89 @@
+
+local EventDispatcher = require("event/EventDispatcher")
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+
+
+--UnionMainUI_dlc
+
+
+local UnionMainUI_dlc = class()
+
+function UnionMainUI_dlc:ctor()
+
+	self.isInitComp = false
+
+end
+
+function UnionMainUI_dlc:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaBehaviour)
+
+	self.obj_unionTaskRedPoint = self.contentPane:GetObjByName("obj_unionTaskRedPoint")
+	
+	self.isInitComp = true
+
+end
+
+function UnionMainUI_dlc:init(obj)
+
+	self:initComp(obj)
+	self:addListeners()
+
+end
+
+function UnionMainUI_dlc:addListeners()
+
+
+end
+
+
+function UnionMainUI_dlc:removeListeners()
+
+
+end
+
+function UnionMainUI_dlc:refreshRedPoints()
+	
+	self.obj_unionTaskRedPoint:SetActive(CS.UserDataProxy.inst.task_unionTaskNeedShowRedPoint)
+	
+end
+
+function UnionMainUI_dlc:clear()
+
+	self.isInitComp = false
+	self:removeListeners()
+
+end
+
+
+
+-----------LuaBehaviour---------------------------------------------------------------------------------------------------------------------------------------
+
+local unionMainUI_dlc
+
+function awake()
+
+	unionMainUI_dlc = UnionMainUI_dlc.new()
+	unionMainUI_dlc:init(self.gameObject)
+
+end
+
+function onEnable()
+
+	if unionMainUI_dlc ~= nil then
+		unionMainUI_dlc:refreshRedPoints()
+	end
+	
+end
+
+function ondestroy()
+
+	if unionMainUI_dlc ~= nil then
+		unionMainUI_dlc:clear()
+		unionMainUI_dlc = nil
+	end
+
+end
+

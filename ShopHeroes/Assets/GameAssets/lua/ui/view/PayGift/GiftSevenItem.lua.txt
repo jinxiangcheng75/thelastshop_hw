@@ -1,0 +1,279 @@
+
+--GiftDealItem
+
+require("const/Constants")
+
+local bgIcon
+local icon
+local numText
+local nameText
+local infoBtn
+local tuzhiBg
+local equipLvObj
+local equipLvTx
+local luxuryNumImg
+local luxuryNumText
+local icon_equipSubType
+local icon_shopkeeperDressType
+local img_shopkeeperDressColor
+local icon_furnitureType
+local obj_furnitureType
+local obj_equipSubType
+local obj_shopkeeperDressType
+
+local rewardedObj
+local curDayObj
+local curDayText
+local lockImage
+local highLightImage
+
+local csItemConfigManagerInst = CS.ItemconfigManager.inst
+local csEquipConfigManagerInst = CS.EquipConfigManager.inst
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csItemType = CS.ItemType
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+
+local data
+local commonData
+
+function InitComp()
+
+	bgIcon = self:GetObjByName("bgIcon"):GetComponent("GUIIcon")
+	nameText = self:GetObjByName("nameText"):GetComponent("Text")
+	icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	numText = self:GetObjByName("numText"):GetComponent("Text")
+	infoBtn = self:GetObjByName("infoBtn"):GetComponent("Button")
+	tuzhiBg = self:GetObjByName("tuzhiBg"):GetComponent("Image")
+	equipLvObj = self:GetObjByName("equipLvObj")
+	equipLvTx = self:GetObjByName("equipLvTx"):GetComponent("Text")
+	luxuryNumImg = self:GetObjByName("luxuryNumImg"):GetComponent("Image")
+	luxuryNumText = self:GetObjByName("luxuryNumText"):GetComponent("Text")
+	icon_equipSubType = self:GetObjByName("icon_equipSubType"):GetComponent("GUIIcon")
+	icon_shopkeeperDressType = self:GetObjByName("icon_shopkeeperDressType"):GetComponent("GUIIcon")
+	icon_furnitureType = self:GetObjByName("icon_furnitureType"):GetComponent("GUIIcon")
+	img_shopkeeperDressColor = self:GetObjByName("img_shopkeeperDressColor"):GetComponent("Image")
+	obj_furnitureType = self:GetObjByName("obj_furnitureType")
+	obj_equipSubType = self:GetObjByName("obj_equipSubType")
+	obj_shopkeeperDressType = self:GetObjByName("obj_shopkeeperDressType")
+	rewardedObj = self:GetObjByName("rewardedObj")
+	curDayObj = self:GetObjByName("curDayObj")
+	curDayText = self:GetObjByName("curDayText"):GetComponent("Text")
+	lockImage = self:GetObjByName("lockImage"):GetComponent("Image")
+	highLightImage = self:GetObjByName("highLightImage"):GetComponent("Image")
+
+	infoBtn:ButtonClickTween(function()
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+			local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+			func(csEventControllerInst, csGameEventType.CommonEvent.COMMONTIPS_SETINFO, commonData, icon.transform)
+		end)
+end
+
+function SetData(_data)
+	if(_data == nil) then
+		print("输出 giftSevenItem data is nil")
+		return
+	end
+
+	data = _data.item
+	if(_data.itemType == 1)then
+		rewardedObj:SetActive(false)
+		curDayObj:SetActive(false)
+		lockImage.enabled = false
+		highLightImage.enabled = false
+	elseif _data.itemType == 2 then
+		curDayText.text = csLanguageManagerInst:GetValueByKey("第{0}天",tostring(_data.cfg.days))
+		rewardedObj:SetActive(_data.cfg.days < GiftSevenDataProxy.inst.day)
+		curDayObj:SetActive(_data.cfg.days == GiftSevenDataProxy.inst.day)
+		lockImage.enabled = _data.cfg.days > GiftSevenDataProxy.inst.day
+		highLightImage.enabled = _data.cfg.days == GiftSevenDataProxy.inst.day
+	end
+	if(data == nil) then return end
+
+	commonData = CS.CommonRewardData(data.itemId,data.count,data.quality,data.itemType)
+	local bgAtlas = "mallItem_atlas"
+	local bgIconName = "shangcheng_kuang2"
+
+	if csItemType.__CastFrom(data.itemType) == csItemType.Equip then
+
+		local equipCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(data.itemId);
+
+		if equipCfg ~= nil then
+			if equipCfg.equipQualityConfig.quality == 4 then
+				bgIconName = "shangcheng_kuang1"
+			elseif equipCfg.equipQualityConfig.quality == 5 then
+				bgIconName = "shangcheng_jipinkuang"
+			end
+		end
+
+	else
+
+		local itemCfg = csItemConfigManagerInst:GetConfig(data.itemId)
+
+		if itemCfg ~= nil then
+			if itemCfg.property == 4 then
+				bgIconName = "shangcheng_kuang1"
+			elseif itemCfg.property == 5 then
+				bgIconName = "shangcheng_jipinkuang"
+			end
+		end
+
+	end
+	bgIcon:SetSprite(bgAtlas,bgIconName)
+
+	obj_equipSubType:SetActive(false)
+	obj_shopkeeperDressType:SetActive(false)
+	obj_furnitureType:SetActive(false)
+	luxuryNumImg.gameObject:SetActive(false)
+	luxuryNumText.gameObject:SetActive(false)
+	luxuryNumText.text = ""
+	nameText.text = ""--"x"..tostring(data.count)
+	numText.text = "x"..tostring(data.count)
+	nameText.color = CS.GUIHelper.GetColorByColorHex("FFFFFF")
+	tuzhiBg.gameObject:SetActive(csItemType.__CastFrom(data.itemType) == csItemType.EquipmentDrawing or data.itemType == 1600)
+	equipLvObj.gameObject:SetActive(csItemType.__CastFrom(data.itemType) == csItemType.EquipmentDrawing or data.itemType == 1600 or csItemType.__CastFrom(data.itemType) == csItemType.Equip)
+	if(csItemType.__CastFrom(data.itemType) == csItemType.Craftsman)then
+		local workerCfg = CS.WorkerConfigManager.inst:GetConfig(data.itemId)
+		icon:SetSprite("portrait_atlas", workerCfg.pic)
+		nameText.text = csLanguageManagerInst:GetValueByKey(workerCfg.name)
+	elseif csItemType.__CastFrom(data.itemType) == csItemType.Equip then
+		local equipCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(data.itemId)
+		icon:SetSprite(equipCfg.equipDrawingsConfig.atlas, equipCfg.equipDrawingsConfig.icon, CS.StaticConstants.qualityColor[equipCfg.equipQualityConfig.quality - 1])
+		nameText.text = csLanguageManagerInst:GetValueByKey(equipCfg.equipQualityConfig.name);
+		local classcfg = CS.EquipConfigManager.inst:GetEquipTypeByID(equipCfg.equipDrawingsConfig.sub_type)
+		if classcfg ~= nil then
+			obj_equipSubType:SetActive(true)
+			icon_equipSubType:SetSprite(classcfg.Atlas, classcfg.icon)
+		end
+
+		equipLvTx.text = tostring(equipCfg.equipDrawingsConfig.level)
+		--nameText.text = csLanguageManagerInst:GetValueByKey("极品装备")
+		nameText.color = CS.GUIHelper.GetColorByColorHex("ff7800")
+	elseif data.itemType == 1600 then
+		local equipDrawingCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(data.itemId)
+		icon:SetSprite(equipDrawingCfg.atlas,equipDrawingCfg.icon)
+		nameText.text = csLanguageManagerInst:GetValueByKey(equipDrawingCfg.name)
+		local classcfg = CS.EquipConfigManager.inst:GetEquipTypeByID(equipDrawingCfg.sub_type);
+		if classcfg ~= nil then
+			obj_equipSubType:SetActive(true)
+			icon_equipSubType:SetSprite(classcfg.Atlas, classcfg.icon)
+		end
+		equipLvTx.text = tostring(equipDrawingCfg.level)
+		--nameText.text = csLanguageManagerInst:GetValueByKey("专属图纸")
+		nameText.color = CS.GUIHelper.GetColorByColorHex("ffea56")
+	elseif csItemType.__CastFrom(data.itemType) == csItemType.EquipmentDrawing then
+		local itemCfg = csItemConfigManagerInst:GetConfig(data.itemId)
+		local equipDrawingCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(itemCfg.effect)
+		icon:SetSprite(equipDrawingCfg.atlas,equipDrawingCfg.icon)
+		nameText.text = csLanguageManagerInst:GetValueByKey(equipDrawingCfg.name)
+		local classcfg = CS.EquipConfigManager.inst:GetEquipTypeByID(equipDrawingCfg.sub_type);
+		if classcfg ~= nil then
+			obj_equipSubType:SetActive(true)
+			icon_equipSubType:SetSprite(classcfg.Atlas, classcfg.icon)
+		end
+		equipLvTx.text = tostring(equipDrawingCfg.level)
+		--nameText.text = csLanguageManagerInst:GetValueByKey("专属图纸")
+		nameText.color = CS.GUIHelper.GetColorByColorHex("ffea56")
+	elseif csItemType.__CastFrom(data.itemType) == csItemType.HeroCard then --英雄卡
+		local itemCfg = csItemConfigManagerInst:GetConfig(data.itemId)
+		icon:SetSprite(itemCfg.atlas, itemCfg.icon)
+		--nameText.text = csLanguageManagerInst:GetValueByKey("稀有英雄")
+		nameText.text = csLanguageManagerInst:GetValueByKey(itemCfg.name)
+		nameText.color = CS.GUIHelper.GetColorByColorHex("fe84ff")
+	else
+		local itemCfg = csItemConfigManagerInst:GetConfig(data.itemId)
+		icon:SetSprite(itemCfg.atlas, itemCfg.icon)
+		nameText.text = csLanguageManagerInst:GetValueByKey(itemCfg.name)
+		if(csItemType.__CastFrom(data.itemType) == csItemType.MakeSlotNum)then
+			numText.text = "▶" ..itemCfg.effect -- "  "为右三角
+			nameText.text = csLanguageManagerInst:GetValueByKey(itemCfg.name)
+		elseif csItemType.__CastFrom(data.itemType) == csItemType.ExploreSlotNum then
+			numText.text = "▶"..itemCfg.effect
+			nameText.text = csLanguageManagerInst:GetValueByKey(itemCfg.name)
+		elseif csItemType.__CastFrom(data.itemType) == csItemType.ShopSizeNum then
+			numText.text = "▶"..itemCfg.effect
+			nameText.text = csLanguageManagerInst:GetValueByKey(itemCfg.name)
+		elseif csItemType.__CastFrom(data.itemType) == csItemType.HeroSlotNum then
+			numText.text = "▶"..itemCfg.effect
+			nameText.text = csLanguageManagerInst:GetValueByKey(itemCfg.name)
+		elseif csItemType.__CastFrom(data.itemType) == csItemType.MarketSlotNum then
+			numText.text = "▶"..itemCfg.effect
+			nameText.text = csLanguageManagerInst:GetValueByKey(itemCfg.name)
+		elseif csItemType.__CastFrom(data.itemType) == csItemType.ShopkeeperDress then --店主装扮
+
+			local atlas = "dressup_atlas"
+			local iconName = ""
+			local dressCfg = CS.dressconfigManager.inst:GetConfig(tonumber(itemCfg.effect))
+			img_shopkeeperDressColor.enabled = false
+
+			if dressCfg ~= nil then
+
+				if dressCfg.type_1 == 1 then --外观
+
+					local dic = dressCfg.gender == 2 and CS.StaticConstants.dressupIconYellow_Facade_Girl_Dic or CS.StaticConstants.dressupIconYellow_Facade_Boy_Dic
+					iconName = dic[dressCfg.type_2]
+					if dressCfg.val ~= nil and dressCfg.val ~= "" then --颜色
+						img_shopkeeperDressColor.enabled = true
+					end
+
+
+
+				elseif dressCfg.type_1 == 2 then --时装
+
+					iconName = CS.StaticConstants.dressupIconYellow_FashionDic[dressCfg.type_2]
+
+				end
+				nameText.text = csLanguageManagerInst:GetValueByKey(dressCfg.name)
+			end
+
+			obj_shopkeeperDressType:SetActive(true)
+			icon_shopkeeperDressType:SetSprite(atlas, iconName)
+			--nameText.text = csLanguageManagerInst:GetValueByKey("专属时装")
+			nameText.color = CS.GUIHelper.GetColorByColorHex("ffea56")
+
+
+		elseif csItemType.__CastFrom(data.itemType) == csItemType.Furniture then
+			--nameText.text = csLanguageManagerInst:GetValueByKey("专属装饰")
+			nameText.color = CS.GUIHelper.GetColorByColorHex("ffea56")
+			luxuryNumImg.gameObject:SetActive(true)
+
+			local furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(tonumber(itemCfg.effect))
+
+			if furnitureCfg ~= nil then
+				nameText.text = csLanguageManagerInst:GetValueByKey(furnitureCfg.name)
+				
+				local luxury = 0
+
+				if furnitureCfg.type_1 == 1 then --墙壁
+
+					local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS_UserDataProxyInst.shopData.shopLevel);
+
+					luxury = math.ceil((cfg.size_x / 2 + cfg.size_y / 2 ) * furnitureCfg.luxury)
+
+				elseif furnitureCfg.type_1 == 2 then --地板
+
+					local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS_UserDataProxyInst.shopData.shopLevel);
+
+					luxury = math.ceil((cfg.size_x / 2) * (cfg.size_y / 2) * furnitureCfg.luxury)
+
+				else
+					luxury = furnitureCfg.luxury
+				end
+
+				luxuryNumText.gameObject:SetActive(true)
+				luxuryNumText.text = tostring(luxury)
+
+				obj_furnitureType:SetActive(true)
+				icon_furnitureType:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.kTileGroupType.__CastFrom(furnitureCfg.type_1) == CS.kTileGroupType.OutdoorFurniture and "jiaju_shiwai" or "jiaju_danyao","",false,true)
+
+			end
+
+		elseif csItemType.__CastFrom(data.itemType) == csItemType.PetSkin then
+
+			nameText.text = csLanguageManagerInst:GetValueByKey("宠物皮肤")
+			nameText.color = CS.GUIHelper.GetColorByColorHex("ffea56")
+
+		end
+	end
+end

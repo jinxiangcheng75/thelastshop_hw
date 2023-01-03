@@ -1,0 +1,198 @@
+
+--ChatDataProxy
+
+require("class")
+require("utils/XLuaUtils")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_ChatDataProxyInst = CS.ChatDataProxy.inst
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+
+ChatDataProxy = class(BaseDataProxy)
+
+ChatDataProxy.inst = ChatDataProxy:new()
+
+function ChatDataProxy:init()
+	
+	self.chatHeadPool = get_csharp_dict(CS.System.String,CS.GraphicDressUpSystem)
+	self.emojiKey = "_shi@li=ya#yi__ya"
+	self.vipSplitKey = "_|"
+	
+end
+
+function ChatDataProxy:Init()
+
+	self:init()
+	
+end
+
+function ChatDataProxy:GetChatList(channel)
+
+	local list = nil
+
+	if channel == 0 then
+		list = CS_ChatDataProxyInst.worldChannelList
+	elseif channel == 2 then
+		list = CS_ChatDataProxyInst.unionChannelList
+	elseif channel == 3 then
+		list = CS_ChatDataProxyInst.sysMsgChannelList
+	end
+
+	return list
+
+end
+
+function ChatDataProxy:GetGraphicDressByIndexAndChannel(chatIndex, channel,callback)
+
+	if(self.chatHeadPool:ContainsKey(chatIndex .. "_" .. channel))then
+
+		local isHave,sys = self.chatHeadPool:TryGetValue(chatIndex .. "_" .. channel)
+
+		if callback ~= nil then
+			callback(chatIndex, channel,sys)
+		end
+
+	else
+
+		local list = self:GetChatList(channel)
+
+		if(list.Count > 0)then
+
+			if(chatIndex <= list[0].index)then
+
+				local chatData = nil
+				for i = 0, list.Count - 1 do
+					local index = i
+					if(list[index].index == chatIndex)then
+						chatData = list[index]
+						break
+					end
+				end
+
+				local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+				local func = funcGeneric(CS.GraphicDressUpSystem)
+				func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(chatData.gender)),CS_SpineUtils.RoleDressToHeadDressIdList(chatData.roleDress),CS.EGender.__CastFrom(chatData.gender),1.4,true,function (system)
+
+						self.chatHeadPool:Add(tostring(chatIndex) .. "_" .. tostring(channel), system)
+						system.gameObject.name = chatIndex .. "_" .. channel
+
+						if callback ~= nil then
+							callback(chatIndex, channel,system)
+						end
+
+						if(self.chatHeadPool.Count > 50)then
+
+							local keyList = get_csharp_array(CS.System.String,self.chatHeadPool.Keys.Count)
+							self.chatHeadPool.Keys:CopyTo(keyList, 0)
+
+							for i = 0, keyList.Length - 1 do
+
+								local isHave,sys = self.chatHeadPool:TryGetValue(keyList[i])
+								if(sys ~= nil and sys.gameObject.transform.parent == CS.FGUI.inst.heroGraphicCacheParent)then
+									CS.UnityEngine.GameObject.Destroy(sys.gameObject)
+									self.chatHeadPool:Remove(keyList[i])
+								elseif sys == nil then
+									self.chatHeadPool:Remove(keyList[i])
+								end
+
+							end
+
+						end
+
+					end)
+			end
+		end
+	end
+
+end
+
+function ChatDataProxy:ClearChatHeadPool()
+	
+	local keyList = get_csharp_array(CS.System.String,self.chatHeadPool.Keys.Count)
+	self.chatHeadPool.Keys:CopyTo(keyList, 0)
+
+	for i = 0, keyList.Length - 1 do
+
+		local isHave,sys = self.chatHeadPool:TryGetValue(keyList[i])
+		if(sys ~= nil)then
+			CS.UnityEngine.GameObject.Destroy(sys.gameObject)
+		end
+
+	end
+	
+	self.chatHeadPool:Clear()
+	
+end
+
+function ChatDataProxy:GetBlockUserIds()
+	
+	local blockUserIds = {}
+	local str_blockUser = CS.SaveManager.inst:GetString("Chat_BlockUserIds")
+	
+	if str_blockUser ~= "" then
+		
+		local infos = split(str_blockUser,'|')
+		
+		for i = 1, #infos do
+			blockUserIds[#blockUserIds + 1] = infos[i]
+		end
+		
+	end
+	
+	return blockUserIds
+	
+end
+
+function ChatDataProxy:RefreshChatChannel(channelList)
+
+	local blockUserIds = self:GetBlockUserIds()
+
+	local removeDatas = {}
+
+	for i = 0, channelList.Count - 1 do
+
+		for k = 1, #blockUserIds do
+
+			if blockUserIds[k] == channelList[i].userId then
+				removeDatas[#removeDatas + 1] = channelList[i]
+			end
+
+		end
+
+	end
+
+	for i = 1, #removeDatas do
+		channelList:Remove(removeDatas[i])
+	end
+
+end
+
+function ChatDataProxy:AddBlockUserId(otherUserId)
+
+	local str_blockUser = CS.SaveManager.inst:GetString("Chat_BlockUserIds")
+	CS.SaveManager.inst:SaveString("Chat_BlockUserIds", str_blockUser..otherUserId.."|")
+
+	self:RefreshChatChannel(self:GetChatList(0))
+	self:RefreshChatChannel(self:GetChatList(2))
+	
+end
+
+function ChatDataProxy:ClearBlockUserIds()
+	
+	CS.SaveManager.inst:SaveString("Chat_BlockUserIds","")
+	
+	--重新设置公会聊天/世界聊天下标 再打开聊天界面后重新获取数据
+	CS_ChatDataProxyInst.chatIndex_world = 0
+	CS_ChatDataProxyInst.chatIndex_union = 0
+	
+end
+
+function ChatDataProxy:Clear()
+
+end

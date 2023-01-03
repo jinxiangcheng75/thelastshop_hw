@@ -1,0 +1,113 @@
+--CSVParser
+require("utils/LuaUtils")
+local StringUtils = StringUtils
+
+CSVParser = {}
+
+local Split_Line = "\r\n"
+local NLINE_SPLIT = "\n"
+local Split_Field = ","
+local DefaultSkipLine = 2
+
+function CSVParser:parse(csv, skipline)
+	if (csv == nil) then
+		print("CSVParser:parse, csv.error")
+		return nil
+	end
+	local skip = skipline or DefaultSkipLine
+	local lines;
+	if string.find(csv, "\r\n") ~= nil then
+	 	lines= StringUtils:split(csv, Split_Line)
+	else
+		lines= StringUtils:split(csv, NLINE_SPLIT)
+	end
+	local cfg = {}
+	for i = skip + 1, #lines do
+		for i = 1, 1 do
+			local line = lines[i]
+			if (line == nil or line == "") then
+				break
+			end
+			local fields = StringUtils:split(line, Split_Field)
+			cfg[#cfg + 1] = fields
+		end
+	end
+	return cfg
+end
+
+function CSVParser:parseRaw(csv, skipline)
+	if (csv == nil) then
+		print("CSVParser:parseRaw, csv.error")
+		return nil
+	end
+	local skip = skipline or DefaultSkipLine
+	local lines;
+	if string.find(csv, "\r\n") ~= nil then
+		lines= StringUtils:split(csv, Split_Line)
+	else
+		lines= StringUtils:split(csv, NLINE_SPLIT)
+	end
+	local titleLine = lines[1]
+	local titles = StringUtils.split(titleLine, Split_Field)
+	local tb = {}
+	for i = skip + 1, #lines do
+		for i = 1, 1 do
+			local line = lines[i]
+			if (line == nil or line == "") then
+				break
+			end
+			local fields = StringUtils.split(line, Split_Field)
+			for i = 1, #titles do
+				local item = {}
+				local fieldName = titles[i]
+				item[fieldName] = fields[i]
+				tb[#tb + 1] = item
+			end
+		end
+	end
+	return tb
+end
+
+function CSVParser:parseClass(csv, skipline, clazz)
+	if (csv == nil) then
+		print("CSVParser:parseClass, csv.error")
+		return nil
+	end
+	local skip = skipline or DefaultSkipLine
+	if (clazz == nil) then
+		return CSVParser:parse(csv, skip)
+	end
+	
+	local lines;
+	if string.find(csv, "\r\n") ~= nil then
+		lines= StringUtils:split(csv, Split_Line)
+	else
+		lines= StringUtils:split(csv, NLINE_SPLIT)
+	end
+	
+	local titleLine = lines[1]
+	local titles = StringUtils:split(titleLine, Split_Field)
+	local tb = {}
+	print("titlelen:", #titles)
+	for i = skip + 1, #lines do
+		--print("parse line:", lines[i])
+		for ii = 1, 1 do
+			local line = lines[i]
+			if (line == nil or line == "") then
+				break
+			end
+			local fields = StringUtils:split(line, Split_Field)
+			local item = clazz:new()
+			for tt = 1, #titles do
+				local fieldName = titles[tt]
+				if(fields[tt] == nil)then
+					item[fieldName] = ""
+					else
+					item[fieldName] = fields[tt]
+					end
+			end
+			tb[#tb + 1] = item
+		end
+	end
+	return tb
+end

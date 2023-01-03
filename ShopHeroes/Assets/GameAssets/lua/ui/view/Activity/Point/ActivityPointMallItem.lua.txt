@@ -1,0 +1,251 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local csVector2 = CS.UnityEngine.Vector2
+local csItemType = CS.ItemType
+
+local activityPointMallItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	activityPointMallItem_dlc = ActivityPointMallItem_dlc.new()
+	activityPointMallItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if activityPointMallItem_dlc~=nil then
+		activityPointMallItem_dlc:Clear()
+		activityPointMallItem_dlc = nil
+	end
+end
+
+function SetData(_data)
+	if activityPointMallItem_dlc~=nil then
+		activityPointMallItem_dlc:SetData(_data)
+	end
+end
+
+function onDisable()
+	if activityPointMallItem_dlc~=nil then
+		activityPointMallItem_dlc:ClearData()
+	end
+end
+
+ActivityPointMallItem_dlc = class()
+
+function ActivityPointMallItem_dlc:ctor()
+
+end
+
+function ActivityPointMallItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+
+	self.data = nil
+	self.fromType = 0 -- 1 - 普通兑换 2 - 活动兑换
+end
+
+function ActivityPointMallItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.selfBtn = self.gameObject:GetComponent("Button")
+	self.nameText = self.contentPane:GetObjByName("nameText"):GetComponent("Text")
+	self.icon = self.contentPane:GetObjByName("icon"):GetComponent("GUIIcon")
+	self.remainCount = self.contentPane:GetObjByName("remainCount"):GetComponent("Text")
+	self.priceText = self.contentPane:GetObjByName("priceText"):GetComponent("Text")
+	self.priceIcon = self.contentPane:GetObjByName("priceIcon"):GetComponent("GUIIcon")
+	self.gray = self.contentPane:GetObjByName("gray")
+	self.countText = self.contentPane:GetObjByName("countText"):GetComponent("Text")
+
+	self.selfBtn.onClick:AddListener(function ()
+			self:ExchangeBtnClick()
+		end)
+
+end
+
+function ActivityPointMallItem_dlc:ExchangeBtnClick()
+	if(self.data.isSellDone)then
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+		func(
+			csEventControllerInst,
+			csGameEventType.SHOWUI_TEXTMSGTIP,
+			cs_LanguageManagerInst:GetValueByKey("已售罄"),
+			csGUIHelper.GetColorByColorHex("FF2828")
+		)
+		return
+	end
+	
+	EventDispatcher:dispatchEvent(GameEvent.ActivityPointEvent.OpenUI_ActivityPoint_MallInfoUI,self.data,self.fromType)
+end
+
+function ActivityPointMallItem_dlc:SetData(_data)
+	if(_data == nil)then return end
+	
+	self.fromType = _data.type
+	self.data = _data.data
+
+	if(not self.data.isSellDone)then
+		self.gray:SetActive(false)
+		self.remainCount.color = CS.UnityEngine.Color.white
+		self.remainCount.text = cs_LanguageManagerInst:GetValueByKey("剩余{0}次",tostring(self.data.count - self.data.process))
+	else
+		self.gray:SetActive(true)
+		self.remainCount.color = csGUIHelper.GetColorByColorHex("FF6464")
+		self.remainCount.text = cs_LanguageManagerInst:GetValueByKey("已售罄")
+	end
+
+	self.countText.text = "x" .. tostring(self.data.reward.count)
+	self.priceText.text = tostring(self.data.needPoint)
+
+	local exchangeItemCfg = CS.ItemconfigManager.inst:GetConfig(self.data.itemId)
+	if(exchangeItemCfg ~= nil)then
+		self.priceIcon.iconImage.enabled = true
+		self.priceIcon:SetSprite(exchangeItemCfg.atlas,exchangeItemCfg.icon)
+	else
+		self.priceIcon.iconImage.enabled = false
+	end
+
+	self:SetGoodData()
+end
+
+function ActivityPointMallItem_dlc:SetGoodData()
+	local itemCfg = CS.ItemconfigManager.inst:GetConfig(self.data.reward.itemId)
+	if(csItemType.__CastFrom(self.data.reward.itemType) == csItemType.Craftsman)then
+		local workerCfg = nil
+		if(itemCfg ~= nil)then
+			workerCfg = CS.WorkerConfigManager.inst:GetConfig(itemCfg.effect)
+		else
+			workerCfg = CS.WorkerConfigManager.inst:GetConfig(self.data.reward.itemId)
+		end
+
+		if(workerCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(workerCfg.name)
+			self.icon.iconImage.enabled = true
+			self.icon:SetSprite("portrait_atlas",workerCfg.pic)
+		else
+			if(itemCfg ~= nil)then
+				self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+				self.icon.iconImage.enabled = true
+				self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+			else
+				self.icon.iconImage.enabled = false
+				self.nameText.text = ""
+				--self.gameObject:SetActive(false)
+			end
+		end
+	elseif csItemType.__CastFrom(self.data.reward.itemType) == csItemType.Equip then
+		local equipCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(self.data.reward.itemId)
+
+		if(equipCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(equipCfg.equipDrawingsConfig.name)
+			self.icon.iconImage.enabled = true
+			self.icon:SetSpriteURL(equipCfg.equipDrawingsConfig.big_icon)
+		else
+			self.icon.iconImage.enabled = false
+			self.nameText.text = ""
+			--self.gameObject:SetActive(false)
+		end
+	elseif csItemType.__CastFrom(self.data.reward.itemType) == csItemType.EquipmentDrawing then
+		local equipDrawingCfg = nil
+		if(itemCfg ~= nil)then
+			equipDrawingCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(itemCfg.effect)
+		else
+			equipDrawingCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(self.data.reward.itemId)
+		end
+
+		if(equipDrawingCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(equipDrawingCfg.name)
+			self.icon.iconImage.enabled = true
+			self.icon:SetSpriteURL(equipDrawingCfg.big_icon)
+		else
+			if(itemCfg ~= nil)then
+				self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+				self.icon.iconImage.enabled = true
+				self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+			else
+				self.icon.iconImage.enabled = false
+				self.nameText.text = ""
+				--self.gameObject:SetActive(false)
+			end
+		end
+	elseif csItemType.__CastFrom(self.data.reward.itemType) == csItemType.ShopkeeperDress then
+		local dressCfg = nil
+		if(itemCfg ~= nil)then
+			dressCfg = CS.dressconfigManager.inst:GetConfig(itemCfg.effect)
+		else
+			dressCfg = CS.dressconfigManager.inst:GetConfig(self.data.reward.itemId)
+		end
+
+		if(dressCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(dressCfg.name)
+			self.icon.iconImage.enabled = true
+			self.icon:SetSprite("ClotheIcon_atlas",dressCfg.icon)
+		else
+			if(itemCfg ~= nil)then
+				self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+				self.icon.iconImage.enabled = true
+				self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+			else
+				self.icon.iconImage.enabled = false
+				self.nameText.text = ""
+				--self.gameObject:SetActive(false)
+			end
+		end
+	elseif csItemType.__CastFrom(self.data.reward.itemType) == csItemType.Furniture then
+		local furnitureCfg = nil
+		if(itemCfg ~= nil)then
+			furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(itemCfg.effect)
+		else
+			furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(self.data.reward.itemId)
+		end
+
+		if(furnitureCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(furnitureCfg.name)
+			self.icon.iconImage.enabled = true
+			self.icon:SetSprite(furnitureCfg.atlas,furnitureCfg.icon)
+		else
+			if(itemCfg ~= nil)then
+				self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+				self.icon.iconImage.enabled = true
+				self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+			else
+				self.icon.iconImage.enabled = false
+				self.nameText.text = ""
+				--self.gameObject:SetActive(false)
+			end
+		end
+	else
+		if(itemCfg ~= nil)then
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+			self.icon.iconImage.enabled = true
+			self.icon:SetSpriteURL(itemCfg.icon)
+		else
+			self.icon.iconImage.enabled = false
+			self.nameText.text = ""
+			--self.gameObject:SetActive(false)
+		end
+	end
+end
+
+function ActivityPointMallItem_dlc:Clear()
+
+	self:removeListeners()
+end
+
+function ActivityPointMallItem_dlc:ClearData()
+
+end
+
+function ActivityPointMallItem_dlc:addListeners()
+
+end
+
+function ActivityPointMallItem_dlc:removeListeners()
+
+end

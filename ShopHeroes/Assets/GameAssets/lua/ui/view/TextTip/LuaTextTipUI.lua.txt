@@ -1,0 +1,83 @@
+--LuaTextTipUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_Type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local GameObject = CS.UnityEngine.GameObject
+local Screen = CS.UnityEngine.Screen
+local Vector2 = CS.UnityEngine.Vector2
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+--二次确认提示界面
+LuaTextTipUI = class(ViewBase)
+
+function LuaTextTipUI:ctor()
+	self.viewID = Constants.ViewName.LuaTextTipUI
+	LuaTextTipUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup_2"
+	self.topResPanelType = CS.TopPlayerShowType.ignore
+end
+------------------------------------------------
+
+
+function LuaTextTipUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.pfb_tip = contentPane:GetObjByName("pfb_textTip")
+
+end
+
+
+function LuaTextTipUI:onInit()
+
+	self:initComp()
+
+end
+
+function LuaTextTipUI:SetData(tips,color,iconUrl,callback)
+
+	local newGo = GameObject.Instantiate(self.pfb_tip, self.contentObject.transform);
+
+	local contentPane = newGo:GetComponent(CS_Type_LuaBehaviour)
+
+
+	local _text = contentPane:GetText("text")
+	local icon = contentPane:GetGUIIcon("icon")
+
+	_text.font = CS_LanguageManagerInst.curFont;
+	_text.color = color
+	_text.text = tips
+	icon:SetSpriteURL(iconUrl)
+
+
+	local rectTransform = newGo:GetComponent("RectTransform")
+	if (_text.preferredWidth > Screen.width) then
+
+		local textRect = _text:GetComponent("RectTransform")
+		textRect.sizeDelta = Vector2(Screen.width, textRect.sizeDelta.y);
+		_text.horizontalOverflow = CS.UnityEngine.HorizontalWrapMode.Wrap;
+		rectTransform.sizeDelta = Vector2(Screen.width, _text.preferredHeight + 20);
+
+	else
+		rectTransform.sizeDelta = Vector2(_text.preferredWidth + 120, _text.preferredHeight + 20);
+	end
+
+	newGo:SetActive(true);
+
+	local endY = rectTransform.anchoredPosition3D.y + 100;
+	rectTransform:DOAnchorPos3DY(endY, 0.5):SetDelay(2):OnStart(function ()
+
+			rectTransform:Fade_a_To_0_All(1, 0.5, false);
+
+		end):OnComplete(function ()
+			if callback ~= nil then
+				callback();
+			end
+			GameObject.Destroy(newGo);
+		end)
+
+end

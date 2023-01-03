@@ -1,0 +1,58 @@
+require("config/RechargeConfigManager")
+
+local icon
+local rechargeNumText
+local rebateObj
+local rebateNumText
+local priceText
+local selfBtn
+
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csPayInst = CS.GamePay.inst
+
+local data
+
+function InitComp()
+	icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	rechargeNumText = self:GetObjByName("rechargeNumText"):GetComponent("Text")
+	rebateObj = self:GetObjByName("rebateBg")
+	rebateNumText = self:GetObjByName("rebateText"):GetComponent("Text")
+	priceText = self:GetObjByName("priceText"):GetComponent("Text")
+	selfBtn = self:GetComponent("Button")
+
+	selfBtn:ButtonClickTween(
+		function ()
+			-- 调用充值接口
+			--print("我点击了充值当前充值的金额是",data.money)
+			if(data == nil) then return end
+			if(data.payProduct == nil) then return end
+			csPayInst:Pay(data.payProduct.priceId,data.payProduct.productId,data.payProduct.payActivityType,data.payProduct.payActivityId,function (isSuccess)
+					if(isSuccess)then
+						--print("充值成功")
+					end
+				end
+			)
+		end
+	)
+end
+
+function SetData(_data)
+	data = _data
+
+	rechargeNumText.text = tostring(data.rewardItem.count)
+	if(data.pic1 ~= "-1" and data.pic2 ~= "-1")then
+		icon:SetSprite(data.pic1,data.pic2)
+	end
+
+	print("直充的价格是"..csPayInst:GetProductPrice(data.payProduct.productId))
+	priceText.text = csPayInst:GetProductPrice(data.payProduct.productId)
+
+	if(data.rebateState == 1)then
+		rebateObj:SetActive(true)
+		local str = csLanguageManagerInst:GetValueByKey(data.txt)
+		str = string.gsub(str,"\\n","\n")
+		rebateNumText.text = str
+	else
+		rebateObj:SetActive(false)
+	end
+end

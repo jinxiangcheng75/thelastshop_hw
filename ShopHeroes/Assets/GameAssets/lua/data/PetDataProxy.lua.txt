@@ -1,0 +1,83 @@
+
+--PetDataProxy
+
+require("class")
+require("utils/XLuaUtils")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_PetDataProxyInst = CS.PetDataProxy.inst
+
+PetDataProxy = class(BaseDataProxy)
+
+PetDataProxy.inst = PetDataProxy:new()
+
+function PetDataProxy:Init()
+
+end
+
+function PetDataProxy:GetCanShowPets()
+
+	local canShowPetCfgs = {}
+
+	local allConfigs = PetConfigManager:GetAllConfig()
+
+	for i = 1, #allConfigs do
+
+		local config = allConfigs[i]
+
+		--已解锁直接显示
+		if CS_PetDataProxyInst.CanChangePetIds:Find(function(t)
+					return t.petId == config.id
+				end) ~= nil then
+			canShowPetCfgs[#canShowPetCfgs + 1] = config
+		else
+
+			if config.show_lv <= CS_UserDataProxyInst.playerData.level then --达到显示等级
+
+				if config.unlock_type == 2 then -- 如果是礼包解锁 判断当前礼包是不是能购买 可购买才展示
+
+					local directPurchaseData = DirectPurchaseProxy.inst:GetDirectPurchaseDataById(config.unlock_sale_id)
+
+					if directPurchaseData ~= nil then
+						canShowPetCfgs[#canShowPetCfgs + 1] = config
+					end
+
+				elseif config.unlock_type == 3 then -- 巧匠大赛的积分奖励 判断当前巧匠大赛积分奖励是否拥有 活动开启或未开启但可领取时候展示
+					
+					if Activity_WorkerGameProxy.inst:GetScoreRewardIndexByPetId(config.id) ~= -1 then
+						canShowPetCfgs[#canShowPetCfgs + 1] = config
+					end
+					
+				elseif config.unlock_type == 4 then -- 夺宝奇兵的积分奖励 判断当前夺宝奇兵积分奖励是否拥有 活动开启或未开启但可领取时候展示
+					
+					if GoldenCityDataProxy.inst:GetScoreRewardIndexByPetId(config.id) ~= -1 then
+						canShowPetCfgs[#canShowPetCfgs + 1] = config
+					end
+					
+				elseif config.unlock_type == 5 then -- 勇气挑战的积分奖励 判断当前勇气挑战积分奖励是否拥有 活动开启或未开启但可领取时候展示
+					
+					if Activity_ScoreAwardGameProxy.inst:GetScoreRewardIndexByPetId(config.id) ~= -1 then
+						canShowPetCfgs[#canShowPetCfgs + 1] = config
+					end
+					
+				else
+					canShowPetCfgs[#canShowPetCfgs + 1] = config
+				end
+
+			end
+			
+		end
+
+	end
+
+	return canShowPetCfgs
+
+end
+
+function PetDataProxy:Clear()
+
+end

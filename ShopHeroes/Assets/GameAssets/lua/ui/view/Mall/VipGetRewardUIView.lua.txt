@@ -1,0 +1,91 @@
+--VipGetRewardUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/MallDataProxy")
+require("utils/XLuaUtils")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEVIPType = CS.EVIPType
+
+local data
+
+VipGetRewardUIView = class(ViewBase)
+
+function VipGetRewardUIView:ctor()
+	self.viewID = Constants.ViewName.VipGetRewardUIView
+	VipGetRewardUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+
+function VipGetRewardUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.levelText = contentPane:GetText("levelText")
+	self.upText = contentPane:GetText("upText")
+	self.downText = contentPane:GetText("downText")
+	self.continueBtn = contentPane:GetButton("continueBtn")
+	self.icon = contentPane:GetGUIIcon("icon")
+end
+
+function VipGetRewardUIView:onInit()
+
+	self:initComp()
+
+
+	self.continueBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+end
+
+
+function VipGetRewardUIView:onHide()
+	--print("VipGetRewardUIView onHide")
+	csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON);
+end
+
+function  VipGetRewardUIView:onShowed()
+	--print("VipGetRewardUIView onShowed")
+	--self:SetRefreshData()
+end
+
+function VipGetRewardUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function VipGetRewardUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function VipGetRewardUIView:closeBtnClick()
+	self:hide()
+end
+
+function VipGetRewardUIView:setUIData(level)
+	local dataList = VipInfoConfingManager:GetConfigByType(3)
+
+	if(level <= #dataList)then
+		local curData = dataList[level]
+
+		if(curData.pic_1 ~= "-1" and curData.pic_2 ~= "-1")then
+			self.icon:SetSprite(curData.pic_1,curData.pic_2)
+		end
+
+		if(level > 12)then
+			level = 12
+		end
+		self.levelText.text = cs_LanguageManagerInst:GetValueByKey("特权等级:{0}级",tostring(level))
+		self.upText.text = cs_LanguageManagerInst:GetValueByKey(curData.title)
+		self.downText.text = cs_LanguageManagerInst:GetValueByKey(curData.txt)
+	else
+		csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON);
+	end
+end
+------------------------------------------------

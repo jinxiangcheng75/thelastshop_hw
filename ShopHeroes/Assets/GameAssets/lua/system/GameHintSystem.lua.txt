@@ -1,0 +1,183 @@
+---------------------------------------------------------------------
+-- ShopHeroes (C) CompanyName, All Rights Reserved
+-- Created by: AuthorName
+-- Date: 2021-09-08 19:51:50
+---------------------------------------------------------------------
+
+-- To edit this template in: Data/Config/Template.lua
+-- To disable this template, check off menuitem: Options-Enable Template File
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+require("ui/view/GameHintView")
+require("ui/view/Union/UnionAidUIView")
+
+local CS_GameEventType = CS.GameEventType
+
+local linkFunSwitch = {
+	--打开工厂界面
+	["1"] = function()
+		print("switch:" .. 1)
+	end,
+	--打开设计界面并打开家具界面资源标签
+	["2"] = function()
+		print("switch:" .. 2)
+		--打开家具页面
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.Int16,CS.System.Int32)
+		func(csEventControllerInst, CS.GameEventType.SHOWUI_TARGETFURN, 1,-1)
+
+		
+		--CS.EventController.inst:TriggerEvent(CS.GameEventType.SHOWUI_TARGETFURN, 1);
+	end,
+	--打开设计界面并打开家具界面货架标签 箱子
+	["3"] = function()
+		print("switch:" .. 3)
+
+		--打开家具页面
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.Int16,CS.System.Int32)
+		func(csEventControllerInst, CS.GameEventType.SHOWUI_TARGETFURN, 0,-1)
+	end,
+	--打开扩建界面
+	["4"] = function()
+		print("switch:" .. 4)
+		CS.EventController.inst:TriggerEvent(CS.GameEventType.SHOWUI_EXTENSIONPANEL);
+	end,
+	--选中仓库箱子升级
+	["5"]=function()
+		print("switch:" .. 5)
+		CS.EventController.inst:TriggerEvent(CS.GameEventType.ShopDesignEvent.ShowTrunkUpgradeUI)
+	end,
+	["6"] = function()
+		print("switch:" .. 6)
+		--打开制作界面
+		CS.EventController.inst:TriggerEvent(CS.GameEventType.EquipEvent.EQUIP_PRODUCTION_SELECT, -1)
+	end,
+	["7"] = function(boxtype)
+		print("switch:" .. 7)
+		--宝箱界面
+		
+	end,
+	["8"] = function()
+		print("switch:" .. 8)
+		--每日任务
+		CS.EventController.inst:TriggerEvent(CS.GameEventType.SHOWUI_TASKPANEL)
+	end,
+	["9"] = function()
+		print("switch:" .. 9)
+	end,
+	["10"] = function()
+		print("switch:" .. 10)
+		--打开副本界面
+		CS.EventController.inst:TriggerEvent(CS.GameEventType.ExploreEvent.EXPLORE_SHOWUI)
+	end,
+	["11"] = function()
+		print("switch:" .. 11)
+		--酒吧
+		CS.EventController.inst:TriggerEvent(CS.GameEventType.RoleEvent.ROLERECRUIT_SHOWUI)
+	end,
+	["12"] = function(heroData)
+		print("switch:" .. 12)
+		--打开对应英雄界面
+		--CS.EventController.inst:TriggerEvent(CS.GameEventType.RoleEvent.ROLERECRUITSUB_SHOWUI, heroData, index)
+	end,
+	["13"] = function()
+		print("switch:" .. 13)
+		--工会页面
+	end,
+	--
+	["test"] = function()
+		print("switch:test")
+	end
+}
+
+---@class GameHintSystem
+
+GameHintSystem = class(BaseSystem)
+GameHintSystem.super = BaseSystem
+
+function GameHintSystem:ctor()
+end
+
+function GameHintSystem:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.UI.ShowUI_GameHintUI, self, self.addMsgTipsUI_HintUI)
+	EventDispatcherInis:addEvent(GameEvent.UI.QueueResp_ShowGameHintUI, self, self.openHintUI)
+	EventDispatcherInis:addEvent(GameEvent.UI.HideUI_GameHintUI, self, self.hideHintUI)
+end
+
+function GameHintSystem:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.UI.ShowUI_GameHintUI, self, self.addMsgTipsUI_HintUI)
+	EventDispatcherInis:removeEvent(GameEvent.UI.QueueResp_ShowGameHintUI, self, self.openHintUI)
+	EventDispatcherInis:removeEvent(GameEvent.UI.HideUI_GameHintUI, self, self.hideHintUI)
+end
+
+local okBtnCallBack = function(linkid)
+	EventDispatcherInis:dispatchEvent(GameEvent.UI.HideUI_GameHintUI)
+end
+
+local skipBtnCallBack = function(linkid)
+
+	EventDispatcherInis:dispatchEvent(GameEvent.UI.HideUI_GameHintUI)
+	CS.GoOperationManager.inst:StartHyperLink(linkid);
+end
+
+function GameHintSystem:addMsgTipsUI_HintUI(helpid,skipBtnPrepositionHandler,value)
+	
+	if helpid == 31 then --充值金条特殊置前 直接弹出
+		self:openHintUI(helpid,skipBtnPrepositionHandler,value)
+	else
+		
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.Award_AboutHint)
+		local data = CS.Award_AboutHint()
+		data.type = CS.ReceiveInfoUIType.Hint
+		data.helpId = helpid
+		data.skipBtnPrepositionHandler = skipBtnPrepositionHandler
+		data.value = value
+		func(csEventControllerInst, CS_GameEventType.ReceiveEvent.NEWITEM_MSG, data)
+		
+	end
+	
+	
+end
+
+function GameHintSystem:openHintUI(helpid,skipBtnPrepositionHandler,value)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GameHint_tip,
+		function(view)
+			print("GameHint_tip open callback")
+			
+			local _skipBtnCallback = function(linkid)
+				
+				if skipBtnPrepositionHandler ~= nil then
+					skipBtnPrepositionHandler()
+				end
+				
+				skipBtnCallBack(linkid)
+				
+			end
+			
+			view:setUIInfo(helpid, okBtnCallBack, _skipBtnCallback,value)
+		end
+	)
+end
+
+
+
+
+function GameHintSystem:hideHintUI()
+	GUIManager.inst:HideView(Constants.ViewName.GameHint_tip)
+end
+
+function TestNewSystem:OnEnter()
+	GameHintSystem.super.OnEnter(self)
+end
+
+function TestNewSystem:OnExit()
+	GameHintSystem.super.OnExit(self)
+end

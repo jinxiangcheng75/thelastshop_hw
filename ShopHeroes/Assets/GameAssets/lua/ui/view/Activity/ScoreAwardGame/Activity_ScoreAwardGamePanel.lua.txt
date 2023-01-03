@@ -1,0 +1,184 @@
+
+--Activity_ScoreAwardGamePanel
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_UnityUtils = CS.UnityUtils
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+Activity_ScoreAwardGamePanel = class(ViewBase)
+
+function Activity_ScoreAwardGamePanel:ctor()
+	self.viewID = Constants.ViewName.Activity_ScoreAwardGamePanel
+	Activity_ScoreAwardGamePanel.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+	self.topResPanelType = CS.TopPlayerShowType.none
+end
+------------------------------------------------
+
+
+function Activity_ScoreAwardGamePanel:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.icon_activity = contentPane:GetGUIIcon("icon_activity")
+	self.tx_name = contentPane:GetText("tx_name")
+	self.tx_dex = contentPane:GetText("tx_des")
+	self.tx_remainTime = contentPane:GetText("tx_remainTime")
+	self.obj_lookRewardRedPoint = contentPane:GetObjByName("obj_lookRewardRedPoint")
+
+	self.btn_lookReward = contentPane:GetButton("btn_lookReward");
+	self.btn_ok = contentPane:GetButton("btn_ok");
+	self.itemList = contentPane:GetObjByName("itemList"):GetComponent(CS_type_superList)
+	self.infoBtn = contentPane:GetButton("btn_info")
+	
+	self.UI_liuguang_Mat = contentPane:GetImage("UI_liuguang_Mat").material
+
+end
+
+
+function Activity_ScoreAwardGamePanel:onInit()
+
+	self:initComp()
+
+	self.showTaskList = {}
+	self.loopTimerComp = nil
+
+	self.btn_lookReward:ButtonClickTween(function ()
+			self:onLookRewardBtnClick()
+		end)
+
+	self.btn_ok:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+
+	self.itemList.itemRenderer = function(index,item)
+		self:scoreRewardListItemRenderer(index,item)
+	end
+
+	self.itemList.itemUpdateInfo = function(index,item)
+		self:scoreRewardListItemRenderer(index,item)
+	end
+
+	self.infoBtn.onClick:AddListener(
+		function ()
+			self:onInfoBtnClick()
+		end)
+
+end
+
+function Activity_ScoreAwardGamePanel:onInfoBtnClick()
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_messRankUI, 0)
+end
+
+function Activity_ScoreAwardGamePanel:scoreRewardListItemRenderer(index,item)
+	item:SetData({data = self.showTaskList[index + 1],mat = self.UI_liuguang_Mat})
+end
+
+function Activity_ScoreAwardGamePanel:SetData(needGotoTop)
+
+	self.icon_activity:SetSpriteURL(Activity_ScoreAwardGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Icon))
+	self.tx_name.text = Activity_ScoreAwardGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Name)
+	self.tx_dex.text = Activity_ScoreAwardGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Desc)
+
+	self.showTaskList = Activity_ScoreAwardGameProxy.inst:GetShowTaskList()
+	local num = #self.showTaskList
+
+	self.itemList.totalItemCount = num
+
+	if needGotoTop then
+		self.itemList:ScrollToTop()
+	end
+
+	self:refreshRedPoint()
+
+	self:setTimer();
+
+end
+
+function Activity_ScoreAwardGamePanel:clearTimer()
+
+	if self.loopTimerComp ~= nil then
+
+		CS_GameTimerInst:removeLoopTimer(self.loopTimerComp)
+		self.loopTimerComp = nil
+
+	end
+
+end
+
+function Activity_ScoreAwardGamePanel:setTimer()
+
+	self:clearTimer()
+	self:timerMethod()
+
+	self.loopTimerComp = CS_GameTimerInst:AddLoopTimerComp(self.tx_remainTime.gameObject,1,function()
+			self:timerMethod()
+		end)
+
+end
+
+function Activity_ScoreAwardGamePanel:timerMethod()
+
+	local remainTime = Activity_ScoreAwardGameProxy.inst.endtime_serverEndtime - CS_GameTimerInst.serverNow
+
+	if remainTime > 0 then
+		self.tx_remainTime.text = CS_LanguageManagerInst:GetValueByKey("剩余：") ..  CS_TimeUtils.timeSpanStrip(remainTime)
+	else
+		self:clearTimer();
+	end
+
+end
+
+function Activity_ScoreAwardGamePanel:refreshRedPoint()
+
+	self.obj_lookRewardRedPoint:SetActive(Activity_ScoreAwardGameProxy.inst:GetScoreReallyCanRewardCount() > 0)
+
+end
+
+function Activity_ScoreAwardGamePanel:Refresh()
+
+	self:SetData()
+
+end
+
+function Activity_ScoreAwardGamePanel:onHide()
+	self:clearTimer()
+end
+
+function Activity_ScoreAwardGamePanel:onLookRewardBtnClick()
+
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_ScoreRewardPanel, Activity_ScoreAwardGameProxy.inst:GetCurScorePointLv())
+
+end
+
+------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+

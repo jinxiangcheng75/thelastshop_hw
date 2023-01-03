@@ -1,0 +1,18 @@
+--ConfigProxy
+
+require("class")
+local CSVParser = require("config/CSVParser")
+
+local ConfigProxy = class()
+
+function ConfigProxy:ctor()
+	self.mConfigMap = {}
+end
+
+function ConfigProxy:getConfig(configName, id)
+end
+
+local function getConfigFromCS()
+end
+
+return ConfigProxy

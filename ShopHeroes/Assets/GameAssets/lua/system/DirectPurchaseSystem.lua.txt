@@ -1,0 +1,470 @@
+---@class DirectPurchaseSystem
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/PayGift/MainGiftUI")
+require("ui/view/PayGift/GiftDetailUI")
+require("ui/view/PayGift/GiftDesPanel")
+local EventDispatcher = require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GameObject = CS.UnityEngine.GameObject
+local CS_Type_LuaListItem = typeof(CS.LuaListItem)
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_GameTimerInst = CS.GameTimer.inst
+
+local CS_ItemConfigManagerInst = CS.ItemconfigManager.inst
+
+DirectPurchaseSystem = class(BaseSystem)
+DirectPurchaseSystem.super = BaseSystem
+
+function DirectPurchaseSystem:ctor()
+end
+
+function DirectPurchaseSystem:OnInit()
+	self.thisLoginPopShow = false
+end
+
+function DirectPurchaseSystem:ReInitSystem()
+	self.thisLoginPopShow = false
+end
+
+function DirectPurchaseSystem:AddListeners()
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.ShowUI_MainGiftUI,self,self.openMainGiftUI)
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.ShowUI_GiftDetailUI,self,self.openGiftDetailUI)
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.ShowUI_GiftDetailUIByUid,self,self.showGiftDetailUIByGiftUid)
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,self,self.addMsgTipsUI_GiftDetailUI)
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.HideUI_GiftDetailUI,self,self.hideGiftDetailUI)
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.ShowUI_GiftDesUI,self,self.openGiftDesUI)
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.MainUI_RefreshGiftBtn,self,self.refreshMainUIGiftBtn)
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.MainUI_ClearGiftBtns,self,self.clearMainUIGiftBtns)
+
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.onDirectPurchaseDataChged,self,self.onDirectPurchaseDataChged)
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.ShowDirectPurchasePanel,self,self.showDirectPurchasePanel)
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.Check_DirectPurchasePushByLevel,self,self.check_DirectPurchasePushByLevel)
+
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.CSCallLua_ShowGiftDeatilUI,self,self.CSCallLua_ShowGiftDeatilUI)
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.CSCallLua_CheckMakeSlotDirectPurchase,self,self.CSCallLua_CheckMakeSlotDirectPurchase)
+
+
+	EventDispatcher:addEvent(GameEvent.DirectPurchaseEvent.Request_Pay_DirectPurchase,self,self.request_pay_directPurchase)
+
+end
+
+function DirectPurchaseSystem:RemoveListeners()
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.ShowUI_MainGiftUI,self.openMainGiftUI)
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.ShowUI_GiftDetailUI,self.openGiftDetailUI)
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.ShowUI_GiftDetailUIByUid,self,self.showGiftDetailUIByGiftUid)
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,self,self.addMsgTipsUI_GiftDetailUI)
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.HideUI_GiftDetailUI,self,self.hideGiftDetailUI)
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.ShowUI_GiftDesUI,self,self.openGiftDesUI)
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.MainUI_RefreshGiftBtn,self,self.refreshMainUIGiftBtn)
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.MainUI_ClearGiftBtns,self,self.clearMainUIGiftBtns)
+
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.onDirectPurchaseDataChged,self,self.onDirectPurchaseDataChged)
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.ShowDirectPurchasePanel,self,self.showDirectPurchasePanel)
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.Check_DirectPurchasePushByLevel,self,self.check_DirectPurchasePushByLevel)
+
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.CSCallLua_ShowGiftDeatilUI,self,self.CSCallLua_ShowGiftDeatilUI)
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.CSCallLua_CheckMakeSlotDirectPurchase,self,self.CSCallLua_CheckMakeSlotDirectPurchase)
+
+	EventDispatcher:removeEvent(GameEvent.DirectPurchaseEvent.Request_Pay_DirectPurchase,self,self.request_pay_directPurchase)
+end
+
+
+function DirectPurchaseSystem:openMainGiftUI()
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.MainGiftUI,
+		function(view)
+
+		end
+	)
+
+end
+
+function DirectPurchaseSystem:openGiftDetailUI(giftData,needShowToggle)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GiftDetailUI,
+		function(view)
+			view:SetData(giftData,needShowToggle)
+		end
+	)
+
+end
+
+function DirectPurchaseSystem:showGiftDetailUIByGiftUid(giftUid,needShowToggle)
+
+	print("lua礼包弹窗事件响应: giftUid :",giftUid)
+
+	local giftData = DirectPurchaseProxy.inst:GetDirectPurchaseDataByUid(giftUid)
+
+	if giftData ~= nil then
+		self:openGiftDetailUI(giftData,needShowToggle)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.Request_Pay_DirectPurchase)
+		CS_EventControllerInst:TriggerEvent(CS_GameEventType.ReceiveEvent.GO_ON);
+	end
+
+end
+
+function DirectPurchaseSystem:addMsgTipsUI_GiftDetailUI(giftUid,needShowToggle)
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.Award_AboutDirectPurchase)
+	local data = CS.Award_AboutDirectPurchase()
+	data.type = CS.ReceiveInfoUIType.DirectPurchasePush
+	data.directPurchaseUid = giftUid
+	data.needShowToggle = needShowToggle or false
+	func(CS_EventControllerInst, CS_GameEventType.ReceiveEvent.NEWITEM_MSG, data)
+
+end
+
+
+function DirectPurchaseSystem:CSCallLua_ShowGiftDeatilUI(giftId)
+
+	local giftData = DirectPurchaseProxy.inst:GetDirectPurchaseDataById(giftId)
+
+	if giftData ~= nil then
+		self:addMsgTipsUI_GiftDetailUI(giftData.data.uid,false)
+	else
+		--再请求一遍
+		EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.Request_Pay_DirectPurchase)
+	end
+
+end
+
+function DirectPurchaseSystem:CSCallLua_CheckMakeSlotDirectPurchase(nextMakeSlotCount,needGemNum)
+
+	local list = DirectPurchaseProxy.inst.DirectPurchaseList
+
+	for i = 1, #list do
+
+		local directPurchaseData = list[i]
+
+		for k = 1, #directPurchaseData.data.itemList do
+
+			local item = directPurchaseData.data.itemList[k]
+
+			if item.itemType == 43 then --制作栏位
+
+				local itemCfg = CS_ItemConfigManagerInst:GetConfig(item.itemId)
+
+				if itemCfg ~= nil then
+
+					if tonumber(itemCfg.effect) == nextMakeSlotCount then
+
+						directPurchaseData.detailShowType = 0
+						EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,directPurchaseData.data.uid)
+						return
+					end
+
+				end
+
+			end
+		end
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,needGemNum - CS.UserDataProxy.inst.playerData.gem)
+end
+
+function DirectPurchaseSystem:hideGiftDetailUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.GiftDetailUI)
+
+end
+
+
+
+function DirectPurchaseSystem:openGiftDesUI(worldPos,content)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GiftDesPanel,
+		function(view)
+			view:SetData(worldPos,content)
+		end
+	)
+
+end
+
+
+
+--主界面 破冰礼包按钮们
+local mainUIGiftBtnObj = {}
+mainUIGiftBtnObj.commonGiftBtnItems = {}
+
+function DirectPurchaseSystem:clearMainUIGiftBtns()
+
+	for i = 1, #mainUIGiftBtnObj.commonGiftBtnItems do
+		mainUIGiftBtnObj.commonGiftBtnItems[i]:ClearData()
+	end
+
+end
+
+function DirectPurchaseSystem:refreshMainUIGiftBtn(parentTf)
+
+	mainUIGiftBtnObj.commonGiftBtnItemPfb = parentTf:GetObjByName("commonGiftBtnItemPfb")
+	mainUIGiftBtnObj.commonGiftBtnTf = parentTf.transform
+	mainUIGiftBtnObj.commonGiftBtnItems = {}
+
+	--根据具体礼包数据刷新
+
+	for i = 1, #mainUIGiftBtnObj.commonGiftBtnItems do
+		mainUIGiftBtnObj.commonGiftBtnItems[i]:ClearData()
+	end
+
+	local list = DirectPurchaseProxy.inst:GetMainShowList()
+
+	if #list > 0 then
+
+		parentTf.gameObject:SetActive(true)
+
+		for i = 1, #list do
+
+			if i <= #mainUIGiftBtnObj.commonGiftBtnItems then
+
+				mainUIGiftBtnObj.commonGiftBtnItems[i]:SetData(list[i])
+
+			else
+
+				local pfb = CS_GameObject.Instantiate(mainUIGiftBtnObj.commonGiftBtnItemPfb,mainUIGiftBtnObj.commonGiftBtnTf)
+				pfb:SetActive(true)
+				local item = pfb:GetComponent(CS_Type_LuaListItem)
+				item:SetData(list[i])
+				mainUIGiftBtnObj.commonGiftBtnItems[#mainUIGiftBtnObj.commonGiftBtnItems + 1] = item
+
+			end
+
+		end
+
+	else
+
+		parentTf.gameObject:SetActive(false)
+
+	end
+
+end
+
+
+function DirectPurchaseSystem:onDirectPurchaseDataChged()
+
+	local mallUI = GUIManager.inst:GetWindow(Constants.ViewName.MallUIView, false)
+
+	if mallUI ~= nil and mallUI.isShowing == true then
+		mallUI:RefreshDirectPurchaseData()
+	end
+
+	local giftDetailUI = GUIManager.inst:GetWindow(Constants.ViewName.GiftDetailUI, false)
+
+	if 	giftDetailUI~=nil and giftDetailUI.isShowing == true then
+		giftDetailUI:Refresh()
+	end
+
+end
+
+function DirectPurchaseSystem:showDirectPurchasePanel()
+
+
+	--拉出来看每天的弹出
+
+	local dateTime = CS_TimeUtils.getDateTimeBySecs(CS_GameTimerInst.serverNow)
+
+	if CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_Directpurchase_"..tostring(dateTime.Year)..tostring(dateTime.Month)..tostring(dateTime.Day)--[[.."_"..uid ]], "-1") == "-1" then
+
+
+		local mainshowList = {}
+
+		--先检测限时的
+		local list = DirectPurchaseProxy.inst:GetMainShowList()
+
+		for i = 1, #list do
+
+			local data = list[i]
+
+			for i = 1, #data.data.pushType do
+
+				if data.data.pushType[i] == 2 then --每日首次登录弹出详情页面，勾选后该日不弹出  登录弹出后该次不下线不弹出
+					mainshowList[#mainshowList + 1] = data
+				end
+
+			end
+
+		end
+
+		if #mainshowList >= 1 and not self.thisLoginPopShow then
+
+			self.thisLoginPopShow = true
+
+			local _giftData = mainshowList[math.random(#mainshowList)]
+			_giftData.detailShowType = 2
+			local uid = _giftData.data.uid
+
+			local storyNpcCfg =  StoryNpcConfigManager:GetConfig(2,_giftData.data.id)
+
+			if storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"-1") == "-1"  then
+
+				EventDispatcher:dispatchEvent(GameEvent.EventSystem.AddEvent,GameEvent.StoryRoleEvent.AddStoryRole,{storyType = 2,parame = _giftData.data.id,callback = function()
+							CS_PlayerPrefs.SetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"1")
+							EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,uid,true)
+							CS_EventControllerInst:TriggerEvent(CS_GameEventType.MenuEvent.REFRESHMAINUIPAYGIFTBTNS)
+							CS.GoOperationManager.inst.isDoing = false
+							CS.FGUI.inst:SetAllUIInteractable(true)
+							CS.FGUI.inst:SetAllUIAlpha(1)
+							EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+							EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+						end},ExecuteType.queueup,kGameState.Shop)
+
+			else
+				EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,uid,true)
+			end
+
+			return
+		end
+
+		--再检测商城常驻的
+		list = DirectPurchaseProxy.inst:GetMallShowList()
+		local mallshowList = {}
+
+		for i = 1, #list do
+
+			local data = list[i]
+
+			for i = 1, #data.data.pushType do
+
+				if data.data.pushType[i] == 2 then --每日首次登录弹出详情页面，勾选后该日不弹出  登录弹出后该次不下线不弹出
+					mallshowList[#mallshowList + 1] = data
+				end
+
+			end
+
+		end
+
+		if #mallshowList >= 1 and not self.thisLoginPopShow then
+
+			self.thisLoginPopShow = true
+
+			local _giftData = mallshowList[math.random(#mallshowList)]
+			_giftData.detailShowType = 2
+			local uid = _giftData.data.uid
+
+			local storyNpcCfg =  StoryNpcConfigManager:GetConfig(2,_giftData.data.id)
+
+			if storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"-1") == "-1"  then
+
+				EventDispatcher:dispatchEvent(GameEvent.EventSystem.AddEvent,GameEvent.StoryRoleEvent.AddStoryRole,{storyType = 2,parame = _giftData.data.id,callback = function()
+							CS_PlayerPrefs.SetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"1")
+							EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,uid,true)
+							CS_EventControllerInst:TriggerEvent(CS_GameEventType.MenuEvent.REFRESHMAINUIPAYGIFTBTNS)
+							CS.GoOperationManager.inst.isDoing = false
+							CS.FGUI.inst:SetAllUIInteractable(true)
+							CS.FGUI.inst:SetAllUIAlpha(1)
+							EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+							EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+						end},ExecuteType.queueup,kGameState.Shop)
+
+			else
+				EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,uid,true)
+			end
+
+			return
+		end
+
+	else --判断哪些礼包小人还未来过 让其再来一次
+
+		for i = 1, #DirectPurchaseProxy.inst.DirectPurchaseList do
+
+			local data = DirectPurchaseProxy.inst.DirectPurchaseList[i]
+
+			local storyNpcCfg =  StoryNpcConfigManager:GetConfig(2,data.data.id)
+
+			if storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"-1") == "-1"  then
+
+				EventDispatcher:dispatchEvent(GameEvent.EventSystem.AddEvent,GameEvent.StoryRoleEvent.AddStoryRole,{storyType = 2,parame = data.data.id,callback = function()
+							CS_PlayerPrefs.SetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"1")
+							EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,data.data.uid,true)
+							CS_EventControllerInst:TriggerEvent(CS_GameEventType.MenuEvent.REFRESHMAINUIPAYGIFTBTNS)
+							CS.GoOperationManager.inst.isDoing = false
+							CS.FGUI.inst:SetAllUIInteractable(true)
+							CS.FGUI.inst:SetAllUIAlpha(1)
+							EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+							EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+						end},ExecuteType.queueup,kGameState.Shop)
+			end
+
+		end
+
+	end
+
+end
+
+function DirectPurchaseSystem:check_DirectPurchasePushByLevel(playerLevel)
+
+	local list = DirectPurchaseProxy.inst.DirectPurchaseList
+
+	for i = 1, #list do
+
+		local data = list[i]
+		local uid = data.data.uid
+		local isPushShow = false
+
+		for i = 1, #data.data.pushType do
+
+			if data.data.pushType[i] == 3 then --每达到[指定等级]即弹出1次，仅一次
+
+				for k = 1, #data.data.pushParam do
+
+					if data.data.pushParam[k] == playerLevel then
+						isPushShow = true
+						break
+					end
+
+				end
+
+			end
+
+		end
+
+		if isPushShow then
+			--data.popShow = true
+
+			data.detailShowType = 0
+			local storyNpcCfg =  StoryNpcConfigManager:GetConfig(2,data.data.id)
+
+			if storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"-1" == "-1")  then
+
+				EventDispatcher:dispatchEvent(GameEvent.EventSystem.AddEvent,GameEvent.StoryRoleEvent.AddStoryRole,{storyType = 2,parame = data.data.id,callback = function()
+							CS_PlayerPrefs.SetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"1")
+							EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,uid)
+							CS_EventControllerInst:TriggerEvent(CS_GameEventType.MenuEvent.REFRESHMAINUIPAYGIFTBTNS)
+							CS.GoOperationManager.inst.isDoing = false
+							CS.FGUI.inst:SetAllUIInteractable(true)
+							CS.FGUI.inst:SetAllUIAlpha(1)
+							EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+							EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+						end},ExecuteType.queueup,kGameState.Shop)
+
+			else
+				EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.AddMsgTipsUI_GiftDetailUI,uid)
+			end
+
+		end
+
+	end
+
+end
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+function DirectPurchaseSystem:request_pay_directPurchase()
+
+	--发送获取直购礼包列表的请求
+	local req = MsgType.Request_Pay_DirectPurchase:New()
+	req:Send()
+
+end

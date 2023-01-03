@@ -1,0 +1,312 @@
+require("utils/XLuaUtils")
+
+local Vector3 = CS.UnityEngine.Vector3
+
+local CS_FurnitureConfigManagerInst = CS.FurnitureConfigManager.inst
+local CS_FurnitureUpgradeConfigManagerInst = CS.FurnitureUpgradeConfigManager.inst
+local CS_ExtensionConfigManagerInst = CS.ExtensionConfigManager.inst
+local csGameTimerInst = CS.GameTimer.inst
+local EventDispatcher = require("event/EventDispatcher")
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+--UnionAidMemberByGemUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+
+UnionAidMemberByGemUIView = class(ViewBase)
+
+function UnionAidMemberByGemUIView:ctor()
+	self.viewID = Constants.ViewName.UnionAidMemberByGemUIView
+	UnionAidMemberByGemUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.selfUnionToken
+end
+------------------------------------------------
+
+--[[
+
+closeBtn
+userLvTx
+playerNameTx
+upTipTx
+timeSlider
+sliderTx
+aidGemBtn
+curGemTx
+oriGemTx
+headIconTf
+
+--]]
+
+local timerId
+local nowPrice
+
+function UnionAidMemberByGemUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn =  contentPane:GetButton("closeBtn");
+	self.userLvTx =  contentPane:GetText("userLvTx");
+	self.playerNameTx = contentPane:GetText("playerNameTx");
+	self.upTipTx = contentPane:GetText("upTipTx");
+	self.timeSlider = contentPane:GetObjByName("timeSlider"):GetComponent("Slider");
+	self.sliderTx = contentPane:GetText("sliderTx")
+	self.aidGemBtn = contentPane:GetButton("aidByGemBtn")
+	self.curGemTx = contentPane:GetText("curGemTx")
+	self.oriGemTx = contentPane:GetText("oriGemTx")
+	self.headIconTf = contentPane:GetObjByName("headIconTf").transform
+	
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+
+function UnionAidMemberByGemUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.aidGemBtn:ButtonClickTween(
+		function ()
+			self:aidGemBtnClick()
+		end
+	)
+
+
+end
+
+function UnionAidMemberByGemUIView:OnMemberHelpListChanged()
+
+	if 	self.data == nil or self.data:IsNull() == true then
+		self:hide()
+		return
+	end
+
+	local needHide = true
+	local aidShowList = CS_UserDataProxyInst.union_aidShowList
+
+	for i = 0, aidShowList.Count - 1 do
+		local tempData = aidShowList[i]
+
+		if 	self.data.severData.userId == tempData.severData.userId and self.data.severData.furnitureUid == tempData.severData.furnitureUid then
+			self.data = tempData
+			needHide = false
+			break
+		end
+
+	end
+
+	if needHide then
+		self:hide()
+	else
+		self:SetData(self.data)
+	end
+
+end
+
+function UnionAidMemberByGemUIView:SetData(data)--UnionMemberHelpData
+
+	self.data = data
+
+	self.playerNameTx.text = CS_LanguageManagerInst:GetValueByKey(self.data.severData.name)
+	self.userLvTx.text = tostring(self.data.severData.userLevel)
+
+	local upgradingItemName = ""
+
+	if self.data.severData.furnitureUid == 99999 then --扩建
+
+		local extensionConfig = CS_ExtensionConfigManagerInst:GetExtensionConfig(self.data.severData.level + 1)
+
+		if extensionConfig:IsNull() == false then
+
+			upgradingItemName = "店铺"
+			self.timeSlider.maxValue = extensionConfig.time
+
+		end
+
+
+	else --家具
+
+		local furnitureCfg = nil
+		local furnitureUpCfg = nil
+
+		furnitureCfg = nil
+		furnitureUpCfg = nil
+
+		furnitureCfg = CS_FurnitureConfigManagerInst:getConfig(self.data.severData.furnitureId)
+
+		if furnitureCfg ~= nil and furnitureCfg:IsNull() == false then
+			
+			if 	furnitureCfg.type_1 == 6 then --柜台
+				furnitureUpCfg = CS_FurnitureUpgradeConfigManagerInst:GetCounterUpgradeConfig(self.data.severData.level + 1)
+			elseif furnitureCfg.type_1 == 7 then --货架
+				furnitureUpCfg = CS_FurnitureUpgradeConfigManagerInst:GetShelfUpgradeConfig(furnitureCfg.type_2,self.data.severData.level + 1)
+			elseif furnitureCfg.type_1 == 8 then --储物箱
+				furnitureUpCfg = CS_FurnitureUpgradeConfigManagerInst:GetTrunkUpgradeConfig(self.data.severData.level + 1)
+			elseif furnitureCfg.type_1 == 9 then --资源箱
+				furnitureUpCfg = CS_FurnitureUpgradeConfigManagerInst:GetResourceBinUpgradeConfig(furnitureCfg.type_2,self.data.severData.level + 1)
+			end
+
+
+			if  furnitureUpCfg ~= nil and furnitureUpCfg:IsNull() == false then
+
+				upgradingItemName = string.sub(furnitureCfg.name,2 * 3 + 1)
+				self.timeSlider.maxValue = furnitureUpCfg.time
+
+			end
+		end
+	end
+
+
+	self:setTimer()
+
+	self.upTipTx.text = CS_LanguageManagerInst:GetValueByKey("正在升级{0}至{1}级",CS_LanguageManagerInst:GetValueByKey(upgradingItemName),self.data.severData.level + 1)
+
+	if self.headGraphicSystem == nil or self.headGraphicSystem:IsNull() == true then
+
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		
+		func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(self.data.severData.gender),CS_SpineUtils.RoleDressToHeadDressIdList(self.data.severData.userDress),CS.EGender.__CastFrom(self.data.severData.gender),1.4,true,function (system)
+				self.headGraphicSystem = system
+				system.transform:SetParent(self.headIconTf);
+				system.transform.localScale = Vector3.one * 0.4;
+				system.transform.localPosition = Vector3.down * 250;
+				system:SetDirection(CS.RoleDirectionType.Right);
+			end)
+
+	else
+		CS_CharacterManagerInst:ReSetCharacter(self.headGraphicSystem,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(self.data.severData.gender),CS_SpineUtils.RoleDressToHeadDressIdList(self.data.severData.userDress),CS.EGender.__CastFrom(self.data.severData.gender))
+	end
+
+end
+
+
+function UnionAidMemberByGemUIView:onHide()
+	print("UnionAidMemberByGemUIView onHide")
+
+	if timerId ~= 0 then
+
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = 0
+
+	end
+end
+
+function  UnionAidMemberByGemUIView:onShowed()
+	print("UnionAidMemberByGemUIView onShowed")
+end
+
+function UnionAidMemberByGemUIView:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function UnionAidMemberByGemUIView:DoHideAnimation()
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+
+function UnionAidMemberByGemUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function UnionAidMemberByGemUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+
+
+function UnionAidMemberByGemUIView:closeBtnClick()
+	self:hide()
+end
+
+function UnionAidMemberByGemUIView:aidGemBtnClick()
+	
+	if self.data == nil then
+		self:hide()
+		return
+	end
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func_2 = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+	
+
+	if nowPrice > CS_UserDataProxyInst.playerData.gem then
+
+		--func_2(csEventControllerInst,csGameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("金条不足"), CS.GUIHelper.GetColorByColorHex("FF2828"))
+		EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,nowPrice - CS_UserDataProxyInst.playerData.gem)
+
+	else
+
+		func_2(csEventControllerInst,csGameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("已帮助{0}减少{1}",CS_LanguageManagerInst:GetValueByKey(self.data.severData.name),CS_TimeUtils.timeSpanStrip(self.data.remainTime,true)), CS.GUIHelper.GetColorByColorHex("Fe4747"))
+		EventDispatcher:dispatchEvent(GameEvent.UnionEvent.Request_UnionHelpMember,self.data.severData.furnitureUid,self.data.severData.userId,1,0)
+
+	end
+
+end
+
+function UnionAidMemberByGemUIView:setTimer()
+
+	if timerId ~= 0 then
+
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = 0
+
+	end
+
+	self:timerMethod()
+
+	timerId = csGameTimerInst:AddTimer(1,function()
+			self:timerMethod()
+		end)
+
+end
+
+
+function UnionAidMemberByGemUIView:timerMethod()
+	self.timeSlider.value = self.timeSlider.maxValue - self.data.remainTime
+	self.sliderTx.text = CS_TimeUtils.timeSpanStrip(self.data.remainTime,true)
+
+	local oriPrice = CS.DiamondCountUtils.GetFurnitureUpgradeDiamonds(self.data.remainTime)
+	nowPrice = math.ceil(oriPrice * 0.9)
+
+	self.curGemTx.text = tostring(nowPrice)
+	--self.curGemTx.color = CS_UserDataProxyInst.playerData.gem < nowPrice and CS.GUIHelper.GetColorByColorHex("FF2828") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+	
+	self.oriGemTx.text = tostring(oriPrice)
+end
+------------------------------------------------

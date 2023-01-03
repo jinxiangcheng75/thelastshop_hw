@@ -1,0 +1,367 @@
+---@class MallSystem
+require("class")
+require("data/MallDataProxy")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/Mall/MallUIView")
+require("ui/view/Mall/VipInfoUIView")
+require("ui/view/Mall/MallBuyVipUIView")
+require("ui/view/Mall/BuyVipUIView")
+require("ui/view/Mall/MallBuyVipComUIView")
+require("ui/view/Mall/MallDealInfoUIView")
+require("ui/view/Mall/VipGetRewardUIView")
+require("ui/view/Mall/BlackMarketItemInfo")
+require("ui/view/GiftMall/GiftMallUI")
+
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+
+MallSystem = class(BaseSystem)
+MallSystem.super = BaseSystem
+
+local mallBuyItemUIView
+local mallRefreshUIView
+local vipInfoUIView
+local mallBuyVipUIView
+local buyVipUIView
+local mallBuyVipComUIView
+local mallDealInfoUIView
+local vipGetRewardUIView
+local blackMarketInfoUIView
+
+function MallSystem:ctor()
+end
+
+function MallSystem:AddListeners()
+	
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_MallUI, self, self.openMallUIView)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.RefreshUI_MallContent, self, self.refreshMallContent)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_MallBuyItemUI, self, self.openMallBuyItemUI)
+
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.REQUEST_MALLLIST, self, self.requestMallList)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.REQUEST_STORELIST, self, self.requestStoreList)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.REQUEST_MALLREFRESH, self, self.requestMallRefresh)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.REQUEST_MALLGOODSBUY, self, self.requestMallGoodsBuy)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.REQUEST_MALLVIPBUY, self, self.requestMallVipBuy)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.REQUEST_GeneralPurchase, self, self.requestGeneralPurchase)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.REQUEST_DailySale, self, self.requestDailySale)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.REQUEST_PAYIOSBUY, self, self.requestBuyIOSPay)
+
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.HideUI_MallBuyItemUI, self, self.hideMallBuyItemUI)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_MallRefreshUI, self, self.showMallRefreshUI)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.HideUI_MallRefreshUI, self, self.hideMallRefreshUI)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_VipInfoUI, self, self.showVipInfoUI)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_MallBuyVipUI, self, self.showMallBuyVipUI)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.HideUI_MallBuyVipUI, self, self.hideMallBuyVipUI)
+
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_MallBuyVipComUI, self, self.showMallBuyVipComUI)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_MallBuyVipOtherComUI, self, self.showMallBuyVipOtherComUI)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_BuyVipUI, self, self.showBuyVipUI)
+
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_DealInfoUI, self, self.showDealInfoUI)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.HideUI_DealInfoUI, self, self.hideDealInfoUI)
+
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_VipGetRewardUI, self, self.showVipGetRewardUI)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_VipOverDueUI, self, self.showVipOverdueUI)
+	
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.ShowUI_BlackMarketUI, self, self.showBlackMarketUI)
+	EventDispatcherInis:addEvent(GameEvent.MallEvent.HideUI_BlackMarketUI, self, self.hideBlackMarketUI)
+
+	--礼包商城
+	EventDispatcherInis:addEvent(GameEvent.GiftMall.Show_GiftMallUI, self, self.showGiftsMallUI)
+	EventDispatcherInis:addEvent(GameEvent.GiftMall.Update_GiftMallUI, self, self.updateGiftsMallUI)
+
+	--领取每日奖励
+	EventDispatcherInis:addEvent(GameEvent.DailyReward.DailyReward_RequestInfo, self, self.DailyRewardRequestInfo)
+	EventDispatcherInis:addEvent(GameEvent.DailyReward.DailyReward_ReceiveAward, self, self.DailyBoxReceiveAward)
+	EventDispatcherInis:addEvent("RequestDailyBoxReward", self, self.RequestDailyBoxReward)
+end
+
+function MallSystem:RemoveListeners()
+	
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_MallUI, self.openMallUIView)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.RefreshUI_MallContent, self, self.refreshMallContent)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_MallBuyItemUI, self.openMallBuyItemUI)
+
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.REQUEST_MALLLIST, self.requestMallList)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.REQUEST_STORELIST, self.requestStoreList)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.REQUEST_MALLREFRESH, self.requestMallRefresh)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.REQUEST_MALLGOODSBUY, self.requestMallGoodsBuy)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.REQUEST_MALLVIPBUY, self.requestMallVipBuy)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.REQUEST_GeneralPurchase, self.requestGeneralPurchase)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.REQUEST_DailySale, self.requestDailySale)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.REQUEST_PAYIOSBUY, self, self.requestBuyIOSPay)
+
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.HideUI_MallBuyItemUI, self.hideMallBuyItemUI)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_MallRefreshUI, self.showMallRefreshUI)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.HideUI_MallRefreshUI, self.hideMallRefreshUI)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_VipInfoUI, self.showVipInfoUI)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_MallBuyVipUI, self.showMallBuyVipUI)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.HideUI_MallBuyVipUI, self.hideMallBuyVipUI)
+
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_MallBuyVipComUI, self.showMallBuyVipComUI)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_MallBuyVipOtherComUI, self.showMallBuyVipOtherComUI)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_BuyVipUI, self.showBuyVipUI)
+
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_DealInfoUI, self.showDealInfoUI)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.HideUI_DealInfoUI, self.hideDealInfoUI)
+
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_VipGetRewardUI, self.showVipGetRewardUI)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_VipOverDueUI, self.showVipOverdueUI)
+	
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.ShowUI_BlackMarketUI, self.showBlackMarketUI)
+	EventDispatcherInis:removeEvent(GameEvent.MallEvent.HideUI_BlackMarketUI, self.hideBlackMarketUI)
+
+	--礼包商城
+	EventDispatcherInis:removeEvent(GameEvent.GiftMall.Show_GiftMallUI, self, self.showGiftsMallUI)
+	EventDispatcherInis:removeEvent(GameEvent.GiftMall.Update_GiftMallUI, self, self.updateGiftsMallUI)
+
+	--每日免费奖励
+	EventDispatcherInis:removeEvent(GameEvent.DailyReward.DailyReward_RequestInfo, self, self.DailyRewardRequestInfo)
+	EventDispatcherInis:removeEvent(GameEvent.DailyReward.DailyReward_ReceiveAward, self, self.DailyBoxReceiveAward)
+	EventDispatcherInis:removeEvent("RequestDailyBoxReward", self, self.RequestDailyBoxReward)
+end
+
+function MallSystem:hideBlackMarketUI()
+	GUIManager.inst:HideView(Constants.ViewName.BlackMarketItemInfo)
+end
+
+function MallSystem:showBlackMarketUI(_data)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.BlackMarketItemInfo,
+		function(view)
+			blackMarketInfoUIView = view
+			view:SetData(_data)
+		end
+	)
+end
+
+local giftMallView = nil
+function MallSystem:showGiftsMallUI(index)
+	
+	index = index or 0
+	
+	--打开礼包商城界面
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GiftMallView,
+		function(view)
+			view:SetTableByIndex(index)
+			giftMallView = view
+		end
+	)
+end
+
+function MallSystem:updateGiftsMallUI()
+	if giftMallView ~= nil and giftMallView.isShowing == true then
+		giftMallView:UpdateUI()
+	end
+end
+
+function MallSystem:showVipOverdueUI()
+	if (MallDataProxy.inst.needShowOverdueUI) then
+		EventDispatcherInis:dispatchEvent(GameEvent.MallEvent.ShowUI_BuyVipUI, 2)
+		MallDataProxy.inst.needShowOverdueUI = false
+	end
+end
+
+function MallSystem:showVipGetRewardUI(level)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.VipGetRewardUIView,
+		function(view)
+			vipGetRewardUIView = view
+			view:setUIData(level)
+		end
+	)
+end
+
+function MallSystem:hideDealInfoUI()
+	GUIManager.inst:HideView(Constants.ViewName.MallDealInfoUIView)
+end
+
+function MallSystem:showDealInfoUI(data)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.MallDealInfoUIView,
+		function(view)
+			mallDealInfoUIView = view
+			view:SetData(data)
+		end
+	)
+end
+
+function MallSystem:showBuyVipUI(fromType)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.BuyVipUIView,
+		function(view)
+			buyVipUIView = view
+			view:setUIData(fromType)
+		end
+	)
+end
+
+function MallSystem:showMallBuyVipOtherComUI(pic1, pic2, desc)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.MallBuyVipComUIView,
+		function(view)
+			mallBuyVipComUIView = view
+			view:setOtherUIData(pic1, pic2, desc)
+		end
+	)
+end
+
+function MallSystem:showMallBuyVipComUI(vipType)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.MallBuyVipComUIView,
+		function(view)
+			mallBuyVipComUIView = view
+			view:setUIData(vipType)
+		end
+	)
+end
+
+function MallSystem:hideMallBuyVipUI()
+	GUIManager.inst:HideView(Constants.ViewName.BuyVipUIView)
+end
+
+function MallSystem:showMallBuyVipUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.MallBuyVipUIView,
+		function(view)
+			mallBuyVipUIView = view
+		end
+	)
+end
+
+function MallSystem:showVipInfoUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.VipInfoUIView,
+		function(view)
+			vipInfoUIView = view
+		end
+	)
+end
+
+function MallSystem:hideMallRefreshUI()
+	GUIManager.inst:HideView(Constants.ViewName.MallRefreshUIView)
+end
+
+function MallSystem:showMallRefreshUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.MallRefreshUIView,
+		function(view)
+			mallRefreshUIView = view
+		end
+	)
+end
+
+function MallSystem:hideMallBuyItemUI()
+	GUIManager.inst:HideView(Constants.ViewName.MallBuyItemUIView)
+end
+
+
+function MallSystem:openMallUIView(mallContentType,extraParam)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.MallUIView,
+		function(view)
+			view:ShowByMallContentType(mallContentType,extraParam)
+		end
+	)
+
+end
+
+function MallSystem:refreshMallContent(mallContentType)
+	
+	local mallUI = GUIManager.inst:GetWindow(Constants.ViewName.MallUIView,false)
+	
+	if mallUI ~= nil and mallUI.isShowing then
+		mallUI:Refresh(mallContentType)
+	end
+	
+end
+
+function MallSystem:requestBuyIOSPay(priceId,payActivityType,payActivityId)
+	local rep = MsgType.Request_Pay_IOSBuy:New()
+	rep.priceId = priceId
+	rep.payActivityType = payActivityType
+	rep.payActivityId = payActivityId
+	rep:Send()
+end
+
+function MallSystem:requestDailySale()
+	local rep = MsgType.Request_Pay_DailySale:New()
+	rep:Send()
+end
+
+function MallSystem:requestGeneralPurchase()
+	local rep = MsgType.Request_Pay_GeneralPurchase:New()
+	rep:Send()
+end
+
+function MallSystem:requestMallVipBuy()
+	local rep = MsgType.Request_Pay_BuyVIP:New()
+	rep:Send()
+end
+
+function MallSystem:requestMallGoodsBuy(buyIndex)
+	local rep = MsgType.Request_Pay_StoreBuy:New()
+	rep.uid = buyIndex
+	rep:Send()
+end
+
+function MallSystem:requestMallRefresh()
+	local rep = MsgType.Request_Pay_StoreRefresh:New()
+	rep:Send()
+end
+
+function MallSystem:requestStoreList()
+	local rep = MsgType.Request_Pay_GemStoreList:New()
+	rep:Send()
+end
+
+function MallSystem:requestMallList()
+	local rep = MsgType.Request_Pay_StoreList:New()
+	rep:Send()
+end
+
+function MallSystem:openMallBuyItemUI(itemData)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.MallBuyItemUIView,
+		function(view)
+			mallBuyItemUIView = view
+			mallBuyItemUIView:SetData(itemData)
+		end
+	)
+end
+
+function MallSystem:DailyRewardRequestInfo()
+	local rep = MsgType.Request_User_DailyBoxInfo:New()
+	rep:Send()
+end
+--领取奖励
+function MallSystem:DailyBoxReceiveAward(boxtype) -- boxtype = enum EUserDailyBoxRewardType
+	if boxtype == 3 then
+		--看广告
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.System.Int32)
+		func(CS.EventController.inst, CS.GameEventType.GameAdEvent.GAMEAD_START, 3) --每日免费奖励广告
+	else
+		self:RequestDailyBoxReward(boxtype)
+	end
+end
+
+function MallSystem:RequestDailyBoxReward(_type)
+	local rep = MsgType.Request_User_DailyBoxReward:New()
+	rep.type = _type
+	rep:Send()
+end
+
+function MallSystem:OnEnter()
+	MallSystem.super.OnEnter(self)
+end
+
+function MallSystem:OnExit()
+	MallSystem.super.OnExit(self)
+end

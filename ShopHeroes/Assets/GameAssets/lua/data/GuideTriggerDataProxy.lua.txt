@@ -1,0 +1,98 @@
+-- GuideTriggerDataProxy
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+require("config/GuideTaskConfigManager")
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGameTimerInst = CS.GameTimer.inst
+
+GuideTriggerDataProxy = class(BaseDataProxy)
+
+GuideTriggerDataProxy.inst = GuideTriggerDataProxy:new()
+
+function GuideTriggerDataProxy:Init()
+
+	NetworkEvent:SetCallback(MsgTypeCmd.Response_User_CheckTriggerGuide_Cmd, function(resp)
+			print("Response_User_CheckTriggerGuide success", resp)
+			self:GetGuideTriggerData(resp)
+		end, function(code)
+			print("Response_User_CheckTriggerGuide fail --- code", code)
+			csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取触发数据失败!")
+		end)
+
+	NetworkEvent:SetCallback(MsgTypeCmd.Response_User_TriggerGuide_Cmd, function(resp)
+			print("Response_User_TriggerGuide success", resp)
+			self:GetGuideTriggerListData(resp)
+		end, function(code)
+			print("Response_User_TriggerGuide fail --- code", code)
+			csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取触发列表失败!")
+		end)
+
+	NetworkEvent:SetCallback(MsgTypeCmd.Response_User_TriggerGuideFurnitureUpgrade_Cmd, function(resp)
+			print("Response_User_TriggerGuideFurnitureUpgrade success", resp)
+			self:GetGuideTriggerFurnData(resp)
+		end, function(code)
+			print("Response_User_TriggerGuideFurnitureUpgrade fail --- code", code)
+			csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取触发家具数据失败!")
+		end)
+
+	self.triggerList = {}
+end
+
+function GuideTriggerDataProxy:GetGuideTriggerFurnData(respData)
+	local data = MsgType.Response_User_TriggerGuideFurnitureUpgrade:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.triggerList[tonumber(data.triggerGuideData.groupId)] = tonumber(data.triggerGuideData.groupFlag) == 1
+	if(data.furnitureInfo.state == 1)then
+		local allFurn = CS.IndoorMap.inst.IndoorFunituresList
+		for i = 0, allFurn.Count - 1 do
+			if(allFurn[i].uid == tonumber(data.furnitureInfo.furnitureUid))then
+				allFurn[i].upgradeAttacher:setTriggerAidBtn()
+			end
+		end
+	end
+end
+
+function GuideTriggerDataProxy:GetGuideTriggerListData(respData)
+	local data = MsgType.Response_User_TriggerGuide:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	for i = 1, #data.triggerGuideList do
+		local curData = data.triggerGuideList[i]
+		self.triggerList[tonumber(curData.groupId)] = tonumber(curData.groupFlag) == 1
+	end
+end
+
+function GuideTriggerDataProxy:GetGuideTriggerData(respData)
+	local data = MsgType.Response_User_CheckTriggerGuide:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.triggerList[tonumber(data.triggerGuideData.groupId)] = tonumber(data.triggerGuideData.groupFlag) == 1
+end
+
+function GuideTriggerDataProxy:CheckIsTrigger(groupId)
+	groupId = tonumber(groupId)
+	if(self.triggerList[groupId] ~= nil)then
+		return self.triggerList[groupId]
+	end
+
+	return false
+end
+
+function GuideTriggerDataProxy:Clear()
+
+end
+
+function GuideTriggerDataProxy:GetData()
+
+end

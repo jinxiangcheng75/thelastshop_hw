@@ -1,0 +1,416 @@
+--ManagerBinder
+require("class")
+require("event/GameEvent")
+require("ui/GUIManager")
+require("manager/GuideTriggerManager")
+
+-------------------DataProxy------------------------
+require("data/TestNewDataProxy")
+require("data/DailySignDataProxy")
+require("data/MallDataProxy")
+require("data/DirectPurchaseProxy")
+require("data/Activity_WorkerGameProxy")
+require("data/GuideTaskDataProxy")
+require("data/VisitShopData/UserIndoorDataProxy")
+require("data/GuideTriggerDataProxy")
+require("data/OnlineRewardDataProxy")
+require("data/DailyRewardDataProxy")
+require("data/RefugeTowerDataProxy")
+require("data/ShopRankDataProxy")
+require("data/RuinsDataProxy")
+require("data/PetDataProxy")
+require("data/GemMonthCardDataProxy")
+require("data/GiftSevenDataProxy")
+require("data/GoldenCityDataProxy")
+require("data/ActivityPointDataProxy")
+require("data/ChatDataProxy")
+require("data/Activity_ScoreAwardGameProxy")
+require("data/Activity_DeadRisingDataProxy")
+
+---------------------System----------------------------------
+require("system/TestNewSystem")
+require("system/GameHintSystem")
+require("system/UnionSystem")
+require("system/DailySignSystem")
+require("system/MallSystem")
+require("system/GameMsgTipSystem")
+require("system/SystemUnlockSystem")
+require("system/DirectPurchaseSystem")
+require("system/PetSystem")
+require("system/RoleExchangeSystem")
+require("system/Activity_WorkerGameSystem")
+require("system/GuideTaskSystem")
+require("system/GuideTriggerSystem")
+require("system/VisitShopSys")
+require("system/CreatRoleSystem")
+require("system/ShopDesignSystem")
+require("system/OnlineRewardSystem")
+require("system/LuxurySystem")
+require("system/StoryRoleSystem")
+require("system/RefugeTowerSystem")
+require("system/WelfareSystem")
+require("system/EquipStarUpTriggerSystem")
+require("system/HeroSystem")
+require("system/IndoorMapEditSys/ShopMapEditModeHandler")
+require("system/IndoorMapEditSys/ShopkeeperHandler")
+require("system/IndoorRoleSystem/IndoorRoleSystem")
+require("network/NetworkManager")
+require("system/GameEventListControl")
+--local PrefUtils = require("utils/PrefUtils")
+require("system/LVGrowthRewardSystem")
+require("system/ShopRankSystem")
+require("system/RuinsSystem")
+require("system/GemMonthCardSystem")
+require("system/GiftSevenSystem")
+require("system/GoldenCitySystem")
+require("system/ActivityPointSystem")
+require("system/ChatSystem")
+require("system/Activity_ScoreAwardGameSystem")
+require("system/UseAdvancedOrLockEquipTipsMediator")
+require("system/Activity_DeadRisingSystem")
+
+require("system/Heartbeat/HeartbeatSystem")
+
+----------------------Config------------------------------------
+require("config/TestNewConfig")
+require("config/VipInfoConfingManager")
+require("config/RechargeConfigManager")
+require("config/RaceLampConfigManager")
+require("config/SystemUnlockConfigManager")
+require("config/PetUpdateConfigManager")
+require("config/GuideTaskConfigManager")
+require("config/GuideTriggerConfigManager")
+require("config/StoryNpcConfigManager")
+require("config/EquipProperty_make_integral_ConfigManager")
+require("config/LuxuryConfigManager")
+require("config/GrowthRewardConfigManager")
+require("config/RefugeConfigManager")
+require("config/RefugeFloorConfigManager")
+require("config/SevenDayPassAwardConfigManager")
+require("config/RankConfigManager")
+require("config/RuinsConfigManager")
+require("config/PetConfigManager")
+require("config/GiftSevenConfigManager")
+require("config/GoldenCityConfigManager")
+require("config/ActivityTaskConfigManager")
+require("config/ChatEmojiConfigManager")
+require("config/ItemConfigManager")
+
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local csLanguageManager = CS.LanguageManager
+
+ManagerBinder = class()
+
+ManagerBinder.inst = ManagerBinder:new()
+
+function ManagerBinder:ctor()
+	print("ManagerBinder:ctor")
+end
+
+function ManagerBinder:onStartSystem()
+	self:StartGameSystem()
+end
+
+function ManagerBinder:Init()
+	print("ManagerBinder:Init")
+	CS.ButtonEx.globalCoolTime = 0.4
+	self.mCSSysList = {}
+	self.mCSDataProxyList = {}
+	self.mLuaDataProxyList = {}
+	self.mLuaSysList = {}
+
+	GUIManager.inst:init()
+	NetworkManager.inst:Init()
+	GuideTriggerManager.inst:init()
+	--IndoorRoleSystem.inst:Init()
+
+	GameEventListControl.inst:Init()
+
+	local loadingSys = CS.LoadingSystem()
+	loadingSys:OnEnter()
+
+	EventDispatcher:addEvent(GameEvent.Asset.Start_System, self, self.onStartSystem)
+end
+
+function ManagerBinder:initLanguage()
+	-- if (PrefUtils:HasKey("languageType")) then
+	--     LanguageManager.inst.curType = (LanguageType)
+	--     Enum.Parse(typeof(LanguageType), PlayerPrefs.GetString("languageType"), false)
+	-- else
+	--     PrefUtils.SetString("languageType", LanguageType.SIMPLIFIED_CHINESE.ToString())
+	--     LanguageManager.inst.curType = (LanguageType)
+	--     Enum.Parse(typeof(LanguageType), PlayerPrefs.GetString("languageType"), false)
+	-- end
+	-- if (PrefUtils.HasKey("combatPlaySpeed")) then
+	--     GameSettingManager.combatPlaySpeed = PlayerPrefs.GetFloat("combatPlaySpeed")
+	-- end
+	-- LanguageManager.inst.SetFont();
+end
+
+function ManagerBinder:initDataProxies()
+	-- C# Dataproxy
+	local dlist = self.mCSDataProxyList
+	dlist[#dlist + 1] = CS.ItemBagProxy.inst --背包(*)
+	dlist[#dlist + 1] = CS.AccountDataProxy.inst --登陆(*)
+	dlist[#dlist + 1] = CS.UserDataProxy.inst --玩家数据(*)
+	dlist[#dlist + 1] = CS.EquipDataProxy.inst --装备(*)
+	dlist[#dlist + 1] = CS.ShopkeeperDataProxy.inst --店主(*)
+	--dlist[#dlist + 1] = CS.ResourceProductionProxy.inst --制造 资源
+	--dlist[#dlist + 1] = CS.DailyTaskDataProxy.inst 	--日常任务
+	dlist[#dlist + 1] = CS.ShopperDataProxy.inst --顾客数据(*)
+	--dlist[#dlist + 1] = CS.MapDataProxy.inst --地图数据
+	dlist[#dlist + 1] = CS.MoneyBoxDataProxy.inst --储蓄罐(*)
+	dlist[#dlist + 1] = CS.ChatDataProxy.inst --聊天(*)
+	dlist[#dlist + 1] = CS.LotteryDataProxy.inst --抽奖(*)
+	dlist[#dlist + 1] = CS.RoleDataProxy.inst --角色(*)
+	--dlist[#dlist + 1] = CS.CityBuildingDataProxy.inst --城市
+	dlist[#dlist + 1] = CS.ExploreDataProxy.inst --副本(*)
+	dlist[#dlist + 1] = CS.TreasureBoxDataProxy.inst --宝箱(*)
+	dlist[#dlist + 1] = CS.GuideDataProxy.inst --新手引导(*)
+	dlist[#dlist + 1] = CS.AcheivementDataProxy.inst --成就(*)
+	dlist[#dlist + 1] = CS.EmailDataProxy.inst --邮件(*)
+	dlist[#dlist + 1] = CS.SevenDayGoalDataProxy.inst --七日目标(*)
+	--dlist[#dlist + 1] = CS.DailyGiftDataProxy.inst --七日目标
+	dlist[#dlist + 1] = CS.StreetDropDataProxy.inst --街道掉落物(捡垃圾)(*)
+	dlist[#dlist + 1] = CS.GlobalBuffDataProxy.inst --全服buff(*)
+	dlist[#dlist + 1] = CS.MainLineDataProxy.inst --主线任务(*)
+	dlist[#dlist + 1] = CS.PetDataProxy.inst --宠物(*)
+	dlist[#dlist + 1] = CS.RewardedVideoDataProxy.inst -- 广告
+	-- Lua Dataproxy
+	local llist = self.mLuaDataProxyList
+	print("llist:", llist)
+	print("#llist:", #llist)
+	llist[#llist + 1] = TestNewDataProxy.inst
+	llist[#llist + 1] = DailySignDataProxy.inst
+	llist[#llist + 1] = MallDataProxy.inst
+	llist[#llist + 1] = DirectPurchaseProxy.inst
+	llist[#llist + 1] = Activity_WorkerGameProxy.inst
+	llist[#llist + 1] = GuideTaskDataProxy.inst
+	llist[#llist + 1] = GuideTriggerDataProxy.inst
+	llist[#llist + 1] = UserIndoorDataProxy.inst
+	llist[#llist + 1] = OnlineRewardDataProxy.inst
+	llist[#llist + 1] = DailyRewardDataProxy.inst
+	llist[#llist + 1] = RefugeTowerDataProxy.inst
+	llist[#llist + 1] = ShopRankDataProxy.inst
+	llist[#llist + 1] = RuinsDataProxy.inst
+	llist[#llist + 1] = PetDataProxy.inst
+	llist[#llist + 1] = GemMonthCardDataProxy.inst
+	llist[#llist + 1] = GiftSevenDataProxy.inst
+	llist[#llist + 1] = GoldenCityDataProxy.inst
+	llist[#llist + 1] = ActivityPointDataProxy.inst
+	llist[#llist + 1] = ChatDataProxy.inst
+	llist[#llist + 1] = Activity_ScoreAwardGameProxy.inst
+	llist[#llist + 1] = Activity_DeadRisingDataProxy.inst
+	
+end
+
+function ManagerBinder:initSystems()
+	--self.mSysList[#self.mSysList] =
+	local slist = self.mCSSysList
+	slist[#slist + 1] = CS.AccountSystem()
+	slist[#slist + 1] = CS.ItemBagSystem()
+	slist[#slist + 1] = CS.EquipSystem()
+	slist[#slist + 1] = CS.GameShopUIMediator()
+	slist[#slist + 1] = CS.GameCityUIMediator()
+	slist[#slist + 1] = CS.PlayerSystem()
+	slist[#slist + 1] = CS.DailyTaskSystem()
+	slist[#slist + 1] = CS.ResProductionSystem()
+	slist[#slist + 1] = CS.ExtensionSystem()
+	slist[#slist + 1] = CS.FurnitureUpgradeSystem()
+	slist[#slist + 1] = CS.SettingSystem()
+	slist[#slist + 1] = CS.BuyMakingSlotUIMediator()
+	slist[#slist + 1] = CS.EquipItemDataUIMediator()
+	slist[#slist + 1] = CS.GameMsgTipSystem()
+	slist[#slist + 1] = CS.UnLockEquipUIMediator()
+	slist[#slist + 1] = CS.ShopperSystem()
+	slist[#slist + 1] = CS.ReceiveAwardUIMediator()
+	slist[#slist + 1] = CS.ShopDesignSystem()
+	slist[#slist + 1] = CS.MoneyBoxSys()
+	slist[#slist + 1] = CS.MarketSystem()
+	slist[#slist + 1] = CS.ChatSystem()
+	slist[#slist + 1] = CS.LotterySystem()
+	slist[#slist + 1] = CS.RoleSystem()
+	slist[#slist + 1] = CS.CityBuildingSystem()
+	slist[#slist + 1] = CS.UnionSystem()
+	slist[#slist + 1] = CS.ExploreSystem()
+	slist[#slist + 1] = CS.CombatSystem()
+	slist[#slist + 1] = CS.TreasureBoxSystem()
+	slist[#slist + 1] = CS.GuideSystem()
+	slist[#slist + 1] = CS.UIUnlockManager()
+	slist[#slist + 1] = CS.EmailSystem()
+	slist[#slist + 1] = CS.AcheivementSystem()
+	slist[#slist + 1] = CS.SevenDayGoalSystem()
+	slist[#slist + 1] = CS.ActivitySystem()
+	slist[#slist + 1] = CS.GlobalBuffSystem()
+	--slist[#slist + 1] = CS.Activitysystem()
+	slist[#slist + 1] = CS.UseAdvancedEquipTipsMediator()
+	slist[#slist + 1] = CS.CommonSystem()
+	slist[#slist + 1] = CS.MainlineTaskSystem()
+	slist[#slist + 1] = CS.PetSystem()
+	slist[#slist + 1] = CS.VisitShopSystem() --拜访
+	slist[#slist + 1] = CS.AdRewardedVideoSystem() --广告
+	-- Lua System
+	-- self.mLuaSysList[#self.mLuaSysList + 1] = TestNewSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = GameHintSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = UnionSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = DailySignSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = MallSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = GameMsgTipSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = SystemUnlockSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = DirectPurchaseSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = PetSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = RoleExchangeSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = Activity_WorkerGameSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = GuideTaskSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = GuideTriggerSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = VisitShopSys:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = CreatRoleSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = ShopDesignSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = OnlineRewardSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = LuxurySystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = LVGrowthRewardSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = StoryRoleSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = RefugeTowerSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = ShopMapEditModeHandler.inst
+	self.mLuaSysList[#self.mLuaSysList + 1] = ShopkeeperHandler.inst
+	self.mLuaSysList[#self.mLuaSysList + 1] = WelfareSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = ShopRankSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = EquipStarUpTriggerSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = HeroSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = RuinsSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = GemMonthCardSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = GiftSevenSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = GoldenCitySystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = ActivityPointSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = ChatSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = Activity_ScoreAwardGameSystem:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = UseAdvancedOrLockEquipTipsMediator:new()
+	self.mLuaSysList[#self.mLuaSysList + 1] = Activity_DeadRisingSystem:new()
+	
+	self.mLuaSysList[#self.mLuaSysList + 1] = HeartbeatSystem:new()
+	
+end
+
+function ManagerBinder:initConfigs()
+	
+	VipInfoConfingManager:InitCSVConfig()
+	RechargeConfigManager:InitCSVConfig()
+	RaceLampConfigManager:InitCSVConfig()
+	SystemUnlockConfigManager:InitCSVConfig()
+	PetUpdateConfigManager:InitCSVConfig()
+	GuideTaskConfigManager:InitCSVConfig()
+	GuideTriggerConfigManager:InitCSVConfig()
+	StoryNpcConfigManager:InitCSVConfig()
+	EquipProperty_make_integral_ConfigManager:InitCSVConfig()
+	LuxuryConfigManager:InitCSVConfig()
+	GrowthRewardConfigManager:InitCSVConfig()
+	RefugeConfigManager:InitCSVConfig()
+	RefugeFloorConfigManager:InitCSVConfig()
+	SevenDayPassAwardConfigManager:InitCSVConfig()
+	RankConfigManager:InitCSVConfig()
+	RuinsConfigManager:InitCSVConfig()
+	PetConfigManager:InitCSVConfig()
+	GiftSevenConfigManager:InitCSVConfig()
+	GoldenCityConfigManager:InitCSVConfig()
+	ActivityTaskConfigManager:InitCSVConfig()
+	ChatEmojiConfigManager:InitCSVConfig()
+	ItemConfigManager:InitCSVConfig()
+	
+end
+
+function ManagerBinder:initNetwork()
+end
+
+function ManagerBinder:StartGameSystem()
+	print("StartGameSystem")
+	self:initDataProxies()
+	self:initSystems()
+
+	--init dataproxy
+	for i = 1, #self.mCSDataProxyList do
+		self.mCSDataProxyList[i]:Init()
+	end
+	for i = 1, #self.mLuaDataProxyList do
+		self.mLuaDataProxyList[i]:Init()
+	end
+	--init systems
+	for i = 1, #self.mCSSysList do
+		self.mCSSysList[i]:OnEnter()
+	end
+	for i = 1, #self.mLuaSysList do
+		self.mLuaSysList[i]:OnEnter()
+	end
+end
+
+function ManagerBinder:ExitGameSystem()
+	--exit dataproxy
+	for i = 1, #self.mCSDataProxyList do
+		self.mCSDataProxyList[i]:Clear()
+	end
+	for i = 1, #self.mLuaDataProxyList do
+		self.mLuaDataProxyList[i]:Clear()
+	end
+	--exit systems
+	for i = 1, #self.mCSSysList do
+		self.mCSSysList[i]:OnExit()
+	end
+	for i = 1, #self.mLuaSysList do
+		self.mLuaSysList[i]:OnExit()
+	end
+end
+
+function ManagerBinder:update()
+	for i = 1, #self.mCSSysList do
+		self.mCSSysList[i]:OnUpdate()
+	end
+
+	for i = 1, #self.mLuaSysList do
+		self.mLuaSysList[i]:OnUpdate()
+	end
+end
+
+function ManagerBinder:clear()
+	for i = 1, #self.mCSDataProxyList do
+		self.mCSDataProxyList[i]:Clear()
+	end
+	for i = 1, #self.mLuaDataProxyList do
+		self.mLuaDataProxyList[i]:Clear()
+	end
+	--init systems
+	for i = 1, #self.mCSSysList do
+		self.mCSSysList[i]:OnExit()
+	end
+	for i = 1, #self.mLuaSysList do
+		self.mLuaSysList[i]:OnExit()
+	end
+end
+
+function ManagerBinder:clearDataProxy()
+	for i = 1, #self.mCSDataProxyList do
+		self.mCSDataProxyList[i]:Clear()
+		self.mCSDataProxyList[i]:Init()
+	end
+	for i = 1, #self.mLuaDataProxyList do
+		self.mLuaDataProxyList[i]:Clear()
+		self.mLuaDataProxyList[i]:Init()
+	end
+
+	--init systems
+	for i = 1, #self.mCSSysList do
+		self.mCSSysList[i]:ReInitSystem()
+		--临时热修 新出包去除
+		if self.mCSSysList[i]:GetType() == typeof(CS.EmailSystem) then
+			self.mCSSysList[i].mailIdMax = 0
+		end
+	end
+	for i = 1, #self.mLuaSysList do
+		self.mLuaSysList[i]:ReInitSystem()
+	end
+end
+
+--向服务器发送事件
+function ManagerBinder:SendReportFlag()
+end
+return ManagerBinder.inst

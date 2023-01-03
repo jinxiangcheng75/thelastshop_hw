@@ -1,0 +1,46 @@
+require("data/MallDataProxy")
+
+local lastBgImg
+local icon
+local upText
+local downText
+local unlockObj
+local lockObj
+local dayText
+
+local csItemConfigManagerInst = CS.ItemconfigManager.inst
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csEVIPState = CS.EVIPState
+
+function InitComp()
+	lastBgImg = self:GetObjByName("lastBg"):GetComponent("Image")
+	icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	upText = self:GetObjByName("upText"):GetComponent("Text")
+	downText = self:GetObjByName("downText"):GetComponent("Text")
+	unlockObj = self:GetObjByName("unlockObj")
+	lockObj = self:GetObjByName("lockObj")
+	dayText = self:GetObjByName("dayText"):GetComponent("Text")
+end
+
+function SetData(data)
+	-- local data = VipInfoConfingManager:GetLevelNotZeroConfig()[index]
+	
+	-- if(tonumber(data.pic_1 ~= -1) and tonumber(data.pic_2 ~= -1))then
+	-- 	icon:SetSprite(data.pic_1,data.pic_2)
+	-- end
+
+	-- dayText.text = csLanguageManagerInst:GetValueByKey(data.list_num)
+
+	local vipInfo = MallDataProxy.inst.vipData
+	lastBgImg.enabled = (tonumber(data.level) <= vipInfo.level and csEVIPState.__CastFrom(vipInfo.state) == csEVIPState.Buy)
+	unlockObj:SetActive(tonumber(data.level) <= vipInfo.level  and csEVIPState.__CastFrom(vipInfo.state) == csEVIPState.Buy)
+	lockObj:SetActive(tonumber(data.level) > vipInfo.level or csEVIPState.__CastFrom(vipInfo.state) ~= csEVIPState.Buy)
+
+	dayText.text = data.level
+	upText.text = csLanguageManagerInst:GetValueByKey(data.title)
+	downText.text = csLanguageManagerInst:GetValueByKey(data.txt)
+
+	if(data.pic_1 ~= "-1" and data.pic_2 ~= "-1")then
+		icon:SetSprite(data.pic_1,data.pic_2)
+	end
+end

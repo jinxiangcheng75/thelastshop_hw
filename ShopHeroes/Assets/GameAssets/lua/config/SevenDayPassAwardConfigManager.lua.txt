@@ -1,0 +1,49 @@
+-- SevenDayPassAwardConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+SevenDayPassAwardConfig = class
+({
+	id = 1,
+	type = 1,
+	reward = 1,
+	reward_number = 1,
+	label = "",
+})
+
+SevenDayPassAwardConfigManager = class()
+--SevenDayPassAwardConfigManager.cfgDict = {}
+local csv_name = "seven_day_pass"
+
+function SevenDayPassAwardConfigManager:InitCSVConfig()
+	
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+
+	local cfgs = CSVParser:parseClass(csv, 3, SevenDayPassAwardConfig)
+	SevenDayPassAwardConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("SevenDayPassAwardConfigManager  错误")
+	end
+	
+end
+
+function SevenDayPassAwardConfigManager:processConfigs(cfgs)
+
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		self.cfgDict[tonumber(c.id)] = c
+	end
+
+end
+
+function SevenDayPassAwardConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end
+
+function SevenDayPassAwardConfigManager:GetAwardsCount()
+	return #self.cfgDict
+end

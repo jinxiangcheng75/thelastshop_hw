@@ -1,0 +1,219 @@
+
+-- Activity_DeadRising_SelectHeroUI
+
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+local luaClass_Activity_DeadRising_HeroFightItem = require("ui/view/Activity/DeadRising/Activity_DeadRising_HeroFightItem")
+
+local CS_type_BtnList = typeof(CS.BtnList)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+
+local CS_RoleDataProxyInst = CS.RoleDataProxy.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+
+Activity_DeadRising_SelectHeroUI = class(ViewBase)
+
+function Activity_DeadRising_SelectHeroUI:ctor()
+	self.viewID = Constants.ViewName.Activity_DeadRising_SelectHeroUI
+	Activity_DeadRising_SelectHeroUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+end
+------------------------------------------------
+
+
+function Activity_DeadRising_SelectHeroUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.btn_close = contentPane:GetButton("btn_close")
+	self.icon_fight = contentPane:GetGUIIcon("icon_fight")
+	self.tx_heroFight = contentPane:GetText("tx_heroFight")
+	
+	self.heroFightItems = {}
+	local objList_heroFight = contentPane:GetObjByName("objList_heroFight"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList_heroFight.Count - 1 do
+
+		local heroFightItem = luaClass_Activity_DeadRising_HeroFightItem.new()
+		heroFightItem:Init(objList_heroFight[i],function (heroUid)
+			self:heroFightItemClickHandler(heroUid)
+		end)
+		self.heroFightItems[#self.heroFightItems + 1] = heroFightItem
+
+	end
+	
+	
+	self.superList = contentPane:GetObjByName("superList"):GetComponent(CS_type_superList)
+	self.tx_empty = contentPane:GetText("tx_empty")
+
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+
+function Activity_DeadRising_SelectHeroUI:onInit()
+
+	self:initComp()
+
+	self.listItemCount = 0
+	self.isHaveRestHero = false
+	self.allNotSelectHeroes = {}
+	
+	self.btn_close:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+
+	self.superList.itemRenderer = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+	self.superList.itemUpdateInfo = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+end
+
+function Activity_DeadRising_SelectHeroUI:setSuperListData()
+	
+	self.allNotSelectHeroes = CS_RoleDataProxyInst:GetNotFightingStateHeroList();
+	self:SetListItemTotalCount(self.allNotSelectHeroes.Count);
+	self.tx_empty.enabled = self.allNotSelectHeroes.Count <= 0;
+	
+end
+
+function Activity_DeadRising_SelectHeroUI:Refresh()
+
+	self:setHeroTeamData()
+	self:setSuperListData()
+	
+end
+
+function Activity_DeadRising_SelectHeroUI:superListItemRenderer(index,item)
+
+	local btnList = item.transform:GetComponent(CS_type_BtnList).buttonList
+
+	for i = 0, 3 - 1 do
+
+		local itemIndex = index * 3 + i
+
+		if 	itemIndex < self.listItemCount then
+
+			btnList[i].gameObject:SetActive(true)
+
+			local isRecoverHero = itemIndex == 0 and self.isHaveRestHero
+			if isRecoverHero then
+				btnList[i].gameObject:GetComponent(CS_type_LuaListItem):SetData({isRecoverHero = isRecoverHero, data = nil })
+			else
+				
+				local data = self.allNotSelectHeroes[self.isHaveRestHero and itemIndex - 1 or itemIndex]
+				btnList[i].gameObject:GetComponent(CS_type_LuaListItem):SetData({isRecoverHero = isRecoverHero, data = data })
+				
+			end
+
+		else
+
+			btnList[i].gameObject:SetActive(false)
+
+		end
+
+	end
+
+end
+
+function Activity_DeadRising_SelectHeroUI:SetListItemTotalCount(count)
+
+	self.listItemCount = count
+	if self.listItemCount < 0 then
+		self.listItemCount = 0
+	end
+
+	self.isHaveRestHero = CS_RoleDataProxyInst:GetRestingStateHeroCount().Count > 0;
+	if self.isHaveRestHero then
+		self.listItemCount = self.listItemCount + 1
+	end
+
+	local count1 = math.floor(self.listItemCount / 3);
+	if self.listItemCount % 3 > 0 then
+		count1 = count1 + 1;
+	end
+
+	self.superList.totalItemCount = count1;
+
+end
+
+function Activity_DeadRising_SelectHeroUI:heroFightItemClickHandler(heroUid)
+	
+	if heroUid ~= -1 then --下架
+		EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelHero, heroUid, 1)
+	end
+	
+end
+
+function Activity_DeadRising_SelectHeroUI:setHeroTeamData()
+	
+	self.tx_heroFight.text = tostring(Activity_DeadRisingDataProxy.inst.fight_self_hero)
+	
+	for i = 1, #self.heroFightItems do
+
+		if i <= #Activity_DeadRisingDataProxy.inst.heroFightDatas then
+			self.heroFightItems[i]:SetData(Activity_DeadRisingDataProxy.inst.heroFightDatas[i])
+		else
+			self.heroFightItems[i]:Clear()
+		end
+
+	end
+	
+end
+
+function Activity_DeadRising_SelectHeroUI:onShowed()
+
+	self:setHeroTeamData()
+	self:setSuperListData()
+
+end
+
+function Activity_DeadRising_SelectHeroUI:onHide()
+
+end
+
+
+function Activity_DeadRising_SelectHeroUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function Activity_DeadRising_SelectHeroUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("commonBagUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+

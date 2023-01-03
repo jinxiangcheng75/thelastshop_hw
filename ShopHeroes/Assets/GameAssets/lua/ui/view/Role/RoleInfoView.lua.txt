@@ -1,0 +1,385 @@
+--RoleInfoView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+
+local csVector2 = CS.UnityEngine.Vector2
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csStaticConstants = CS.StaticConstants
+local csGUIHelper = CS.GUIHelper
+local csCharacterManagerInst = CS.CharacterManager.inst
+local csEGender = CS.EGender
+local csVector3 = CS.UnityEngine.Vector3
+local csSpineUtils = CS.SpineUtils
+
+local csRoleDataProxyInst = CS.RoleDataProxy.inst
+
+RoleInfoView = class(ViewBase)
+
+function RoleInfoView:ctor()
+	self.viewID = Constants.ViewName.RoleInfoView
+	RoleInfoView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function RoleInfoView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.intelligenceText = contentPane:GetText("intelligenceText")
+	self.allStarsList = contentPane:GetObjByName("allStars"):GetComponent("ObjList")
+	if(self.allStarsList ~= nil)then
+		self.allStars = self.allStarsList.objList
+	end
+	self.preofessionTx = contentPane:GetText("preofessionTx")
+	self.typeIcon = contentPane:GetGUIIcon("typeIcon")
+	self.roleTrans = contentPane:GetObjByName("roleTrans").transform
+	local allSkillsObj = contentPane:GetObjByName("allSkills")
+	if(allSkillsObj ~= nil)then
+		self.allSkillsList = allSkillsObj:GetComponent("ObjList")
+		if(self.allSkillsList ~= nil)then
+			self.allSkills = self.allSkillsList.objList
+		end
+		self.skillGroup = allSkillsObj:GetComponent("ToggleGroupMarget")
+	end
+	self.talentIcon = contentPane:GetGUIIcon("talentIcon")
+	self.talent = contentPane:GetGUIIcon("talent")
+	self.talentName = contentPane:GetText("talentName")
+	self.talentDesc1 = contentPane:GetText("talentDesc1")
+	self.talentDesc2 = contentPane:GetText("talentDesc2")
+	self.talentDesc3 = contentPane:GetText("talentDesc3")
+	self.talentDesc4 = contentPane:GetText("talentDesc4")
+	self.levelText = contentPane:GetText("levelText")
+	self.nickNameTx = contentPane:GetText("nickNameTx")
+	self.fightingText = contentPane:GetText("fightingText")
+	self.equipText = contentPane:GetText("equipText")
+	self.allEquipsList = contentPane:GetObjByName("allEquips"):GetComponent("ObjList")
+	if(self.allEquipsList ~= nil)then
+		self.allEquips = self.allEquipsList.objList
+	end
+	--self.bgCanvas = contentPane:GetObjByName("bgCanvas"):GetComponent("Canvas")
+	self.qualityIcon = contentPane:GetGUIIcon("qualityIcon")
+	self.tipsIcon = contentPane:GetButton("tipsIcon")
+	self.lifeVal = contentPane:GetText("lifeVal")
+	self.atkVal = contentPane:GetText("atkVal")
+	self.defVal = contentPane:GetText("defVal")
+	self.intelligenceBgIcon = contentPane:GetGUIIcon("intelligenceBgIcon")
+	self.headParent = contentPane:GetObjByName("headParent").transform
+	self.group = contentPane:GetObjByName("group"):GetComponent("ToggleGroupMarget")
+	self.typeBgIcon = contentPane:GetGUIIcon("typeBgIcon")
+	self.infoObj = contentPane:GetObjByName("infoObj")
+	self.skillObj = contentPane:GetObjByName("skillObj")
+	self.talentQualityStr = contentPane:GetText("talentQualityStr")
+	self.talentXDescText = contentPane:GetText("talentXDescText")
+	self.skillArrowRect = contentPane:GetObjByName("skillArrowRect"):GetComponent("RectTransform")
+	self.skillNameText = contentPane:GetText("skillNameText")
+	self.skillDescText = contentPane:GetText("skillDescText")
+	self.equipNumText = contentPane:GetText("equipNumText")
+	self.playerNameText = contentPane:GetText("playerNameText")
+	self.playerInfoBtn = contentPane:GetButton("playerInfoBtn")
+
+	self.arrowPos = {}
+	self.arrowPos[0] = -147
+	self.arrowPos[1] = 12
+	self.arrowPos[2] = 173
+end
+
+function RoleInfoView:onInit()
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function()
+			self:closeBtnClick()
+		end
+	)
+
+	self.tipsIcon:ButtonClickTween(
+		function ()
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.HeroPropertyData)
+			func(csEventControllerInst, csGameEventType.RoleEvent.SHOWUI_ROLEHEROATTVIEW, self.data.attributeConfig)
+		end
+	)
+
+	self.playerInfoBtn:ButtonClickTween(
+		function ()
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.System.String)
+			func(csEventControllerInst, csGameEventType.SocialEvent.REQUEST_OTHERUSERDATA, self.userId)
+		end
+	)
+
+	self.group.OnSelectedIndexValueChange = function(index)
+		self:typeSelectedChange(index)
+	end
+
+	self.skillGroup.OnSelectedIndexValueChange = function(index)
+		self:typeSelectedChangeSkill(index)
+	end
+
+	self.data = nil
+	self.graphicDressUp = nil
+	self.heroDress = nil
+	self.userId = nil
+
+
+end
+
+function RoleInfoView:typeSelectedChange(index)
+	CS.AudioManager.inst:PlaySound(11)
+	self.infoObj:SetActive(index == 0)
+	self.skillObj:SetActive(index == 1)
+	if (index == 1)then
+		self.skillGroup:OnEnableMethod()
+	end
+end
+
+function RoleInfoView:typeSelectedChangeSkill(index)
+	CS.AudioManager.inst:PlaySound(8)
+	self.skillArrowRect.anchoredPosition = csVector2(self.arrowPos[index], self.skillArrowRect.anchoredPosition.y)
+	local skillShowData = CS.HeroSkillShowConfig()
+	if (index == 0)then
+		skillShowData = self.data.skill1
+	elseif(index == 1)then
+		skillShowData = self.data.skill2
+	elseif(index == 2)then
+		skillShowData = self.data.skill3
+	end
+
+	if (skillShowData == nil)then
+		self.skillGroup.selectedIndex = 0
+		return
+	end
+
+	self.skillNameText.text = csLanguageManagerInst:GetValueByKey(skillShowData.skill_name)
+	self.skillDescText.text = csLanguageManagerInst:GetValueByKey(skillShowData.skill_dec)
+end
+
+function RoleInfoView:SetData(heroInfo,userId,nickName)
+	if(heroInfo == nil) then return end
+	local heroData = CS.RoleHeroData()
+	heroData:setData(heroInfo)
+	self.data = heroData
+	self.userId = userId
+	self.playerInfoBtn.gameObject:SetActive(true)
+	self.playerNameText.text = csLanguageManagerInst:GetValueByKey("{0}的玩家资料",csLanguageManagerInst:GetValueByKey(nickName))
+	self:SetUIShow()
+end
+
+function RoleInfoView:SetDataFromRuins(heroInfo)
+	self.playerInfoBtn.gameObject:SetActive(false)
+	
+	if(heroInfo == nil) then return end
+	self.data = heroInfo
+	self:SetUIShow()
+end
+
+function RoleInfoView:SetUIShow()
+	if(self.data == nil) then return end
+
+	self.group:onEnable()
+	self.skillGroup.togglesBtn[0].interactable = self.data.skill1 ~= nil
+	self.skillGroup.togglesBtn[1].interactable = self.data.skill2 ~= nil
+	self.skillGroup.togglesBtn[2].interactable = self.data.skill3 ~= nil
+	local rarity = csRoleDataProxyInst:ReturnRarityByAptitude(self.data.intelligence)
+	self.intelligenceBgIcon:SetSprite(csStaticConstants.roleAtlasName, csStaticConstants.roleHeroBgIconName[rarity - 1])
+	local qualityColor = csStaticConstants.roleIntelligenceColor[rarity]
+	self.typeBgIcon:SetSprite(csStaticConstants.roleAtlasName, csStaticConstants.heroTypeBgIconName[self.data.config.type - 1])
+	self.typeIcon:SetSprite(self.data.config.atlas, self.data.config.ocp_icon)
+	self.intelligenceText.text = tostring(self.data.intelligence)
+	self.intelligenceText.color = csGUIHelper.GetColorByColorHex(qualityColor)
+	self.preofessionTx.text = csLanguageManagerInst:GetValueByKey(self.data.config.name)
+	self.talentName.text = csLanguageManagerInst:GetValueByKey(self.data.talentConfig.name)
+	self.talentName.color = csGUIHelper.GetColorByColorHex(csStaticConstants.roleIntelligenceColor[self.data.talentConfig.quality - 1])
+	self.talentQualityStr.text = csLanguageManagerInst:GetValueByKey(csStaticConstants.roleTalentQualityStr[self.data.talentConfig.quality - 2]) .. csLanguageManagerInst:GetValueByKey("天赋")
+	local talentBySkillCfg = CS.HeroSkillShowConfigManager.inst:GetConfig(self.data.talentConfig.skill_id)
+	self.talentXDescText.text = csLanguageManagerInst:GetValueByKey(talentBySkillCfg.skill_dec)
+	self.talentDesc1.gameObject:SetActive(self.data.talentConfig.easy_txt_1 ~= nil and #self.data.talentConfig.easy_txt_1 > 0)
+	self.talentDesc2.gameObject:SetActive(self.data.talentConfig.easy_txt_2 ~= nil and #self.data.talentConfig.easy_txt_2 > 0)
+	self.talentDesc3.gameObject:SetActive(self.data.talentConfig.easy_txt_3 ~= nil and #self.data.talentConfig.easy_txt_3 > 0)
+	self.talentDesc4.gameObject:SetActive(self.data.talentConfig.easy_txt_4 ~= nil and #self.data.talentConfig.easy_txt_4 > 0)
+	if(self.data.talentConfig.easy_txt_1 ~= nil and #self.data.talentConfig.easy_txt_1 > 0) then
+		self.talentDesc1.text = csLanguageManagerInst:GetValueByKey(self.data.talentConfig.easy_txt_1)
+	end
+	if(self.data.talentConfig.easy_txt_2 ~= nil and #self.data.talentConfig.easy_txt_2 > 0) then
+		self.talentDesc2.text = csLanguageManagerInst:GetValueByKey(self.data.talentConfig.easy_txt_2)
+	end
+	if(self.data.talentConfig.easy_txt_3 ~= nil and #self.data.talentConfig.easy_txt_3 > 0) then
+		self.talentDesc3.text = csLanguageManagerInst:GetValueByKey(self.data.talentConfig.easy_txt_3)
+	end
+	if(self.data.talentConfig.easy_txt_4 ~= nil and #self.data.talentConfig.easy_txt_4 > 0) then
+		self.talentDesc4.text = csLanguageManagerInst:GetValueByKey(self.data.talentConfig.easy_txt_4)
+	end
+	self.talent:SetSprite(csStaticConstants.roleAtlasName, csStaticConstants.roleTalentBgIconName[self.data.talentConfig.quality - 2])
+	local cfg = CS.HeroSkillShowConfigManager.inst:GetConfig(self.data.talentConfig.skill_id)
+	self.talentIcon:SetSprite(cfg.skill_atlas, cfg.skill_icon)
+
+
+	self.qualityIcon:SetSprite(csStaticConstants.roleAtlasName, csStaticConstants.roleIntelligenceIconStr[rarity - 1])
+	self.nickNameTx.text = csLanguageManagerInst:GetValueByKey(self.data.nickName)
+	self.levelText.text = tostring(self.data.level)
+	self.equipText.text = csLanguageManagerInst:GetValueByKey("可穿戴装备等阶：")
+	local curLevelConfig = CS.heroupgradeconfigManager.inst:GetHeroUpgradeConfig(self.data.level)
+	if(curLevelConfig ~= nil)then
+		self.equipNumText.text = tostring(curLevelConfig.equip_lv)
+	end
+
+	self:setHeroHeadIcon()
+	self:setAttributeData()
+	self:SetHeroPrefabData()
+	self:setStarNum()
+	self:setEquipData()
+	self:setSkillData()
+end
+
+function RoleInfoView:setHeroHeadIcon()
+	if (self.graphicDressUp == nil)then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		func(csCharacterManagerInst,csCharacterManagerInst:GetPeopleShapeNudeSpinePath(csEGender.__CastFrom(self.data.gender)),self.data:GetHeadDressIds(),csEGender.__CastFrom(self.data.gender),0.35,true,function (system)
+				self.graphicDressUp = system
+				system.transform:SetParent(self.headParent)
+				system.transform.localScale = csVector3(1,1,1)
+				system.transform.localPosition = csVector3(0,0,0)
+			end,nil)
+	else
+		csCharacterManagerInst:ReSetCharacter(self.graphicDressUp, csCharacterManagerInst:GetPeopleShapeNudeSpinePath(csEGender.__CastFrom(self.data.gender)), self.data:GetHeadDressIds(), csEGender.__CastFrom(self.data.gender))
+	end
+end
+
+function RoleInfoView:setAttributeData()
+	self.lifeVal.text = tostring(self.data.attributeConfig.hp_basic)..(self.data.hpAdd > 0 and "<color=#58ff68>(+"..self.data:GetGeneProperty(1)..")</color>" or "")
+	self.atkVal.text = tostring(self.data.attributeConfig.atk_basic)..(self.data.atkAdd > 0 and "<color=#58ff68>(+"..self.data:GetGeneProperty(3)..")</color>" or "")
+	self.defVal.text = tostring(self.data.attributeConfig.def_basic)..(self.data.defAdd > 0 and "<color=#58ff68>(+"..self.data:GetGeneProperty(2)..")</color>" or "")
+
+	self.fightingText.text = tostring(self.data.fightingNum)
+end
+
+function RoleInfoView:SetHeroPrefabData()
+	if (self.heroDress == nil)then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByHero")
+		local func = funcGeneric(CS.DressUpSystem)
+		func(csCharacterManagerInst,csEGender.__CastFrom(self.data.gender),self.data:GetAllWearEquipId(),csSpineUtils.RoleDressToUintList(self.data.roleDress),0.35,true,function (system)
+				self.heroDress = system
+				system:SetUIPosition(self.roleTrans,self._uiCanvas.sortingLayerName,self._uiCanvas.sortingOrder + 1,0.875)
+				self:heroShowAnim()
+			end,nil)
+	else
+		csCharacterManagerInst:ReSetCharacterByHero(self.heroDress, csEGender.__CastFrom(self.data.gender), self.data:GetAllWearEquipId(), csSpineUtils.RoleDressToUintList(self.data.roleDress))
+		self.heroDress:SetUIPosition(self.roleTrans, self._uiCanvas.sortingLayerName, self._uiCanvas.sortingOrder + 1, 0.875)
+		self:heroShowAnim()
+	end
+end
+
+function RoleInfoView:heroShowAnim()
+	if(self.data.equip1.equipId ~= 0)then
+		local equipCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(self.data.equip1.equipId)
+		if(equipCfg ~= nil)then
+			local action = CS.EquipActionConfigManager.inst:GetCfg(equipCfg.equipDrawingId)
+
+			self.heroDress:Play(action.act_combat_standby_show,false,1,0,function (t)
+					if (self ~= nil)then
+						local idleAnimationName = CS.IndoorRoleActionConfigManager.inst:GetRandomAction(self.heroDress.gender, CS.kIndoorRoleActionType.normal_standby)
+						self.heroDress:Play(idleAnimationName, true)
+					end
+				end)
+		end
+	else
+		local action = CS.EquipActionConfigManager.inst:GetCfg(999999)
+		self.heroDress:Play(action.act_combat_standby_show,false,1,0,function (t)
+				if (self ~= nil)then
+					local idleAnimationName = CS.IndoorRoleActionConfigManager.inst:GetRandomAction(self.heroDress.gender, CS.kIndoorRoleActionType.normal_standby)
+					self.heroDress:Play(idleAnimationName, true)
+				end
+			end)
+	end
+end
+
+function RoleInfoView:setStarNum()
+	for i = 0, self.allStars.Count - 1 do
+		local index = i
+		if (index < self.data.config.hero_grade) then
+			self.allStars[index]:SetActive(true)
+			self.allStars[index]:GetComponent("GUIIcon"):SetSprite(csStaticConstants.roleAtlasName, "yingxiong_xingcheng")
+		else
+			if (index < self.data.transferNumLimit)then
+				self.allStars[index]:SetActive(true)
+				self.allStars[index]:GetComponent("GUIIcon"):SetSprite(csStaticConstants.roleAtlasName, "yingxiong_xingcheng1")
+			else
+				self.allStars[index]:SetActive(false)
+			end
+		end
+	end
+end
+
+function RoleInfoView:setEquipData()
+	local equipDic = CS.HeroProfessionConfigManager.inst:GetEquipDic(self.data.id)
+	for i = 0, self.allEquips.Count - 1 do
+		local index = i
+		local curEquipItem = self.allEquips[index]:GetComponent("LuaListItem")
+		local curData = {}
+		curData.heroId = self.data
+		curData.fieldId = index + 1
+		curData.equipIds = equipDic[index]
+		if (index < equipDic.Count)then
+			curEquipItem.gameObject:SetActive(true)
+			local tempEquip = self.data:GetEquipByField(index + 1)
+			curData.equip = tempEquip
+			if (tempEquip.equipId == 0)then
+				curData.itemState = 2
+				--curEquipItem.equipBtn.interactable = false
+				--curEquipItem:setNotWearEquipData(equipDic[index], self.data.uid, index + 1, -1, false)
+			else
+				curData.itemState = 1
+				--curEquipItem.equipBtn.interactable = true
+				--curEquipItem:setWearEquipData(tempEquip, self.data.uid, index + 1, equipDic[index], -1, false)
+			end
+			curEquipItem:SetData(curData)
+		else
+			curData.itemState = 3
+			curEquipItem:SetData(curData)
+			--curEquipItem:setLockData()
+		end
+	end
+end
+
+function RoleInfoView:setSkillData()
+	local tempSkillList = self.data:GetAllSkillId()
+	for i = 0, self.allSkills.Count - 1 do
+		local index = i
+		local curSkillItem = self.allSkills[index]:GetComponent("RoleSkillItemUI")
+		if (index < tempSkillList.Count)then
+			curSkillItem:setData(tempSkillList[index])
+		else
+			curSkillItem:clearData()
+		end
+	end
+end
+
+function RoleInfoView:onHide()
+	--print("RoleInfoView onHide")
+	CS.AudioManager.inst:PlaySound(9)
+end
+
+function RoleInfoView:onShowed()
+	--self.bgCanvas.sortingOrder = self._uiCanvas.sortingOrder
+	--print("RoleInfoView onShowed")
+end
+
+function RoleInfoView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function RoleInfoView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RoleInfoView:closeBtnClick()
+	self:hide()
+end
+------------------------------------------------

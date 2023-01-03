@@ -1,0 +1,125 @@
+
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local EventDispatcher = require("event/EventDispatcher")
+
+
+local equipInfoUI_dlc
+
+
+
+
+function InitComp()
+
+	equipInfoUI_dlc = EquipInfoUI_dlc.new()
+	equipInfoUI_dlc:init(self.gameObject)
+
+end
+
+function SetData(equipDrawingId)
+
+	if CS_UserDataProxyInst.playerData.level < CS_WorldParConfigManagerInst:GetConfig(323).parameters  then
+		return
+	end
+
+	if equipInfoUI_dlc ~= nil then
+		equipInfoUI_dlc:SetData(equipDrawingId)
+	end
+
+end
+
+function onDestroy()
+
+	if equipInfoUI_dlc ~= nil then
+		equipInfoUI_dlc:clear()
+	end
+
+	equipInfoUI_dlc = nil
+
+end
+
+
+--EquipInfoUI_dlc 实际逻辑在lua侧
+
+EquipInfoUI_dlc = class()
+----
+
+function EquipInfoUI_dlc:ctor()
+	self.equipDrawingId = 0
+end
+
+function EquipInfoUI_dlc:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.tf_workerGame_scoreBg = self.contentPane:GetObjByName("tf_workerGame_scoreBg"):GetComponent("RectTransform")
+	self.tx_workerGame_score = self.contentPane:GetObjByName("tx_workerGame_score"):GetComponent("Text")
+
+end
+
+
+function EquipInfoUI_dlc:init(obj)
+
+	self:initComp(obj)
+
+	self:addListeners()
+
+
+end
+
+function EquipInfoUI_dlc:addListeners()
+
+	EventDispatcher:addEvent(GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,self,self.refrshActivity_WorkerGameState)
+
+end
+
+function EquipInfoUI_dlc:removeListeners()
+
+	EventDispatcher:removeEvent(GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,self,self.refrshActivity_WorkerGameState)
+end
+
+function EquipInfoUI_dlc:refrshActivity_WorkerGameState(flag)
+
+	if flag then
+		if self.equipDrawingId ~= 0 then
+			self:SetData(self.equipDrawingId)
+		end
+	else
+		if self.equipDrawingId ~= 0 then
+			self.tf_workerGame_scoreBg.gameObject:SetActive(false)
+		end
+	end
+
+end
+
+
+function EquipInfoUI_dlc:SetData(equipDrawingId)
+
+	self.equipDrawingId = equipDrawingId
+
+	local makeIntegral = Activity_WorkerGameProxy.inst:GetEquipMakeIntegralByDrawingId(equipDrawingId)
+
+	if makeIntegral <= 0 then
+		self.tf_workerGame_scoreBg.gameObject:SetActive(false)
+	else
+
+		self.tf_workerGame_scoreBg.gameObject:SetActive(true)
+		self.tx_workerGame_score.text = tostring(math.ceil(makeIntegral))
+
+	end
+
+end
+
+
+function EquipInfoUI_dlc:clear()
+
+	self.equipDrawingId = 0
+	self.tf_workerGame_scoreBg.gameObject:SetActive(false)
+	self:removeListeners()
+
+end

@@ -1,0 +1,102 @@
+--GiftSevenDataProxy
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGameTimerInst = CS.GameTimer.inst
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csGUIHelper = CS.GUIHelper
+
+GiftSevenDataProxy = class(BaseDataProxy)
+
+GiftSevenDataProxy.inst = GiftSevenDataProxy:new()
+
+function GiftSevenDataProxy:Init()
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Pay_AmountCheck_Cmd,
+		function(resp)
+			print("Response_Pay_AmountCheck_Cmd success", resp)
+			self:GetGiftData(resp)
+		end,
+		function(code)
+			print("Response_Pay_AmountCheck_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Pay_AmountReward_Cmd,
+		function(resp)
+			print("Response_Pay_AmountReward_Cmd success", resp)
+			self:GetGiftRewardData(resp)
+		end,
+		function(code)
+			print("Response_Pay_AmountReward_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	self.isRecharge = false
+	self.day = 1
+	self.isReward = false
+end
+
+function GiftSevenDataProxy:GetGiftData(respData)
+	local data = MsgType.Response_Pay_AmountCheck:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.isRecharge = data.amount == 1
+	self.day = data.index
+	self.isReward = data.flag == 1
+	
+	if(self.day == 9999)then
+		EventDispatcher:dispatchEvent(GameEvent.GiftSevenEvent.HideUI_GiftSeven)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.GiftSevenEvent.RefreshUI_GiftSeven)
+	end
+end
+
+function GiftSevenDataProxy:GetGiftRewardData(respData)
+	local data = MsgType.Response_Pay_AmountReward:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.day = data.index
+	self.isReward = data.flag == 1
+
+	if(data.item ~= nil)then
+		local cfg = CS.ItemconfigManager.inst:GetConfig(data.item.itemId)
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.queueItem)
+		if (cfg ~= nil) then
+			local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", 0, data.item.itemId, data.item.count)
+
+			func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+		else
+			local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", data.item.itemId, 0, data.item.count)
+
+			func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+		end
+	end
+
+	--刷新界面
+	if(self.day == 9999)then
+		EventDispatcher:dispatchEvent(GameEvent.GiftSevenEvent.HideUI_GiftSeven)
+		EventDispatcher:dispatchEvent(GameEvent.GiftSevenEvent.RefreshUI_GiftSevenBtn)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.GiftSevenEvent.RefreshUI_GiftSevenRedPoint)
+	end
+end
+
+function GiftSevenDataProxy:Clear()
+end
+
+function GiftSevenDataProxy:GetData()
+end

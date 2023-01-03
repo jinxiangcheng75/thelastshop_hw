@@ -1,0 +1,20 @@
+
+---- MsgBox_ExitUnionUIHotfix
+----C#已同步逻辑 新包需要
+
+--local util = require("xlua/util")
+--xlua.private_accessible(CS.MsgBox_ExitUnionUI)
+
+--util.hotfix_ex(
+	--CS.MsgBox_ExitUnionUI,
+	--"onOKBtnClick",
+	--function(self)
+		
+		--self:onOKBtnClick();
+		
+		--if self.isExit and not CS.GameSettingManager.inst.needShowUIAnim then
+			--GUIManager.inst:HideViewCS(typeof(CS.UnionInfoUI))
+		--end
+
+	--end
+--)

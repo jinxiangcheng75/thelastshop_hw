@@ -1,0 +1,114 @@
+--Activity_WorkerGameScoreRewardPanel
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_UnityUtils = CS.UnityUtils
+local CS_GameTimerInst = CS.GameTimer.inst
+
+Activity_WorkerGameScoreRewardPanel = class(ViewBase)
+
+function Activity_WorkerGameScoreRewardPanel:ctor()
+	self.viewID = Constants.ViewName.Activity_WorkerGameScoreRewardPanel
+	Activity_WorkerGameScoreRewardPanel.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+	self.topResPanelType = CS.TopPlayerShowType.none
+end
+------------------------------------------------
+
+
+function Activity_WorkerGameScoreRewardPanel:initComp()
+	local contentPane = self.contentPanel
+
+	self.backBtn = contentPane:GetButton("btn_back");
+	self.itemList = contentPane:GetObjByName("itemList"):GetComponent(CS_type_superList)
+	self.infoBtn = contentPane:GetButton("btn_info")
+
+end
+
+
+function Activity_WorkerGameScoreRewardPanel:onInit()
+
+	self:initComp()
+
+	self.backBtn.onClick:AddListener(
+		function ()
+			self:hide()
+		end)
+
+	self.itemList.itemRenderer = function(index,item)
+		self:scoreRewardListItemRenderer(index,item)
+	end
+
+	self.itemList.itemUpdateInfo = function(index,item)
+		self:scoreRewardListItemRenderer(index,item)
+	end
+
+	self.infoBtn.onClick:AddListener(
+		function ()
+			self:onInfoBtnClick()
+		end)
+
+end
+
+function Activity_WorkerGameScoreRewardPanel:onInfoBtnClick()
+	EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_messRankUI)
+end
+
+function Activity_WorkerGameScoreRewardPanel:scoreRewardListItemRenderer(index,item)
+	item:SetData(index)
+end
+
+function Activity_WorkerGameScoreRewardPanel:SetData()
+
+	local num = #Activity_WorkerGameProxy.inst.scoreRewardList
+
+	if CS.FGUI.inst.isLandscape then
+
+		self.itemList.totalItemCount = num + 2
+
+	else
+
+		self.itemList.totalItemCount = num + 2
+
+	end
+
+end
+
+function Activity_WorkerGameScoreRewardPanel:ShowByRewardLv(lv)
+	
+	self:SetData()
+
+	local num = #Activity_WorkerGameProxy.inst.scoreRewardList
+	if lv < 1 then
+		lv = 1
+	end
+
+	self.itemList:scrollByItemIndex(CS.FGUI.inst.isLandscape and lv - 1 or num - lv)
+	
+end
+
+function Activity_WorkerGameScoreRewardPanel:Refresh()
+
+	self.itemList:refresh()
+
+end
+
+function Activity_WorkerGameScoreRewardPanel:onHide()
+
+end
+
+
+------------------------------------------------

@@ -1,0 +1,69 @@
+local EventDispatcher = require "lua/event/EventDispatcher.lua"
+--AssetManager
+require("event/GameEvent")
+local AssetEvent = GameEvent.Asset
+
+local AssetManager = class()
+local log = CS.UnityEngine.Debug.Log
+
+AssetManager.inst = AssetManager:new()
+
+function AssetManager:ctor()
+	self.UIAtlasDependencyDict = nil
+	self.mDownloadHandlerFactory = nil
+	self.mExtractHandlerFactory = nil
+	self.mAssetHandlerFactory = nil
+	self.mAssetPipeline = AssetPipeline:new()
+end
+
+function AssetManager:loadSettings()
+end
+
+function AssetManager:printSystemInfo()
+	local app = CS.UnityEngine.Application
+	log("Application.dataPath : " + app.dataPath)
+	log("Application.PersistentPath : " + app.PersistentPath)
+	log("Application.StreamingPath : " + app.StreamingPath)
+	log("Application.TempPath : " + app.TempPath)
+	log("Addressables.RuntimePath : " + CS.UnityEngine.AddressableAssets.Addressables.RuntimePath)
+end
+
+function AssetManager:initExtractHandlers()
+	self.mExtractHandlerFactory = AbstractHandlerFactory:new()
+	self.mExtractHandlerFactory.add(kAssetExtractType.Text, CS.TextAssetExtractHandler())
+	self.mExtractHandlerFactory.add(kAssetExtractType.Binary, CS.BinaryAssetExtractHandler())
+end
+
+function AssetManager:initDownloadHandlers()
+	self.mDownloadHandlerFactory = AbstractHandlerFactory:new()
+	local fac = self.mDownloadHandlerFactory
+	local handlerParam = CS.DownloadHandlerParams()
+	fac.add(kAssetDownloadType.Web, nil)
+	fac.add(kAssetDownloadType.Addressable, CS.AddressableDownloadHandler())
+end
+
+function AssetManager:initAssetHandlers()
+	self.mAssetHandlerFactory = AbstractHandlerFactory:new()
+	local fac = self.mAssetHandlerFactory
+	fac.add(kAssetHandlerType.Channel, CS.ChannelAssetHandler())
+	fac.add(kAssetHandlerType.Patch, CS.PatchFileHandler())
+end
+
+function AssetManager:initEvent()
+	EventDispatcher.inst.addEvent(AssetEvent.Load_Assets, self, self.onLoadAssets)
+end
+
+function AssetManager:onLoadAssets(group)
+	self.mAssetPipeline:addGroup(group)
+	self.mAssetPipeline:execute()
+end
+
+function AssetManager:onStartLoad()
+	-- load version file
+end
+
+function AssetManager:clear()
+	EventDispatcher.inst.removeEvent(AssetEvent.Load_Assets, self.onLoadAssets)
+end
+
+return AssetManager.inst

@@ -1,0 +1,55 @@
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local EventDispatcher = require("event/EventDispatcher")
+
+ShopMapEditModeHandler = class(BaseSystem)
+ShopMapEditModeHandler.inst = ShopMapEditModeHandler:new()
+
+function ShopMapEditModeHandler:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.ShopMapEditEvent.ShowHeadTips,self,self.showHeadTips)
+	EventDispatcher:addEvent(GameEvent.ShopMapEditEvent.HideHeadTips,self,self.hideHeadTips)
+
+end
+
+function ShopMapEditModeHandler:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.ShopMapEditEvent.ShowHeadTips,self,self.showHeadTips)
+	EventDispatcher:removeEvent(GameEvent.ShopMapEditEvent.HideHeadTips,self,self.hideHeadTips)
+
+end
+
+function ShopMapEditModeHandler:showHeadTips()
+	self:setShopMapHeadTips(true)
+end
+
+function ShopMapEditModeHandler:hideHeadTips()
+	self:setShopMapHeadTips(false)
+end
+
+function ShopMapEditModeHandler:setShopMapHeadTips(visible)
+
+	--店主头上
+	if ShopkeeperHandler.inst.shopKeeper ~= nil then
+		ShopkeeperHandler.inst.shopKeeper.attacher:SetVisible(visible)
+	end
+
+	--顾客
+	CS.IndoorRoleSystem.inst:SetShopperHeadTipsVisible(visible)
+	
+	if visible then
+		CS_EventControllerInst:TriggerEvent(CS_GameEventType.ShopperEvent.SHOPPER_SHOWALLANIM)
+	end
+	
+	--宠物小家
+	if visible then
+		CS.IndoorMap.inst:ShowPethouseFeedTips()
+	else
+		CS.IndoorMap.inst:HidePethouseFeedTips()
+	end
+	
+	
+end
+

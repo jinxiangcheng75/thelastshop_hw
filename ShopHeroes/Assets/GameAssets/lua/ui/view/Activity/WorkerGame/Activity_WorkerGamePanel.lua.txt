@@ -1,0 +1,395 @@
+--Activity_WorkerGamePanel
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+local luaClass_WorkerGameMakeScoreItem = require("ui/view/Activity/WorkerGame/WorkerGameMakeScoreItem")
+local luaClass_WorkerGameExchangeItem = require("ui/view/Activity/WorkerGame/WorkerGameExchangeItem")
+
+local CS_type_ToggleGroupMarget = typeof(CS.ToggleGroupMarget)
+local CS_type_ObjList = typeof(CS.ObjList)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EquipDataProxyInst = CS.EquipDataProxy.inst
+local CS_UnityUtils = CS.UnityUtils
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local Vector3 = CS.UnityEngine.Vector3
+
+Activity_WorkerGamePanel = class(ViewBase)
+
+function Activity_WorkerGamePanel:ctor()
+	self.viewID = Constants.ViewName.Activity_WorkerGamePanel
+	Activity_WorkerGamePanel.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.activity_workerGame
+end
+------------------------------------------------
+
+
+function Activity_WorkerGamePanel:initComp()
+	local contentPane = self.contentPanel
+
+	self.maskBtn = contentPane:GetButton("btn_mask");
+	self.closeBtn = contentPane:GetButton("btn_close");
+
+	self.activityCountdownTx = contentPane:GetText("tx_activityCountdown")
+
+	self.stateGroup = contentPane:GetObjByName("toggleGroup"):GetComponent(CS_type_ToggleGroupMarget)
+	self.toggleLinkObjs = contentPane:GetObjByName("toggleLinkObjs"):GetComponent(CS_type_ObjList).objList
+
+	self.scoreItemObjs = contentPane:GetObjByName("obj_scoreItems"):GetComponent(CS_type_ObjList).objList
+	self.redPoint_lookReward = contentPane:GetObjByName("redPoint_lookReward")
+	self.lookRewardBtn = contentPane:GetButton("btn_lookReward")
+	self.makeBtn = contentPane:GetButton("btn_make")
+
+	self.exchangeCountdownTx = contentPane:GetText("tx_exchangeCountdown")
+	self.exchangeRefreshBtn = contentPane:GetButton("btn_exchangeRefresh")
+	self.exchangeItemObjs = contentPane:GetObjByName("obj_exchangeItems"):GetComponent(CS_type_ObjList).objList
+	
+	self.tf_role = contentPane:GetObjByName("tf_role"):GetComponent("RectTransform")
+	
+	self.tx_title = contentPane:GetObjByName("tx_title"):GetComponent("Text")
+	self.tx_talk = contentPane:GetObjByName("tx_talk"):GetComponent("Text")
+	
+	self.makeScoreItems = {}
+	for i = 0,self.scoreItemObjs.Count - 1 do
+		local obj = self.scoreItemObjs[i]
+
+		local scoreItem = luaClass_WorkerGameMakeScoreItem.new()
+		scoreItem:init(obj)
+
+		self.makeScoreItems[#self.makeScoreItems + 1] = scoreItem
+
+	end
+
+	self.exchangeItems = {}
+	for i = 0,self.exchangeItemObjs.Count - 1 do
+		local obj = self.exchangeItemObjs[i]
+
+		local exchangeItem = luaClass_WorkerGameExchangeItem.new()
+		exchangeItem:init(obj)
+
+		self.exchangeItems[#self.exchangeItems + 1] = exchangeItem
+
+	end
+
+	self.btn_workerGameCoin = contentPane:GetButton("btn_workerGameCoin")
+	self.tx_workergameCoinCountDown = contentPane:GetText("tx_workergameCoinCountDown")
+	self.tx_workergameCoinName = contentPane:GetText("tx_workergameCoinName")
+	
+	self.btnGameCoinRedPoint = contentPane:GetObjByName("btnGameCoinRedPoint")
+	
+end
+
+
+function Activity_WorkerGamePanel:onInit()
+
+	self:initComp()
+	self.index = 0
+	self.countdownTimer = 0
+	self.exchangeCountdownTimer = 0
+	self.headGraphicSystem = nil
+
+	--self.maskBtn.onClick:AddListener(
+		--function ()
+			--self:hide()
+		--end)
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:hide()
+		end
+	)
+
+	self.lookRewardBtn:ButtonClickTween(
+		function ()
+			self:onLookRewardBtnClick()
+		end
+	)
+
+	self.makeBtn:ButtonClickTween(
+		function ()
+			self:onMakeBtnClick()
+		end
+	)
+
+	self.exchangeRefreshBtn:ButtonClickTween(
+		function ()
+			self:onExchangeRefreshBtnClick()
+		end
+	)
+	
+	self.btn_workerGameCoin:ButtonClickTween(
+		function ()
+			self:onWorkerGameCoinBtnClick()
+		end
+	)
+
+	self.stateGroup.OnSelectedIndexValueChange = function (index)
+		self:onSelectedIndexValueChange(index)
+	end
+	
+end
+
+
+function Activity_WorkerGamePanel:onShowed()
+
+	self:setTimer()
+	self.stateGroup:OnEnableMethod(self.index)
+
+	self:setCharacter()
+	
+	self.tx_workergameCoinName.text = Activity_WorkerGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.PurchaseTitle)
+	self.tx_title.text = Activity_WorkerGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Name)
+	self.tx_talk.text = Activity_WorkerGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Desc)
+	
+	self:refreshRedPoint(Activity_WorkerGameProxy.inst.scoreCanRewardCount > 0)	
+	
+end
+
+function Activity_WorkerGamePanel:refreshRedPoint(flag)
+	
+	self.redPoint_lookReward:SetActive(flag)
+	self.btnGameCoinRedPoint:SetActive(Activity_WorkerGameProxy.inst.coinFreeFlag)
+end
+
+function Activity_WorkerGamePanel:setCharacter()
+	
+	if self.headGraphicSystem == nil or self.headGraphicSystem:IsNull() == true then
+
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByModel")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+
+		func(CS_CharacterManagerInst,50006,1.4,true,function (system)
+				self.headGraphicSystem = system
+				system.transform:SetParent(self.tf_role);
+				system.transform.localScale = Vector3.one * 0.8;
+				system.transform.localPosition = Vector3.down * 510;
+				system:SetDirection(CS.RoleDirectionType.Right);
+			end)
+
+	else
+		CS_CharacterManagerInst:ReSetCharacterByModel(self.headGraphicSystem,50006)
+	end
+	
+end
+
+function Activity_WorkerGamePanel:SetOneMakingActivityDataByIndex(index)
+
+	if 	self.index == 0 then
+
+		local makingActivityData = Activity_WorkerGameProxy.inst:getMakingActivityData(index)
+
+		local makeScoreItem = self.makeScoreItems[index]
+
+		if makeScoreItem ~= nil then
+
+			makeScoreItem.gameObject:SetActive(true)
+			makeScoreItem:SetData(makingActivityData)
+
+		end
+
+	end
+
+end
+
+function Activity_WorkerGamePanel:RefreshExchangeData()
+
+	if self.index == 1 then
+		self:setExchangeRewardMess()
+	end
+
+end
+
+
+function Activity_WorkerGamePanel:onSelectedIndexValueChange(index)
+
+	self.index = index
+
+	for i = 0,self.toggleLinkObjs.Count - 1 do
+		self.toggleLinkObjs[i]:SetActive(false)
+	end
+
+	self.toggleLinkObjs[index]:SetActive(true)
+
+	self:setState(index)
+
+end
+
+function Activity_WorkerGamePanel:setState(index)
+
+	if index == 0 then --制作积分
+
+		self:setMakeScoreMess()
+
+	elseif index == 1 then	--兑换奖品
+
+		self:setExchangeRewardMess()
+
+	end
+
+end
+
+function Activity_WorkerGamePanel:setMakeScoreMess()
+
+
+	for i = 1, #self.makeScoreItems do
+
+		local makingActivityData = Activity_WorkerGameProxy.inst:getMakingActivityData(i)
+
+		if makingActivityData ~= nil then
+
+			self.makeScoreItems[i].gameObject:SetActive(true)
+			self.makeScoreItems[i]:SetData(makingActivityData)
+
+		else
+
+			self.makeScoreItems[i].gameObject:SetActive(false)
+			self.makeScoreItems[i]:ClearTimer()
+
+		end
+
+	end
+
+
+end
+
+function Activity_WorkerGamePanel:setExchangeRewardMess()
+
+	self:setExchangeCountdownTimer()
+
+	for i = 1, #self.exchangeItems do
+
+		local exchangeData = Activity_WorkerGameProxy.inst:getExchangeData(i)
+
+		if exchangeData ~= nil then
+
+			self.exchangeItems[i].gameObject:SetActive(true)
+			self.exchangeItems[i]:SetData(exchangeData)
+
+		else
+
+			self.exchangeItems[i].gameObject:SetActive(false)
+
+		end
+
+	end
+
+
+end
+
+function Activity_WorkerGamePanel:Refresh()
+
+	self.stateGroup:OnEnableMethod(self.index)
+
+end
+
+
+function Activity_WorkerGamePanel:onLookRewardBtnClick()
+	EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGameScoreRewardPanel,Activity_WorkerGameProxy.inst:GetCurScorePointLv())
+end
+
+function Activity_WorkerGamePanel:onMakeBtnClick()
+
+	if CS_EquipDataProxyInst:GetIdleEquipMakeSlotNum() == 0 then --当前没有空闲的槽位
+		CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_BuyMakingSlot)
+	else
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+		local func = funcGeneric(CS.System.Int32)
+		func(CS_EventControllerInst,CS_GameEventType.EquipEvent.EQUIP_PRODUCTION_SELECT,-1)
+	end
+
+end
+
+function Activity_WorkerGamePanel:onExchangeRefreshBtnClick()
+
+	EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_RefeshExchangeDataConfirmUI)
+
+end
+
+function Activity_WorkerGamePanel:onWorkerGameCoinBtnClick()
+	
+	EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_WorkerGameCoinGiftsUI)
+	
+end
+
+function Activity_WorkerGamePanel:onHide()
+	
+	self:clearTimer()
+
+	for i = 1, #self.makeScoreItems do
+		self.makeScoreItems[i]:ClearTimer()
+	end
+
+end
+
+function Activity_WorkerGamePanel:setExchangeCountdownTimer()
+
+	self:clearTimer()
+	
+	
+	local exchangeRefreshTime = Activity_WorkerGameProxy.inst.exchangeRefreshTime_serverEndTime - CS_GameTimerInst.serverNow
+	self.exchangeCountdownTx.text = CS_TimeUtils.timeSpanStrip(exchangeRefreshTime,true)
+
+	self.exchangeCountdownTimer = CS_GameTimerInst:AddTimer(1,exchangeRefreshTime,function()
+
+			local _exchangeRefreshTime = Activity_WorkerGameProxy.inst.exchangeRefreshTime_serverEndTime - CS_GameTimerInst.serverNow
+			self.exchangeCountdownTx.text = CS_TimeUtils.timeSpanStrip(_exchangeRefreshTime,true)
+
+		end)
+
+end
+
+function Activity_WorkerGamePanel:setTimer()
+
+	self:clearTimer()
+
+	local remainTime = Activity_WorkerGameProxy.inst.endtime_serverEndtime - CS_GameTimerInst.serverNow
+	
+	self.activityCountdownTx.text = CS_TimeUtils.timeSpanStrip(remainTime,true)
+	self.tx_workergameCoinCountDown.text = CS_TimeUtils.timeSpanStrip(remainTime,true)
+
+	self.countdownTimer = CS_GameTimerInst:AddTimer(1,Activity_WorkerGameProxy.inst.endtime,function()
+
+			local _remainTime = Activity_WorkerGameProxy.inst.endtime_serverEndtime - CS_GameTimerInst.serverNow
+			
+			self.activityCountdownTx.text = CS_TimeUtils.timeSpanStrip(_remainTime,true)
+			self.tx_workergameCoinCountDown.text = CS_TimeUtils.timeSpanStrip(_remainTime,true)
+
+		end)
+
+	--self:setExchangeCountdownTimer()
+
+end
+
+
+function Activity_WorkerGamePanel:clearTimer()
+
+	if self.countdownTimer ~= 0 then
+
+		CS_GameTimerInst:RemoveTimer(self.countdownTimer)
+		self.countdownTimer = 0
+
+	end
+
+	if self.exchangeCountdownTimer ~= 0 then
+
+		CS_GameTimerInst:RemoveTimer(self.exchangeCountdownTimer)
+		self.exchangeCountdownTimer = 0
+
+	end
+
+end
+
+------------------------------------------------

@@ -1,0 +1,191 @@
+--PetBuyBoothUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_ObjList = typeof(CS.ObjList)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GameTimerInst = CS.GameTimer.inst
+
+local CS_PetDataProxyInst = CS.PetDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_FieldConfigManagerInst = CS.FieldConfigManager.inst
+
+
+PetBuyBoothUI = class(ViewBase)
+
+function PetBuyBoothUI:ctor()
+	self.viewID = Constants.ViewName.PetBuyBoothUI
+	PetBuyBoothUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.noSetting
+end
+------------------------------------------------
+
+
+function PetBuyBoothUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.btn_mask =  contentPane:GetButton("btn_mask");
+	self.btn_close =  contentPane:GetButton("btn_close");
+	self.btn_gold = contentPane:GetButton("btn_gold")
+	self.btn_gem = contentPane:GetButton("btn_gem")
+	self.gemConfirmObj = contentPane:GetObjByName("gemConfirmObj")
+	self.tx_needLv = contentPane:GetText("tx_needLv")
+	self.tx_goldCost = contentPane:GetText("tx_goldCost")
+	self.tx_gemCost = contentPane:GetText("tx_gemCost")
+	self.notArriveLv = contentPane:GetObjByName("lvBg")
+	self.arriveLv = contentPane:GetText("arriveLvText")
+	
+	self.uiAnimator = contentPane.uiAnimator
+	
+end
+
+
+function PetBuyBoothUI:onInit()
+
+	self:initComp()
+
+	self.btn_mask.onClick:AddListener(
+		function ()
+			self:hide()
+		end)
+
+	self.btn_close:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+
+	self.btn_gold:ButtonClickTween(
+		function ()
+			self:buyBoothField(0)
+		end)
+
+	self.btn_gem:ButtonClickTween(
+		function ()
+			self:onBtn_gemClick()
+		end)
+
+
+end
+
+
+function PetBuyBoothUI:onHide()
+	print("PetBuyBoothUI onHide")
+end
+
+function  PetBuyBoothUI:onShowed()
+	print("PetBuyBoothUI onShowed")
+	self:SetData()
+end
+
+function PetBuyBoothUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function PetBuyBoothUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+function PetBuyBoothUI:SetData()
+
+	self.gemConfirmObj:SetActive(false)
+
+	self.fieldCostCfg = CS_FieldConfigManagerInst:GetFieldConfig(5,CS_PetDataProxyInst.BoothNum + 1)
+
+	self.tx_needLv.text = tostring(self.fieldCostCfg.level)
+	self.tx_needLv.color = CS_UserDataProxyInst.playerData.level < self.fieldCostCfg.level and CS.GUIHelper.GetColorByColorHex("fd4f4f") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+	self.tx_goldCost.text = self.fieldCostCfg.money <= 0 and CS_LanguageManagerInst:GetValueByKey("免费") or tostring(self.fieldCostCfg.money)
+	self.tx_goldCost.color = CS_UserDataProxyInst.playerData.gold < self.fieldCostCfg.money and CS.GUIHelper.GetColorByColorHex("fd4f4f") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+	self.tx_gemCost.text = self.fieldCostCfg.diamond <= 0 and CS_LanguageManagerInst:GetValueByKey("免费") or tostring(self.fieldCostCfg.diamond)
+	--self.tx_gemCost.color = CS_UserDataProxyInst.playerData.gem < self.fieldCostCfg.diamond and CS.GUIHelper.GetColorByColorHex("fd4f4f") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+	
+	self.notArriveLv:SetActive(CS_UserDataProxyInst.playerData.level < self.fieldCostCfg.level)
+	self.arriveLv.enabled = CS_UserDataProxyInst.playerData.level >= self.fieldCostCfg.level
+end
+
+
+function PetBuyBoothUI:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function PetBuyBoothUI:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function PetBuyBoothUI:onBtn_gemClick()
+
+	if self.gemConfirmObj.activeSelf == true then
+		self:buyBoothField(1)
+	else
+		self.gemConfirmObj:SetActive(true)
+	end
+
+end
+
+function PetBuyBoothUI:buyBoothField(costType) --0 新币  1 金条
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func_2 = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+
+
+	if costType == 0 then
+
+		if 	CS_UserDataProxyInst.playerData.level < self.fieldCostCfg.level then
+
+			func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("店主等级不足"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+			return
+
+		end
+
+		if CS_UserDataProxyInst.playerData.gold < self.fieldCostCfg.money then
+
+			func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("新币不足"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+			return
+
+		end
+
+
+	elseif costType == 1 then
+
+		if CS_UserDataProxyInst.playerData.gem < self.fieldCostCfg.diamond then
+
+			--func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("金条不足"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+			EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,self.fieldCostCfg.diamond - CS_UserDataProxyInst.playerData.gem)
+			return
+
+		end
+
+	end
+
+	
+	-- 发送购买宠物栏位的请求
+	EventDispatcher:dispatchEvent(GameEvent.PetEvent.REQUEST_PET_BUYSLOT,costType)
+
+end
+
+------------------------------------------------

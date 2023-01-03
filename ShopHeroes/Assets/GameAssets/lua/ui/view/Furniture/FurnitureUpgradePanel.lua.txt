@@ -1,0 +1,1146 @@
+--FurnitureUpgradePanel
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+require("config/LuxuryConfigManager")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GameTimerInst = CS.GameTimer.inst
+
+local CS_FurnitureUpgradeConfigManagerInst = CS.FurnitureUpgradeConfigManager.inst
+local CS_FurnitureConfigManagerInst = CS.FurnitureConfigManager.inst
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local curNextCfg = nil
+
+local Vector3 = CS.UnityEngine.Vector3
+
+FurnitureUpgradePanel = class(ViewBase)
+
+function FurnitureUpgradePanel:ctor()
+	self.viewID = Constants.ViewName.FurnitureUpgradePanel
+	FurnitureUpgradePanel.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.noSettingAndEnergy
+end
+
+function FurnitureUpgradePanel:initComp()
+	local contentPane = self.contentPanel
+
+	self.currentLevelTxt = contentPane:GetText("currentLevelTxt")
+	self.objName = contentPane:GetText("objName")
+	self.subtypeNameTx = contentPane:GetText("subtypeNameTx")
+	self.introTxt = contentPane:GetText("introTxt")
+
+	self.phase1LevelTxt = contentPane:GetText("phase1LevelTxt")
+	self.phase2LevelTxt = contentPane:GetText("phase2LevelTxt")
+	self.phase3LevelTxt = contentPane:GetText("phase3LevelTxt")
+
+	self.item1NameTxt = contentPane:GetText("item1NameTxt")
+	self.item1OldValueTxt = contentPane:GetText("item1OldValueTxt")
+	self.item1ArrowImg = contentPane:GetImage("item1ArrowImg")
+	self.item1NewValueTxt = contentPane:GetText("item1NewValueTxt")
+
+	self.item2NameTxt = contentPane:GetText("item2NameTxt")
+	self.item2OldValueTxt = contentPane:GetText("item2OldValueTxt")
+	self.item2ArrowImg = contentPane:GetImage("item2ArrowImg")
+	self.item2NewValueTxt = contentPane:GetText("item2NewValueTxt")
+
+	self.item3NameTxt = contentPane:GetText("item3NameTxt")
+	self.item3OldValueTxt = contentPane:GetText("item3OldValueTxt")
+	self.item3ArrowImg = contentPane:GetImage("item3ArrowImg")
+	self.item3NewValueTxt = contentPane:GetText("item3NewValueTxt")
+
+	self.item4NameTxt = contentPane:GetText("item4NameTxt")
+	self.item4TimeTxt = contentPane:GetText("item4TimeTxt")
+
+	self.coinCountTxt = contentPane:GetText("coinCountTxt")
+	self.flagLevelTxt = contentPane:GetText("flagLevelTxt")
+
+	self.diamCountTx = contentPane:GetText("diamCountTx")
+
+	self.timerTxt = contentPane:GetText("timerTxt")
+	self.diamCountTxt3 = contentPane:GetText("diamCountTxt3")
+	self.diamCountTxt4 = contentPane:GetText("diamCountTxt4")
+
+	self.maxLevelText = contentPane:GetText("maxLevelText")
+
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.upgradeBtn = contentPane:GetButton("upgradeBtn")
+
+
+	self.confirmUpgradeObj = contentPane:GetObjByName("confirmUpgradeObj")
+
+	self.immediatelyUpgradeBtn = contentPane:GetButton("immediatelyUpgradeBtn")
+	self.completeUpgradeBtn = contentPane:GetButton("completeUpgradeBtn")
+	self.gangongBtn = contentPane:GetButton("gangongBtn")
+	self.confirmGanGongBtn = contentPane:GetButton("confirmGanGongBtn")
+
+	self.notArriveLv = contentPane:GetObjByName("notArriveLv")
+	self.arriveLv = contentPane:GetText("arriveLv")
+
+	self.leftBtn = contentPane:GetButton("leftBtn")
+	self.rightBtn = contentPane:GetButton("rightBtn")
+
+	self.upgradePanelTog = contentPane:GetObjByName("upgradePanelTog"):GetComponent("Toggle")
+	self.contentPanelTog = contentPane:GetObjByName("contentPanelTog"):GetComponent("Toggle")
+
+	self.maskCanvas = contentPane:GetObjByName("maskCanvas"):GetComponent("Canvas")
+	self.entityPos = contentPane:GetObjByName("entityPos"):GetComponent("RectTransform")
+	self.storageImg = contentPane:GetGUIIcon("storageImg")
+
+	self.item1Img = contentPane:GetGUIIcon("item1Img")
+	self.item2Img = contentPane:GetGUIIcon("item2Img")
+	self.item3Img = contentPane:GetGUIIcon("item3Img")
+	self.item4Img = contentPane:GetGUIIcon("item4Img")
+
+	self.frameImgs = {}
+	local frameImgObjs =  contentPane:GetObjByName("frameImgs"):GetComponent(CS_type_ObjList).objList
+	for i = 0, frameImgObjs.Count - 1 do
+		self.frameImgs[#self.frameImgs + 1] = frameImgObjs[i]:GetComponent(CS_type_GUIIcon)
+	end
+
+	self.phaseImgs = {}
+	local phaseImgsObjs =  contentPane:GetObjByName("phaseImgs"):GetComponent(CS_type_ObjList).objList
+	for i = 0, frameImgObjs.Count - 1 do
+		self.phaseImgs[#self.phaseImgs + 1] = phaseImgsObjs[i]:GetComponent(CS_type_GUIIcon)
+	end
+
+	self.arrowImgs = {}
+	local arrowImgsObjs =  contentPane:GetObjByName("arrowImgs"):GetComponent(CS_type_ObjList).objList
+	for i = 0, arrowImgsObjs.Count - 1 do
+		self.arrowImgs[#self.arrowImgs + 1] = arrowImgsObjs[i]:GetComponent(CS_type_GUIIcon)
+	end
+
+	self.topBtnsAndLinesObj = contentPane:GetObjByName("topBtnsAndLinesObj")
+	self.introDataObj = contentPane:GetObjByName("introDataObj")
+	self.bottomBtnsObj = contentPane:GetObjByName("bottomBtnsObj")
+	self.contentVarietyObj = contentPane:GetObjByName("contentVarietyObj")
+
+	self.item1Obj = contentPane:GetObjByName("item1Obj")
+	self.item2Obj = contentPane:GetObjByName("item2Obj")
+	self.item3Obj = contentPane:GetObjByName("item3Obj")
+	self.item4Obj = contentPane:GetObjByName("item4Obj")
+
+	self.sceneStateObj = contentPane:GetObjByName("sceneStateObj")
+	self.turnStateObj = contentPane:GetObjByName("turnStateObj")
+	self.turnState_UprgadingObj = contentPane:GetObjByName("turnState_UprgadingObj")
+
+
+	self.gridContent = contentPane:GetObjByName("gridContent"):GetComponent("GridLayoutGroup")
+
+	self.oldPfb = contentPane:GetObjByName("oldPfb")
+	self.oldImg = contentPane:GetObjByName("oldImg"):GetComponent("Image")
+	self.newImg = contentPane:GetObjByName("newImg"):GetComponent("Image")
+
+	self.onlyIntroDataObj = contentPane:GetObjByName("onlyIntroDataObj")
+	self.only_glGroup = contentPane:GetObjByName("only_glGroup"):GetComponent("GridLayoutGroup")
+	self.only_item2Obj = contentPane:GetObjByName("only_item2Obj")
+	self.only_item4Obj = contentPane:GetObjByName("only_item4Obj")
+	self.only_IntroTxt = contentPane:GetText("only_IntroTxt")
+
+	self.only_icon1 =contentPane:GetGUIIcon("only_icon1")
+	self.only_icon2 =contentPane:GetGUIIcon("only_icon2")
+	self.only_icon3 =contentPane:GetGUIIcon("only_icon3")
+	self.only_icon4 =contentPane:GetGUIIcon("only_icon4")
+
+	self.only_tx1 =contentPane:GetText("only_tx1")
+	self.only_tx2 =contentPane:GetText("only_tx2")
+	self.only_tx3 =contentPane:GetText("only_tx3")
+	self.only_tx4 =contentPane:GetText("only_tx4")
+	self.only_oldVal1 =contentPane:GetText("only_oldVal1")
+	self.only_oldVal2 =contentPane:GetText("only_oldVal2")
+	self.only_oldVal3 =contentPane:GetText("only_oldVal3")
+	self.only_newVal1 =contentPane:GetText("only_newVal1")
+	self.only_newVal2 =contentPane:GetText("only_newVal2")
+	self.only_newVal3 =contentPane:GetText("only_newVal3")
+	self.only_timerTxt =contentPane:GetText("only_timerTxt")
+
+	self.ctrl = contentPane:GetObjByName("ctrl"):GetComponent(typeof(CS.ShelfContentCtrlComp))
+
+	self.topAnimator = contentPane:GetObjByName("topAnimator"):GetComponent("Animator")
+	self.windowAnimator = contentPane:GetObjByName("windowAnimator"):GetComponent("Animator")
+
+
+end
+
+function FurnitureUpgradePanel:onInit()
+
+	self:initComp()
+
+	self.nextLevel = -1
+	self.nextGold = -1
+	self.currUpgradeItem = nil
+	self.remainTimerId = 0
+	self.maxLv = 15
+	self.xFactor = 0.054;
+	self.yFactor = 0.027;
+
+	self.closeBtn:ButtonClickTween(
+		function()
+			self:hide()
+		end
+	)
+
+	self.upgradeBtn:ButtonClickTween(
+		function ()
+			self:onUpgradeBtnClick()
+		end)
+
+	self.immediatelyUpgradeBtn:ButtonClickTween(
+		function ()
+			self:onImmediatelyUpgradeBtnClick()
+		end)
+
+
+	self.upgradePanelTog.onValueChanged:AddListener(function (isOn)
+
+			CS.AudioManager.inst:PlaySound(11);
+
+			for i = 0, self.upgradePanelTog.graphic.transform.childCount - 1 do
+				self.upgradePanelTog.graphic.transform:GetChild(i).gameObject:SetActive(isOn);
+			end
+
+
+			if isOn then
+				self:OnUpgradePanelTogDown()
+			end
+
+		end)
+
+	self.contentPanelTog.onValueChanged:AddListener(function (isOn)
+			CS.AudioManager.inst:PlaySound(11);
+
+			for i = 0, self.contentPanelTog.graphic.transform.childCount - 1 do
+				self.contentPanelTog.graphic.transform:GetChild(i).gameObject:SetActive(isOn);
+			end
+
+
+			if isOn then
+				self:OnContentPanelTogDown()
+			end
+		end)
+
+	self.leftBtn:ButtonClickTween(function ()
+			self:PageChange(true)
+		end)
+
+	self.rightBtn:ButtonClickTween(function ()
+			self:PageChange(false)
+		end)
+
+
+end
+
+
+function FurnitureUpgradePanel:onUpgradeBtnClick()
+
+	if (CS_UserDataProxyInst.playerData.level < self.nextLevel) then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("店主等级不足"),"FF2828")
+		return
+	end
+
+	if CS_UserDataProxyInst.playerData.gold < self.nextGold then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("新币不足"),"FF2828")
+		return
+	end
+
+	local curUpgradeFurnitureUid = CS_UserDataProxyInst:GetCurrentUpgradefurniture();
+
+	if curUpgradeFurnitureUid == 0 then --没有正在升级的
+
+		self:Upgrade(self.currUpgradeItem.type, self.currUpgradeItem.uid, 0);
+
+	else
+		local item = CS_UserDataProxyInst:GetFuriture(curUpgradeFurnitureUid);
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.IndoorData.ShopDesignItem)
+		func(CS_EventControllerInst, CS_GameEventType.FurnitureUpgradeEvent.SHOWMSGBOX,item)
+	end
+
+end
+
+function FurnitureUpgradePanel:onImmediatelyUpgradeBtnClick()
+
+	if (not self.confirmUpgradeObj.activeSelf) then
+
+		self.confirmUpgradeObj:SetActive(true);
+	else
+		self:Upgrade(self.currUpgradeItem.type, self.currUpgradeItem.uid, 1);
+	end
+
+end
+
+function FurnitureUpgradePanel:Upgrade(designType,designUid,kind) --0为金币，1为钻石
+
+	if (kind == 1 and not CS_UserDataProxyInst:FurnitureCanUpgradeFinish(designUid)) then--为钻石 先前端检测空间是否足够升级
+		return
+	end
+
+	if(kind == 1 and curNextCfg ~= nil)then
+		if(CS_UserDataProxyInst.playerData.gem < curNextCfg.diamond)then
+			EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,curNextCfg.diamond - CS_UserDataProxyInst.playerData.gem)
+			return
+		end
+	end
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func = funcGeneric(CS.System.Int32,CS.System.Int32)
+	func(CS_EventControllerInst, CS_GameEventType.FurnitureUpgradeEvent.SHOPUPGRADE_SAVEDATA,designUid,kind)
+
+	local funcGeneric_2 = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua3")
+	local func_2 = funcGeneric_2(CS.System.Int32,CS.System.Int32,CS.System.Int32)
+	func_2(CS_EventControllerInst,CS_GameEventType.FurnitureUpgradeEvent.SHOPUPGRADE_UPGRADEFRUITURE,designType,designUid,kind)
+
+end
+
+function FurnitureUpgradePanel:OnUpgradePanelTogDown()
+
+	self.upgradePanelTog.isOn = true;
+	self.contentPanelTog.isOn = false;
+
+	self.contentVarietyObj:SetActive(false);
+	self.introDataObj:SetActive(true);
+
+	self.turnStateObj:SetActive(self.currUpgradeItem.state == MsgType.EDesignState.Upgrading or self.currUpgradeItem.state == MsgType.EDesignState.Finished);
+	self.bottomBtnsObj:SetActive(self.currUpgradeItem.level <= self.maxLv);
+
+end
+
+function FurnitureUpgradePanel:OnContentPanelTogDown()
+
+	self.contentPanelTog.isOn = true;
+	self.upgradePanelTog.isOn = false;
+
+	self.introDataObj:SetActive(false);
+	self.bottomBtnsObj:SetActive(false);
+	self.turnStateObj:SetActive(false);
+
+	self.contentVarietyObj:SetActive(true);
+
+end
+
+
+function FurnitureUpgradePanel:PageChange(isLeft)
+
+	CS.AudioManager.inst:PlaySound(21);
+	if (CS.kTileGroupType.__CastFrom(self.currUpgradeItem.type) == CS.kTileGroupType.Counter) then
+		return
+	end
+
+	if self.currUpgradeItem ~= nil then
+
+		local has,furniture = CS.IndoorMap.inst:GetFurnituresByUid(self.currUpgradeItem.uid)
+
+		if has then
+			furniture:ReSetPos()
+		end
+
+	end
+
+	self.currUpgradeItem = CS_UserDataProxyInst:getNearFurniture(self.currUpgradeItem.uid, self.currUpgradeItem.type, isLeft);
+
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.Int32)
+	func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.PICK_ITEM,self.currUpgradeItem.uid)
+
+	CS.IndoorMap.inst:OnFurnituresSelect(self.currUpgradeItem.uid);
+	CS_GameTimerInst:RemoveTimer(self.remainTimerId);
+
+	self:setData(self.currUpgradeItem);
+
+end
+
+function FurnitureUpgradePanel:setData(_data)
+
+	self.currUpgradeItem = _data
+
+	self.introTxt.text = CS_LanguageManagerInst:GetValueByKey(self.currUpgradeItem.config.des);
+
+	self:OnUpgradePanelTogDown()
+
+	self.currentLevelTxt.text = tostring(self.currUpgradeItem.level)
+
+	self.gangongBtn.gameObject:SetActive(true);
+	self.confirmGanGongBtn.gameObject:SetActive(false);
+
+
+	if self.currUpgradeItem.state == MsgType.EDesignState.Upgrading then
+
+		self.maxLevelText.gameObject:SetActive(false);
+		self.sceneStateObj:SetActive(false);
+		self.turnStateObj:SetActive(true);
+		self.turnState_UprgadingObj:SetActive(true);
+		self.completeUpgradeBtn.gameObject:SetActive(false);
+
+
+		self:RemainTimeUpdate();
+
+		self.remainTimerId = CS_GameTimerInst:AddTimer(1, function()
+				self:RemainTimeUpdate()
+			end)
+
+	elseif self.currUpgradeItem.state == MsgType.EDesignState.Finished then
+
+		self.sceneStateObj:SetActive(false);
+		self.turnStateObj:SetActive(true);
+		self.turnState_UprgadingObj:SetActive(false);
+		self.completeUpgradeBtn.gameObject:SetActive(true);
+
+		self.maxLevelText.gameObject:SetActive(false);
+		self.timerTxt.text = CS_LanguageManagerInst:GetValueByKey("就绪");
+
+	else
+
+		if (self.currUpgradeItem.level < self.maxLv) then
+
+			local flag = false
+
+			if (CS.kTileGroupType.__CastFrom(self.currUpgradeItem.config.type_1) == CS.kTileGroupType.ResourceBin) then
+
+				local resUpCfg = CS.ResourceBinUpgradeConfigManager.inst:getConfigByType(self.currUpgradeItem.config.type_2, self.currUpgradeItem.level + 1);
+
+				if (resUpCfg ~= nil) then
+
+					local buildData = CS_UserDataProxyInst:GetBuildingData(resUpCfg.build_id);
+
+					if buildData ~= nil and buildData.state ~= MsgType.EBuildState.EB_Lock then
+
+						if (buildData.level < resUpCfg.build_level) then
+
+							self.maxLevelText.text = CS_LanguageManagerInst:GetValueByKey("需要{0}达到{1}级", CS_LanguageManagerInst:GetValueByKey(buildData.config.name), tostring(resUpCfg.build_level));
+							self.sceneStateObj:SetActive(false);
+							self.maxLevelText.gameObject:SetActive(true);
+							flag = true;
+						end
+
+					end
+				end
+			end
+
+			if not flag then
+
+				self.sceneStateObj:SetActive(true);
+				self.maxLevelText.gameObject:SetActive(false);
+
+			end
+
+		else
+
+			self.sceneStateObj:SetActive(false);
+			self.maxLevelText.text = CS_LanguageManagerInst:GetValueByKey("已升至最高级");
+			self.maxLevelText.gameObject:SetActive(true);
+
+		end
+
+		self.turnStateObj:SetActive(false);
+
+
+	end
+
+
+	if (CS.kTileGroupType.__CastFrom( self.currUpgradeItem.config.type_1) == CS.kTileGroupType.Counter) then
+		self:ShowCounterUpgradePanel()
+	elseif (CS.kTileGroupType.__CastFrom( self.currUpgradeItem.config.type_1) == CS.kTileGroupType.ResourceBin) then
+		self:ShowResourceUpgradePanel()
+	elseif (CS.kTileGroupType.__CastFrom( self.currUpgradeItem.config.type_1) == CS.kTileGroupType.Shelf) then
+		self:ShowShelfUpgradePanel()
+	elseif (CS.kTileGroupType.__CastFrom( self.currUpgradeItem.config.type_1) == CS.kTileGroupType.Trunk) then
+		self:ShowStorageUpgradePanel()
+	end
+
+	self:SetPhaseImgsFrameColor();
+
+end
+
+function FurnitureUpgradePanel:RemainTimeUpdate()
+
+	if self.currUpgradeItem.entityState.leftTime > 0 then
+
+		self:SetState(1);
+
+		self.timerTxt.text = CS.TimeUtils.timeSpanStrip(math.ceil(self.currUpgradeItem.entityState.leftTime));
+		--刷新钻石消耗（最少十颗钻石）
+		local immediatelyDiamCount = CS.DiamondCountUtils.GetFurnitureUpgradeDiamonds(self.currUpgradeItem.entityState.leftTime);
+
+		self.diamCountTxt3.text = CS.System.String.Format("{0:N0}",immediatelyDiamCount)
+		self.diamCountTxt4.text = CS.System.String.Format("{0:N0}",immediatelyDiamCount)
+
+	else
+
+		self:SetState(2);
+
+	end
+
+
+end
+
+function FurnitureUpgradePanel:SetState(state)
+
+	if state == 2 then
+		self.timerTxt.text = CS_LanguageManagerInst:GetValueByKey("就绪");
+		self.turnState_UprgadingObj:SetActive(false);
+		CS_GameTimerInst:RemoveTimer(self.remainTimerId);
+	end
+
+	self.gangongBtn.gameObject:SetActive(state == 1);
+	self.completeUpgradeBtn.gameObject:SetActive(state == 2);
+
+end
+
+function FurnitureUpgradePanel:ShowBlocks(oldLength, oldWidth, newLength,  newWidth)
+
+	self.gridContent.constraintCount = newWidth;
+	self.only_glGroup.constraintCount = newWidth;
+
+	for i = 0, self.gridContent.transform.childCount - 1 do
+
+		CS.UnityEngine.GameObject.Destroy(self.gridContent.transform:GetChild(i).gameObject);
+		CS.UnityEngine.GameObject.Destroy(self.only_glGroup.transform:GetChild(i).gameObject);
+
+	end
+
+	local scaleFactor = 1 - (newWidth * self.yFactor + newLength * self.xFactor);
+
+
+	self.gridContent:GetComponent("RectTransform").localScale = Vector3(scaleFactor,scaleFactor,1)
+	self.only_glGroup:GetComponent("RectTransform").localScale = Vector3(scaleFactor,scaleFactor,1)
+
+	local items = get_csharp_stack(CS.UnityEngine.GameObject)
+	local onlyItems = get_csharp_stack(CS.UnityEngine.GameObject)
+
+
+	for i = 1, newLength * newWidth do
+
+		local item = CS.UnityEngine.GameObject.Instantiate(self.oldPfb, self.gridContent.transform);
+		local onlyItem = CS.UnityEngine.GameObject.Instantiate(self.oldPfb, self.only_glGroup.transform);
+
+
+		items:Push(item)
+		onlyItems:Push(onlyItem)
+
+	end
+
+	for i = (newLength - oldLength) * newWidth, 1 , -1 do
+
+		local item = items:Pop();
+		local onlyItem = onlyItems:Pop();
+
+		item:GetComponent("Image").sprite = self.newImg.sprite
+		onlyItem:GetComponent("Image").sprite = self.newImg.sprite
+
+	end
+
+	local itemsArr = items:ToArray()
+	CS.System.Array.Reverse(itemsArr)
+
+	local onlyItemsArr = onlyItems:ToArray()
+	CS.System.Array.Reverse(onlyItemsArr)
+
+	for i = 0, itemsArr.Length - 1, newWidth do
+
+		for k = oldWidth, newWidth - 1  do
+			itemsArr[i + k].gameObject:GetComponent("Image").sprite = self.newImg.sprite
+			onlyItemsArr[i + k].gameObject:GetComponent("Image").sprite = self.newImg.sprite
+		end
+
+	end
+
+end
+
+function FurnitureUpgradePanel:onShowUpgradePanel(sec)
+
+	self.item4Img:SetSprite(CS.StaticConstants.funitureItemAtlasName,CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[3]]);
+	self.item4NameTxt.text = CS_LanguageManagerInst:GetValueByKey("升级时间");
+	self.item4TimeTxt.text = CS.TimeUtils.timeSpanStrip(sec, false);
+
+end
+
+
+function FurnitureUpgradePanel:ShowCounterUpgradePanel()
+
+	local isArriveMaxLevel = self.currUpgradeItem.level >= self.maxLv;
+	local lastConfig = CS_FurnitureUpgradeConfigManagerInst:GetCounterUpgradeConfig(self.currUpgradeItem.level);
+
+	local nextConfig = nil
+	if not isArriveMaxLevel then
+		nextConfig = CS_FurnitureUpgradeConfigManagerInst:GetCounterUpgradeConfig(self.currUpgradeItem.level + 1);
+		curNextCfg = nextConfig
+	end
+
+	local newConfig = nil
+
+	if not isArriveMaxLevel then
+		newConfig =  CS_FurnitureConfigManagerInst:getConfig(nextConfig.furniture_id);
+	end
+
+	local oldConfig = CS_FurnitureConfigManagerInst:getConfig(lastConfig.furniture_id);
+
+	if (not isArriveMaxLevel) then
+		self:ShowBlocks(oldConfig.width, oldConfig.height, newConfig.width, newConfig.height);
+		self:onShowUpgradePanel(nextConfig.time);
+	end
+
+	self:SetTopContentValue(false, false);
+
+	for i = 0, 2 do
+		local sucfg = CS.CounterUpgradeConfigManager.inst:getConfig(i * 5 + 1);
+		local ftcfg = CS_FurnitureConfigManagerInst:getConfig(sucfg.furniture_id);
+		self.phaseImgs[i + 1]:SetSprite(ftcfg.atlas, ftcfg.icon);
+	end
+
+	local ssucfg = CS.CounterUpgradeConfigManager.inst:getConfig(self.currUpgradeItem.level);
+	local fftcfg = CS_FurnitureConfigManagerInst:getConfig(ssucfg.furniture_id);
+	self.storageImg.gameObject:SetActive(true);
+	self.storageImg:SetSpriteURL(fftcfg.icon_big);
+	self.maskCanvas.sortingLayerName = self._uiCanvas.sortingLayerName;
+	self.maskCanvas.sortingOrder = self._uiCanvas.sortingOrder - 10;
+	self.entityPos.gameObject:SetActive(false);
+	self._curFurniture = nil;
+
+	--Item1
+	self.item1Img:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[0]]);
+	self.item1NameTxt.text = CS_LanguageManagerInst:GetValueByKey("售卖获得的能量");
+	self.item1OldValueTxt.text = tostring(lastConfig.energy)
+
+	if not isArriveMaxLevel then
+		self.item1NewValueTxt.text = tostring(nextConfig.energy);
+	else
+		self.item1NewValueTxt.text = CS_LanguageManagerInst:GetValueByKey("已满级");
+	end
+
+	self.item1NewValueTxt.gameObject:SetActive(not isArriveMaxLevel and (lastConfig.energy < nextConfig.energy));
+	self.item1ArrowImg.gameObject:SetActive(not isArriveMaxLevel and (lastConfig.energy < nextConfig.energy));
+
+	--Item3
+	self.item3Img:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[2]]);
+	self.item3NameTxt.text = CS_LanguageManagerInst:GetValueByKey("大小");
+	self.item3OldValueTxt.text =  tostring(self.currUpgradeItem.config.height).."x"..tostring(self.currUpgradeItem.config.width)
+
+	if (not isArriveMaxLevel) then
+		self.item3NewValueTxt.text = tostring(newConfig.height).."x"..tostring(newConfig.width)
+	else
+		self.item3NewValueTxt.text = CS_LanguageManagerInst:GetValueByKey("已满级");
+	end
+
+	self.item3NewValueTxt.gameObject:SetActive(not isArriveMaxLevel and newConfig.height * newConfig.width > oldConfig.height * oldConfig.width);
+	self.item3ArrowImg.gameObject:SetActive(not isArriveMaxLevel and newConfig.height * newConfig.width > oldConfig.height * oldConfig.width);
+
+	--底部按钮组件
+	self:SetBottomBtns(nextConfig, isArriveMaxLevel);
+
+end
+
+function FurnitureUpgradePanel:ShowResourceUpgradePanel()
+
+	local isArriveMaxLevel = self.currUpgradeItem.level >= self.maxLv;
+	local lastConfig = CS_FurnitureUpgradeConfigManagerInst:GetResourceBinUpgradeConfig(self.currUpgradeItem.config.type_2, self.currUpgradeItem.level);
+	local nextConfig = nil
+	if not isArriveMaxLevel then
+		nextConfig = CS_FurnitureUpgradeConfigManagerInst:GetResourceBinUpgradeConfig(self.currUpgradeItem.config.type_2, self.currUpgradeItem.level + 1);
+		curNextCfg = nextConfig
+	end
+	local newConfig = nil
+	if not isArriveMaxLevel then
+		newConfig = CS_FurnitureConfigManagerInst:getConfig(nextConfig.furniture_id);
+	end
+	local oldConfig = CS_FurnitureConfigManagerInst:getConfig(lastConfig.furniture_id);
+
+
+	if (not isArriveMaxLevel) then
+		self:ShowBlocks(oldConfig.width, oldConfig.height, newConfig.width, newConfig.height);
+		self:onShowUpgradePanel(nextConfig.time);
+	end
+
+	self:SetTopContentValue(false, false);
+
+	for i = 0, 2 do
+		local sucfg = CS.ResourceBinUpgradeConfigManager.inst:getConfigByType(lastConfig.type, i * 5 + 1);
+		local ftcfg = CS_FurnitureConfigManagerInst:getConfig(sucfg.furniture_id);
+		self.phaseImgs[i + 1]:SetSprite(ftcfg.atlas, ftcfg.icon);
+	end
+
+	local ssucfg = CS.ResourceBinUpgradeConfigManager.inst:getConfigByType(lastConfig.type, self.currUpgradeItem.level);
+	local fftcfg = CS_FurnitureConfigManagerInst:getConfig(ssucfg.furniture_id);
+	self.storageImg:SetSpriteURL(fftcfg.icon_big);
+
+	if (fftcfg.type_2 ~= 4 and fftcfg.type_2 ~= 5) then--储油箱，珠宝箱没有阶段转换 无须拿来实例
+		self.maskCanvas.sortingLayerName = self._uiCanvas.sortingLayerName;
+		self.maskCanvas.sortingOrder = self._uiCanvas.sortingOrder - 30;
+		self.entityPos.gameObject:SetActive(true);
+
+		local has,furniture = CS.IndoorMap.inst:GetFurnituresByUid(self.currUpgradeItem.uid)
+
+		if has then
+			self._curFurniture = furniture
+			self._curFurniture:SetUIPosition(self.entityPos, self._uiCanvas.sortingLayerName, self._uiCanvas.sortingOrder - 30 + 1, self.currUpgradeItem.config.height);
+		end
+
+		self.storageImg.gameObject:SetActive(false);
+
+	else
+
+		self.storageImg.gameObject:SetActive(true);
+
+	end
+
+	--Item1
+	self.item1Img:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[0]]);
+	self.item1NameTxt.text = CS_LanguageManagerInst:GetValueByKey("仓库容量");
+	self.item1OldValueTxt.text = tostring(lastConfig.store)
+	if not isArriveMaxLevel then
+		self.item1NewValueTxt.text = tostring(nextConfig.store)
+	else
+		self.item1NewValueTxt.text = CS_LanguageManagerInst:GetValueByKey("已满级");
+	end
+	self.item1NewValueTxt.gameObject:SetActive(not isArriveMaxLevel and lastConfig.store < nextConfig.store);
+	self.item1ArrowImg.gameObject:SetActive(not isArriveMaxLevel and lastConfig.store < nextConfig.store);
+
+
+	--Item3
+	self.item3Img:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[2]]);
+	self.item3NameTxt.text = CS_LanguageManagerInst:GetValueByKey("大小");
+	self.item3OldValueTxt.text = tostring(self.currUpgradeItem.config.height).."x"..tostring(self.currUpgradeItem.config.width);
+
+	if not isArriveMaxLevel then
+		self.item3NewValueTxt.text = tostring(newConfig.height).."x"..tostring(newConfig.width);
+	else
+		self.item3NewValueTxt.text = CS_LanguageManagerInst:GetValueByKey("已满级");
+	end
+
+	self.item3NewValueTxt.gameObject:SetActive(not isArriveMaxLevel and newConfig.height * newConfig.height > oldConfig.height * oldConfig.height);
+	self.item3ArrowImg.gameObject:SetActive(not isArriveMaxLevel and newConfig.height * newConfig.height > oldConfig.height * oldConfig.height);
+
+	self:SetBottomBtns(nextConfig, isArriveMaxLevel);
+
+end
+
+function FurnitureUpgradePanel:ShowShelfUpgradePanel()
+
+	local isArriveMaxLevel = self.currUpgradeItem.level >= self.maxLv;
+	local lastConfig = CS_FurnitureUpgradeConfigManagerInst:GetShelfUpgradeConfig(self.currUpgradeItem.config.type_2, self.currUpgradeItem.level);
+	local nextConfig = nil
+	if not isArriveMaxLevel then
+		nextConfig = CS_FurnitureUpgradeConfigManagerInst:GetShelfUpgradeConfig(self.currUpgradeItem.config.type_2, self.currUpgradeItem.level + 1);
+		curNextCfg = nextConfig
+	end
+	local newConfig = nil
+	if not isArriveMaxLevel then
+		newConfig = CS_FurnitureConfigManagerInst:getConfig(nextConfig.furniture_id);
+	end
+	local oldConfig = CS_FurnitureConfigManagerInst:getConfig(lastConfig.furniture_id);
+
+	if not isArriveMaxLevel then
+		self:ShowBlocks(oldConfig.width, oldConfig.height, newConfig.width, newConfig.height);
+		local percent = LuxuryConfigManager:GetLuxuryUpgradeBuff(nextConfig.type)
+		local tempTime = nextConfig.time
+		if(percent ~= -1)then
+			local p = percent / 100
+			tempTime = tempTime - tempTime * p
+		end
+		self:onShowUpgradePanel(tempTime);
+	end
+
+	self:SetTopContentValue(true, true);
+
+	for i = 0, 2 do
+
+		local sucfg = CS.ShelfUpgradeConfigManager.inst:getConfigByType(lastConfig.type, i * 5 + 1);
+		local ftcfg = CS.FurnitureConfigManager.inst:getConfig(sucfg.furniture_id);
+		self.phaseImgs[i + 1]:SetSprite(ftcfg.atlas, ftcfg.icon);
+
+		local img = self.ctrl.img_levelShelfList[i];
+		img:SetSprite(ftcfg.atlas, ftcfg.icon);
+
+		if (i * 5 + 1 > lastConfig.level) then
+			CS.GUIHelper.SetUIGray(img.transform, true);
+		else
+			CS.GUIHelper.SetUIGray(img.transform, false);
+		end
+
+	end
+
+
+	local ssucfg = CS.ShelfUpgradeConfigManager.inst:getConfigByType(lastConfig.type, self.currUpgradeItem.level);
+	self.storageImg.gameObject:SetActive(false);
+
+	self.maskCanvas.sortingLayerName = self._uiCanvas.sortingLayerName;
+	self.maskCanvas.sortingOrder = self._uiCanvas.sortingOrder - 30;
+	self.entityPos.gameObject:SetActive(true);
+
+	local has,furniture = CS.IndoorMap.inst:GetFurnituresByUid(self.currUpgradeItem.uid)
+
+	if has then
+		self._curFurniture = furniture
+		self._curFurniture:SetUIPosition(self.entityPos, self._uiCanvas.sortingLayerName, self._uiCanvas.sortingOrder - 30 + 1, self.currUpgradeItem.config.height);
+	end
+
+	--Item1
+	self.item1Img:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[0]]);
+	self.item1NameTxt.text = CS_LanguageManagerInst:GetValueByKey("能量上限");
+	self.item1OldValueTxt.text = tostring(lastConfig.energy)
+	if not isArriveMaxLevel then
+		self.item1NewValueTxt.text = tostring(nextConfig.energy)
+	else
+		self.item1NewValueTxt.text = CS_LanguageManagerInst:GetValueByKey("已满级");
+	end
+	self.item1NewValueTxt.gameObject:SetActive(not isArriveMaxLevel and lastConfig.energy < nextConfig.energy);
+	self.item1ArrowImg.gameObject:SetActive(not isArriveMaxLevel and lastConfig.energy < nextConfig.energy);
+
+	--Item2
+	self.item2Img:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[1]]);
+	self.item2NameTxt.text = CS_LanguageManagerInst:GetValueByKey("容量");
+	self.item2OldValueTxt.text = tostring(lastConfig.store)
+	if (not isArriveMaxLevel) then
+		self.item2NewValueTxt.text = tostring(nextConfig.store)
+	else
+		self.item2NewValueTxt.text = CS_LanguageManagerInst:GetValueByKey("已满级");
+	end
+	self.item2NewValueTxt.gameObject:SetActive(not isArriveMaxLevel and lastConfig.store < nextConfig.store);
+	self.item2ArrowImg.gameObject:SetActive(not isArriveMaxLevel and lastConfig.store < nextConfig.store);
+
+	--Item3
+	self.item3Img:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[2]]);
+	self.item3NameTxt.text = CS_LanguageManagerInst:GetValueByKey("大小");
+	self.item3OldValueTxt.text =  tostring(self.currUpgradeItem.config.height).."x"..tostring(self.currUpgradeItem.config.width)
+
+	if (not isArriveMaxLevel) then
+		self.item3NewValueTxt.text = tostring(newConfig.height).."x"..tostring(newConfig.width)
+	else
+		self.item3NewValueTxt.text = CS_LanguageManagerInst:GetValueByKey("已满级");
+	end
+
+	self.item3NewValueTxt.gameObject:SetActive(not isArriveMaxLevel and newConfig.height * newConfig.width > oldConfig.height * oldConfig.width);
+	self.item3ArrowImg.gameObject:SetActive(not isArriveMaxLevel and newConfig.height * newConfig.width > oldConfig.height * oldConfig.width);
+
+	self:SetBottomBtns(nextConfig, isArriveMaxLevel);
+
+	--Ctrl
+	if CS.kShelfType.__CastFrom(lastConfig.type) == CS.kShelfType.ColdeWeapon then
+		self.ctrl:SetNodes(false, self.currUpgradeItem);
+	else
+		self.ctrl:SetNodes(true, self.currUpgradeItem);
+	end
+
+end
+
+function FurnitureUpgradePanel:ShowStorageUpgradePanel()
+
+	local isArriveMaxLevel = self.currUpgradeItem.level >= self.maxLv;
+	local lastConfig = CS_FurnitureUpgradeConfigManagerInst:GetTrunkUpgradeConfig(self.currUpgradeItem.level);
+
+	local nextConfig = nil
+	if not isArriveMaxLevel then
+		nextConfig = CS_FurnitureUpgradeConfigManagerInst:GetTrunkUpgradeConfig(self.currUpgradeItem.level + 1);
+		curNextCfg = nextConfig
+	end
+
+	local newConfig = nil
+	if not isArriveMaxLevel then
+		newConfig = CS_FurnitureConfigManagerInst:getConfig(nextConfig.furniture_id);
+	end
+
+	local oldConfig = CS_FurnitureConfigManagerInst:getConfig(lastConfig.furniture_id);
+
+	if (not isArriveMaxLevel) then
+		self:ShowBlocks(oldConfig.width, oldConfig.height, newConfig.width, newConfig.height);
+		self:onShowUpgradePanel(nextConfig.time);
+	end
+
+	self:SetTopContentValue(false, true);
+
+	for i = 0, 2 do
+		local sucfg = CS.TrunkUpgradeConfigManager.inst:getConfig(i * 5 + 1);
+		local ftcfg = CS.FurnitureConfigManager.inst:getConfig(sucfg.furniture_id);
+		self.phaseImgs[i + 1]:SetSprite(ftcfg.atlas, ftcfg.icon);
+	end
+
+	local ssucfg = CS.TrunkUpgradeConfigManager.inst:getConfig(self.currUpgradeItem.level);
+	local fftcfg = CS.FurnitureConfigManager.inst:getConfig(ssucfg.furniture_id);
+	self.storageImg.gameObject:SetActive(true);
+	self.storageImg:SetSpriteURL(fftcfg.icon_big);
+	self.maskCanvas.sortingLayerName = self._uiCanvas.sortingLayerName;
+	self.maskCanvas.sortingOrder = self._uiCanvas.sortingOrder - 10;
+	self.entityPos.gameObject:SetActive(false);
+	self._curFurniture = nil;
+
+	--Item1
+	self.item1Img:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[0]]);
+	self.item1NameTxt.text = CS_LanguageManagerInst:GetValueByKey("仓库容量");
+	self.item1OldValueTxt.text = tostring(lastConfig.space)
+	if not isArriveMaxLevel then
+		self.item1NewValueTxt.text = tostring(nextConfig.space)
+	else
+		self.item1NewValueTxt.text = CS_LanguageManagerInst:GetValueByKey("已满级");
+	end
+	self.item1NewValueTxt.gameObject:SetActive(not isArriveMaxLevel and lastConfig.space < nextConfig.space);
+	self.item1ArrowImg.gameObject:SetActive(not isArriveMaxLevel and lastConfig.space < nextConfig.space);
+
+	--Item2
+	self.item2Img:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[1]]);
+	self.item2NameTxt.text = CS_LanguageManagerInst:GetValueByKey("堆叠上限");
+	self.item2OldValueTxt.text = tostring(lastConfig.pile_space)
+	if (not isArriveMaxLevel) then
+		self.item2NewValueTxt.text = tostring(nextConfig.pile_space)
+	else
+		self.item2NewValueTxt.text = CS_LanguageManagerInst:GetValueByKey("已满级");
+	end
+	self.item2NewValueTxt.gameObject:SetActive(not isArriveMaxLevel and lastConfig.pile_space < nextConfig.pile_space);
+	self.item2ArrowImg.gameObject:SetActive(not isArriveMaxLevel and lastConfig.pile_space < nextConfig.pile_space);
+
+	--Item3
+	self.item3Img:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[2]]);
+	self.item3NameTxt.text = CS_LanguageManagerInst:GetValueByKey("大小");
+	self.item3OldValueTxt.text =  tostring(self.currUpgradeItem.config.height).."x"..tostring(self.currUpgradeItem.config.width)
+
+	if (not isArriveMaxLevel) then
+		self.item3NewValueTxt.text = tostring(newConfig.height).."x"..tostring(newConfig.width)
+	else
+		self.item3NewValueTxt.text = CS_LanguageManagerInst:GetValueByKey("已满级");
+	end
+
+	self.item3NewValueTxt.gameObject:SetActive(not isArriveMaxLevel and newConfig.height * newConfig.width > oldConfig.height * oldConfig.width);
+	self.item3ArrowImg.gameObject:SetActive(not isArriveMaxLevel and newConfig.height * newConfig.width > oldConfig.height * oldConfig.width);
+
+	self:SetBottomBtns(nextConfig, isArriveMaxLevel);
+
+end
+
+
+function FurnitureUpgradePanel:SetPhaseImgsFrameColor()
+
+	for i = 0, 2 do
+		if (self.currUpgradeItem.level >= i * 5 + 1 and self.currUpgradeItem.level <= (i + 1) * 5 + 1) then
+			self.frameImgs[i+1]:SetSprite("shopdesign_atlas","jiaju_huojiaxiaodi")
+		else
+			self.frameImgs[i+1]:SetSprite("shopdesign_atlas","jiaju_huojiaxiaodi1")
+		end
+	end
+
+	for i = 0, 1  do
+		if(self.arrowImgs[i+1] ~= nil)then
+			self.arrowImgs[i+1]:SetSprite("shopdesign_atlas","jiaju_jiantouzong")
+		end
+	end
+
+
+	if self.currUpgradeItem.level < 6 then
+
+		CS.GUIHelper.SetUIGray(self.phaseImgs[3].transform,true)
+
+	else
+
+		CS.GUIHelper.SetUIGray(self.phaseImgs[3].transform,false)
+
+	end
+
+	self:SetArrowImgs();
+
+end
+
+function FurnitureUpgradePanel:SetArrowImgs()
+
+	if (self.currUpgradeItem.level == 5) then
+
+		self.frameImgs[2]:SetSprite("shopdesign_atlas","jiaju_huojiaxiaodi")
+		self.arrowImgs[1]:SetSprite("shopdesign_atlas","jiaju_jiantoulv")
+		self.frameImgs[2]:SetSprite("shopdesign_atlas","jiaju_huojiaxiaodi2")
+
+	elseif (self.currUpgradeItem.level == 10) then
+		self.frameImgs[3]:SetSprite("shopdesign_atlas","jiaju_huojiaxiaodi")
+		self.arrowImgs[2]:SetSprite("shopdesign_atlas","jiaju_jiantoulv")
+		self.frameImgs[3]:SetSprite("shopdesign_atlas","jiaju_huojiaxiaodi2")
+	end
+
+end
+
+function FurnitureUpgradePanel:SetTopContentValue(topBtnsAndLinesObjActive,item2ObjActive)
+
+	self.topBtnsAndLinesObj:SetActive(topBtnsAndLinesObjActive);
+	self.introDataObj:SetActive(topBtnsAndLinesObjActive);
+	self.onlyIntroDataObj:SetActive(not topBtnsAndLinesObjActive);
+	self.item2Obj:SetActive(item2ObjActive);
+	self.only_item2Obj:SetActive(item2ObjActive);
+
+	self.objName.text = CS_LanguageManagerInst:GetValueByKey(self.currUpgradeItem.config.name);
+	self.subtypeNameTx.text = CS_LanguageManagerInst:GetValueByKey(CS.StaticConstants.furnitureSubTypeNames[self.currUpgradeItem.config.type_1]);
+
+end
+
+function FurnitureUpgradePanel:SetBottomBtns(nextConfig,isMax)
+
+	self:syncOnlyIntroDataDes();
+
+	if isMax then
+
+		self.item4Obj:SetActive(false);
+		self.only_item4Obj:SetActive(false);
+		return;
+
+	else
+
+		self.item4Obj:SetActive(true);
+		self.only_item4Obj:SetActive(true);
+
+	end
+
+	if (CS_UserDataProxyInst.playerData.gold < nextConfig.money) then
+		self.coinCountTxt.text = "<color=#ff2828>"..tostring(nextConfig.money).."</color>"
+	else
+		self.coinCountTxt.text = "<color=#FFFFFF>"..tostring(nextConfig.money).."</color>"
+	end
+
+	self.diamCountTx.text = tostring(nextConfig.diamond)
+	
+	--if (CS_UserDataProxyInst.playerData.gem < nextConfig.diamond) then
+		--self.immediatelyUpgradeBtn.interactable = false;
+		--CS.GUIHelper.SetUIGray(self.immediatelyUpgradeBtn.transform, true);
+		--self.diamCountTx.text = "<color=#ff2828>"..tostring(nextConfig.diamond).."</color>";
+	--else
+		--self.immediatelyUpgradeBtn.interactable = true;
+		--CS.GUIHelper.SetUIGray(self.immediatelyUpgradeBtn.transform, false);
+		--self.diamCountTx.text = "<color=#FFFFFF>"..tostring(nextConfig.diamond).."</color>";
+	--end
+
+	if (CS_UserDataProxyInst.playerData.level < nextConfig.shopkeeper_level) then
+
+		self.notArriveLv:SetActive(true);
+		self.arriveLv.enabled = false;
+		self.flagLevelTxt.text = "<color=#ff2828>"..tostring(nextConfig.shopkeeper_level).."</color>"
+
+	else
+
+		self.notArriveLv:SetActive(false);
+		self.arriveLv.enabled = true;
+		self.flagLevelTxt.text = "<color=#FFFFFF>"..tostring(nextConfig.shopkeeper_level).."</color>"
+
+	end
+
+	self.nextLevel = nextConfig.shopkeeper_level;
+	self.nextGold = nextConfig.money;
+
+	if (self.currUpgradeItem.level >= self.maxLv) then
+		self.bottomBtnsObj:SetActive(false);
+		self.item4Obj:SetActive(false);
+	end
+
+end
+
+function FurnitureUpgradePanel:syncOnlyIntroDataDes()
+
+	self.only_IntroTxt.text = self.introTxt.text;
+	if (self.currUpgradeItem.config.iconitem_id[0] ~= 0) then
+		self.only_icon1:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[0]]);
+	end
+	if (self.currUpgradeItem.config.iconitem_id[1] ~= 0) then
+		self.only_icon2:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[1]]);
+	end
+	if (self.currUpgradeItem.config.iconitem_id[2] ~= 0) then
+		self.only_icon3:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[2]]);
+	end
+	if (self.currUpgradeItem.config.iconitem_id[3] ~= 0) then
+		self.only_icon4:SetSprite(CS.StaticConstants.funitureItemAtlasName, CS.StaticConstants.funitureItemIcons[self.currUpgradeItem.config.iconitem_id[3]]);
+	end
+
+	self.only_tx1.text = self.item1NameTxt.text;
+	self.only_tx2.text = self.item2NameTxt.text;
+	self.only_tx3.text = self.item3NameTxt.text;
+	self.only_tx4.text = self.item4NameTxt.text;
+
+	self.only_oldVal1.text = self.item1OldValueTxt.text;
+	self.only_oldVal2.text = self.item2OldValueTxt.text;
+	self.only_oldVal3.text = self.item3OldValueTxt.text;
+
+	self.only_newVal1.text = self.item1NewValueTxt.text;
+	self.only_newVal2.text = self.item2NewValueTxt.text;
+	self.only_newVal3.text = self.item3NewValueTxt.text;
+
+	self.only_timerTxt.text = self.item4TimeTxt.text;
+
+end
+
+function FurnitureUpgradePanel:RefreshShelfGridItem(item)
+
+	if (self._curFurniture.uid ~= item.uid) then
+		return
+	end
+
+	self.ctrl:RefreshShelfGridItem(item);
+
+end
+
+
+function FurnitureUpgradePanel:DoShowAnimation()
+
+	self:onShowed()
+
+	self.topAnimator:CrossFade("show", 0);
+	self.topAnimator:Update(0);
+	self.topAnimator:Play("show");
+
+	self.windowAnimator:CrossFade("show", 0);
+	self.windowAnimator:Update(0);
+	self.windowAnimator:Play("show");
+
+end
+
+function FurnitureUpgradePanel:DoHideAnimation()
+
+	self.topAnimator:Play("hide");
+	self.windowAnimator:Play("hide");
+
+	local animLength = self.windowAnimator:GetClipLength("window_hide");
+
+	CS_GameTimerInst:AddTimer(animLength,1,function()
+			self.topAnimator:CrossFade("null", 0);
+			self.topAnimator:Update(0);
+			self.windowAnimator:CrossFade("null", 0);
+			self.windowAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+function FurnitureUpgradePanel:onShowed()
+
+end
+
+function FurnitureUpgradePanel:onHide()
+
+	if self.remainTimerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.remainTimerId)
+		self.remainTimerId = 0
+	end
+
+	self.confirmUpgradeObj:SetActive(false);
+	if (self._curFurniture ~= nil) then
+		self._curFurniture:ReSetPos();
+		self._curFurniture:OnSelected();
+		self._curFurniture = nil
+	end
+
+end
+
+
+function FurnitureUpgradePanel:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function FurnitureUpgradePanel:shiftOut()
+	self.contentObject:SetActive(false)
+
+end
+------------------------------------------------

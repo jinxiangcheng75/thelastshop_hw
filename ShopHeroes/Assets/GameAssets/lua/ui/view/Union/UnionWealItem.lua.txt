@@ -1,0 +1,203 @@
+---------------------------------------------------------------------
+
+require("utils/XLuaUtils")
+local Vector3 = CS.UnityEngine.Vector3
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local EventDispatcher = require("event/EventDispatcher")
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_UnionTaskPopularityConfigManagerInst = CS.UnionTaskPopularityConfigManager.inst
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+--UnionWealItem
+
+local selfBtn
+local highLightKuang
+local lvTx
+local wealIcon
+local specialIconObj
+local shichang_lvObj
+local shichang_lanObj
+local nameTx
+local desTx
+local nextLvDexTx
+local rightBtn
+local rightIcon
+local scoreTx
+local maskObj
+
+----
+
+local data
+
+
+function InitComp()
+
+	selfBtn = self.transform:Find("selfBtn"):GetComponent("Button")
+	highLightKuang = self.transform:Find("selfBtn/highLightKuang"):GetComponent("Image")
+	lvTx = self.transform:Find("selfBtn/LvBg/lvTx"):GetComponent("Text")
+	wealIcon = self.transform:Find("selfBtn/iconBg/icon"):GetComponent(CS_type_GUIIcon)
+	specialIconObj = self.transform:Find("selfBtn/iconBg/specialIcon").gameObject
+	shichang_lvObj = self.transform:Find("selfBtn/iconBg/shichang_lv").gameObject
+	shichang_lanObj = self.transform:Find("selfBtn/iconBg/shichang_lan").gameObject
+	nameTx = self.transform:Find("selfBtn/nameTx"):GetComponent("Text")
+	desTx = self.transform:Find("selfBtn/desTx"):GetComponent("Text")
+	nextLvDexTx = self.transform:Find("selfBtn/nextLvDexTx"):GetComponent("Text")
+	rightBtn = self.transform:Find("selfBtn/rightBtn"):GetComponent("Button")
+	rightIcon = self.transform:Find("selfBtn/rightBtn/icon"):GetComponent(CS_type_GUIIcon)
+	scoreTx = self.transform:Find("selfBtn/rightBtn/scoreTx"):GetComponent("Text")
+	maskObj = self.transform:Find("selfBtn/maskObj").gameObject
+
+
+	selfBtn:ButtonClickTween
+	(
+		function ()
+			selfBtnClick()
+		end
+	)
+
+	rightBtn:ButtonClickTween
+	(
+		function ()
+			rightBtnClick()
+		end
+	)
+
+
+end
+
+function SetData(index)
+
+	data = CS_UserDataProxyInst.UnionScienceList[index]
+
+	specialIconObj:SetActive(false)
+	shichang_lvObj:SetActive(false)
+	shichang_lanObj:SetActive(false)
+
+	lvTx.text = tostring(data.serverData.level)
+	rightBtn.gameObject:SetActive(true)
+	rightBtn.enabled = true
+	maskObj:SetActive(false)
+
+	highLightKuang.enabled = data.serverData.type == 21
+
+	if 	data.serverData.type == 21 then --公会等级升级
+
+
+		if data.unionNextLvCfg == nil or data.unionNextLvCfg:IsNull() == true then --满级情况
+			rightBtn.gameObject:SetActive(false)
+		end
+
+		rightIcon:SetSprite("union_atlas","jiaju_shengji")
+		wealIcon:SetSprite(data.unionLvCfg.atlas,data.unionLvCfg.icon)
+		nameTx.text = CS_LanguageManagerInst:GetValueByKey(data.unionLvCfg.name,tostring(data.unionLvCfg.level))
+		desTx.text = CS_LanguageManagerInst:GetValueByKey(data.unionLvCfg.desc)
+		nextLvDexTx.text = ""
+		scoreTx.text = tostring(data.unionLvCfg.next_level_point)
+		scoreTx.color = CS_UserDataProxyInst.Union_uCoin < data.unionLvCfg.next_level_point and CS.GUIHelper.GetColorByColorHex("FF2828") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+
+	else --other
+
+		--是否满级
+		local isMaxLv = data.nextLvCfg == nil or data.nextLvCfg:IsNull() == true
+		rightBtn.gameObject:SetActive(not isMaxLv)
+		scoreTx.gameObject:SetActive(not isMaxLv)
+
+		wealIcon:SetSprite(data.config.atlas,data.config.icon)
+
+		if data.serverData.type == 16 then --市场请求
+
+			shichang_lanObj:SetActive(true)
+
+		elseif data.serverData.type == 17 then --市场报价
+
+			shichang_lvObj:SetActive(true)
+
+		elseif data.serverData.type == 18 or data.serverData.type == 19 or data.serverData.type == 20 then --资源类
+
+			specialIconObj:SetActive(true)
+
+		end
+
+		nameTx.text = CS_LanguageManagerInst:GetValueByKey(data.config.name)
+		desTx.text = CS_LanguageManagerInst:GetValueByKey(data.config.desc,tostring(data.config.add_num))
+		
+		if not isMaxLv then
+			scoreTx.text = tostring(data.nextLvCfg.need_point)
+			scoreTx.color = CS_UserDataProxyInst.Union_uCoin < data.nextLvCfg.need_point and CS.GUIHelper.GetColorByColorHex("FF2828") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+		end
+		
+		nextLvDexTx.text = ""
+
+
+		CS.GUIHelper.SetSingleUIGray(rightBtn.transform,data.state == 2)
+
+		if 	data.state == 0 then --未解锁
+
+			maskObj:SetActive(true)
+			rightBtn.gameObject:SetActive(false)
+			desTx.text = isMaxLv and "" or CS_LanguageManagerInst:GetValueByKey(data.config.next_union_level_desc,tostring(data.nextLvCfg.need_level))
+
+		elseif data.state == 1 then --可解锁
+
+			maskObj:SetActive(true)
+			rightIcon:SetSprite("union_atlas","lianmeng_suo")
+
+		elseif data.state == 2 then --不可升级
+
+			rightBtn.enabled = false
+			nextLvDexTx.text = isMaxLv and "" or CS_LanguageManagerInst:GetValueByKey(data.config.next_union_level_desc,tostring(data.nextLvCfg.need_level))
+			rightIcon:SetSprite("union_atlas","jiaju_shengji")
+
+		elseif data.state == 3 then --可升级
+
+			nextLvDexTx.text = isMaxLv and "" or CS_LanguageManagerInst:GetValueByKey(data.config.next_union_level_desc,tostring(data.nextLvCfg.need_level))
+			rightIcon:SetSprite("union_atlas","jiaju_shengji")
+			
+		end
+
+	end
+
+
+end
+
+
+function selfBtnClick()
+
+	EventDispatcher:dispatchEvent(GameEvent.UnionEvent.ShowUI_UnionWealUpDetailUI,data)
+
+end
+
+
+function rightBtnClick()
+
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func_2 = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+
+
+	if CS_UserDataProxyInst.playerData.memberJob == 0 then
+		func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("只有管理员和联盟盟主可以购买联盟福利。"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+		return
+	end
+
+
+	if scoreTx.color == CS.GUIHelper.GetColorByColorHex("FF2828") then
+		func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("联盟积分不足"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+	else
+
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+		local func_1 = funcGeneric(CS.System.Int32)
+
+		func_1(CS_EventControllerInst,CS_GameEventType.UnionEvent.UNION_REQUEST_SCIENCEUPGRADE,data.serverData.type)
+	end
+
+
+end

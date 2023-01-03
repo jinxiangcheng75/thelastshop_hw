@@ -1,0 +1,23 @@
+xlua.private_accessible(CS.ExplorePanelView)
+
+-- C#已同步
+
+xlua.hotfix(
+	CS.ExplorePanelView,
+	"setData",
+	function(self)
+		
+		if(CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver)then
+
+			if(CS.FGUI.inst.isLandscape)then
+				self.contentPane.scrollRect.horizontal = false
+			else
+				self.contentPane.scrollRect.horizontal = true
+			end
+
+		end
+		
+		self:SetDataList(CS.ExploreDataProxy.inst.ExploreList)
+
+	end
+)

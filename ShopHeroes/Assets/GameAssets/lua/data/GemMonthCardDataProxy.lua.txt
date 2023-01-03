@@ -1,0 +1,166 @@
+
+--GemMonthCardDataProxy
+
+require("class")
+require("utils/XLuaUtils")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_ItemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+GemMonthCardDataProxy = class(BaseDataProxy)
+
+GemMonthCardDataProxy.inst = GemMonthCardDataProxy:new()
+
+
+
+function GemMonthCardDataProxy:Init()
+
+	self.rewardItem = nil
+	self.payProduct = nil
+	self.name = "金条月卡"
+	self.value = "100"
+	self.roleImgIcon = "SkeletonDataDriver"
+
+	self.remainCount = 0 --可领取次数
+	self.flag = 0 --当天领取状态  0 未领取 1 已领取
+	self.gemMonthCardEndTime = 0 --刷新时间
+
+	NetworkEvent:SetCallback(MsgTypeCmd.Response_Pay_GoldVip_Cmd,
+		function (resp)
+			print("Response_Pay_GoldVip success",resp)
+			self:GetGemMonthCardDataResp(resp)
+		end,
+		function (code)
+			print("Response_Pay_GoldVip fail --- code",code)
+		end
+	)
+
+	NetworkEvent:SetCallback(MsgTypeCmd.Response_Pay_GoldVipReward_Cmd,
+		function (resp)
+			print("Response_Pay_GoldVipReward_Cmd success",resp)
+			self:GetGemMonthCardRewardResp(resp)
+		end,
+		function (code)
+			print("Response_Pay_GoldVipReward_Cmd fail --- code",code)
+		end
+	)
+
+	self.timer = 0
+	self.rewardItemAtlas = "-1"
+	self.rewardItemIcon = "-1"
+
+end
+
+
+function GemMonthCardDataProxy:GetGemMonthCardDataResp(respData)
+
+	local data = MsgType.Response_Pay_GoldVip:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	self.rewardItem = data.item
+
+	local itemCfg = CS_ItemConfigManagerInst:GetConfig(self.rewardItem.itemId)
+	if itemCfg ~= nil then
+
+		self.rewardItemAtlas = itemCfg.atlas
+		self.rewardItemIcon = itemCfg.icon
+
+	end
+
+
+	self.payProduct = data.payProduct
+	self.name = data.name
+	self.value = data.value
+	self.roleImgIcon = data.roleImgIcon
+	self.gemMonthCardEndTime = data.endTime
+	self.flag = data.flag or 0
+	self.remainCount = data.remainCount
+
+	--刷新界面
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.store)
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.AcheivementEvent.ACHEIVEMENTSETDATA)
+	--刷新店主头上气泡
+	EventDispatcher:dispatchEvent(GameEvent.ShopkeeperComEvent.SHOPKEEPER_ACHEIVEMENTREFRESH)
+	
+	
+	self:SetTimer()
+
+end
+
+function GemMonthCardDataProxy:SetTimer()
+
+	self:ClearTimer()
+
+	if self.remainCount > 0 and self.flag == 1 and self.gemMonthCardEndTime > CS_GameTimerInst.serverNow then
+
+		self.timer = CS_GameTimerInst:AddTimer(self.gemMonthCardEndTime - CS_GameTimerInst.serverNow + 5,1,function()
+
+				EventDispatcher:dispatchEvent(GameEvent.GemMonthEvent.Request_GemMonthCardData)
+
+			end,CS.GameTimerType.byServerTime)
+
+	end
+
+end
+
+function GemMonthCardDataProxy:ClearTimer()
+
+	if self.timer ~= 0 then
+
+		CS_GameTimerInst:RemoveTimer(self.timer)
+		self.timer = 0
+
+	end
+
+end
+
+function GemMonthCardDataProxy:GetGemMonthCardRewardResp(respData)
+
+	local data = MsgType.Response_Pay_GoldVipReward:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	self.rewardItem = data.item
+
+	local itemCfg = CS_ItemConfigManagerInst:GetConfig(self.rewardItem.itemId)
+	if itemCfg ~= nil then
+
+		self.rewardItemAtlas = itemCfg.atlas
+		self.rewardItemIcon = itemCfg.icon
+
+	end
+
+	self.flag = data.flag or 0
+	self.remainCount = data.remainCount
+	self.gemMonthCardEndTime = data.endTime
+
+	--刷新界面
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.store)
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.AcheivementEvent.ACHEIVEMENTSETDATA)
+	--刷新店主头上气泡
+	EventDispatcher:dispatchEvent(GameEvent.ShopkeeperComEvent.SHOPKEEPER_ACHEIVEMENTREFRESH)
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.queueItem)
+	local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem,"",0,self.rewardItem.itemId,self.rewardItem.count)
+	func(CS_EventControllerInst, CS_GameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+
+	self:SetTimer()
+end
+
+function GemMonthCardDataProxy:Clear()
+
+	self:ClearTimer()
+
+end

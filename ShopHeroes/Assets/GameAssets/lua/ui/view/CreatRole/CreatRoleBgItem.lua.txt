@@ -1,0 +1,28 @@
+local bgImg
+local csTime = CS.UnityEngine.Time
+local csVector3 = CS.UnityEngine.Vector3
+local canMove = true
+local lastObj
+
+function InitComp()
+	bgImg = self.gameObject.transform
+	lastObj = self:GetObjByName("lastObj")
+	if (lastObj ~= nil) then
+		lastObj = lastObj.transform
+	end
+end
+
+function DataUpdate(data)
+	if (not canMove) then
+		return
+	end
+	bgImg:Translate(csVector3(-1, 0.5, 0) * csTime.deltaTime * 1.3)
+
+	if (bgImg.localPosition.x <= -4096) then
+		bgImg.localPosition = csVector3(lastObj.localPosition.x + 2044, lastObj.localPosition.y - 1020, 0)
+	end
+end
+
+function SetData(index)
+	canMove = false
+end

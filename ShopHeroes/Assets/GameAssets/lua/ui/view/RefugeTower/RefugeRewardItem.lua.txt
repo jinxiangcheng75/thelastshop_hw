@@ -1,0 +1,167 @@
+local finishImg
+local icon
+local numText
+local nameText
+local gouImg
+local selfBtn
+local luxuryNumImg
+local luxuryNumText
+
+local csItemConfigManager = CS.ItemconfigManager.inst
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local CS_ItemType = CS.ItemType
+
+local csVipState = CS.K_Vip_State
+
+local data
+local commonData
+local state
+
+function InitComp()
+	if(self:GetComponent("Button") ~= nil)then
+		selfBtn = self:GetComponent("Button")
+	else
+		selfBtn = nil
+	end
+
+	if(self:GetObjByName("finishImg") ~= nil)then
+		finishImg = self:GetObjByName("finishImg")
+	else
+		finishImg = nil
+	end
+
+	if(self:GetObjByName("icon") ~= nil)then
+		icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	else
+		icon = nil
+	end
+
+	if(self:GetObjByName("numText") ~= nil)then
+		numText = self:GetObjByName("numText"):GetComponent("Text")
+	else
+		numText = nil
+	end
+
+	if(self:GetObjByName("nameText") ~= nil)then
+		nameText = self:GetObjByName("nameText"):GetComponent("Text")
+	else
+		nameText = nil
+	end
+
+	if(self:GetObjByName("gou") ~= nil)then
+		gouImg = self:GetObjByName("gou"):GetComponent("Image")
+	else
+		gouImg = nil
+	end
+
+	luxuryNumImg = self:GetObjByName("luxuryNumImg"):GetComponent("Image")
+	luxuryNumText = self:GetObjByName("luxuryNumText"):GetComponent("Text")
+
+	if(selfBtn ~= nil)then
+		selfBtn:ButtonClickTween(
+			function()
+				if (data == nil) then
+					return
+				end
+
+				if(commonData == nil)then
+					return
+				end
+				if(state == 1)then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+					func(csEventControllerInst, csGameEventType.CommonEvent.COMMONTIPS_SETINFO, commonData, self.transform)
+				elseif state == 2 then
+					if(commonData.specialType == 1)then
+						if(csVipState.__CastFrom(CS.UserDataProxy.inst.playerData.vipState) == csVipState.Vip)then
+							EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Request_RefugeReward,data.floorId,1)
+						else
+							EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_BuyVipUI,1)
+						end
+					else
+						EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Request_RefugeReward,data.floorId,0)
+					end
+				end
+			end
+		)
+	end
+end
+
+function SetData(_data)
+	data = _data
+	state = _data.curState
+	local itemConfig = csItemConfigManager:GetConfig(data.itemId)
+	
+	luxuryNumText.text = ""
+	luxuryNumImg.enabled = false
+	
+
+	if(itemConfig ~= nil)then
+		commonData = CS.CommonRewardData(tonumber(data.itemId),tonumber(data.count),0,itemConfig.type)
+		commonData.specialType = data.isVip and 1 or 0
+		if(icon ~= nil)then
+			icon:SetSprite(itemConfig.atlas,itemConfig.icon)
+		end
+
+		if(nameText ~= nil)then
+			nameText.text = cs_LanguageManagerInst:GetValueByKey(itemConfig.name)
+		end
+		
+		if(CS_ItemType.__CastFrom(itemConfig.type) == CS_ItemType.Furniture)then
+			luxuryNumImg.enabled = true
+			local furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(tonumber(itemConfig.effect))
+
+			if furnitureCfg ~= nil then
+
+				local luxury = 0
+
+				if furnitureCfg.type_1 == 1 then --墙壁
+
+					local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS.UserDataProxy.inst.shopData.shopLevel)
+
+					luxury = math.ceil((cfg.size_x / 2 + cfg.size_y / 2 ) * furnitureCfg.luxury)
+
+				elseif furnitureCfg.type_1 == 2 then --地板
+
+					local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS.UserDataProxy.inst.shopData.shopLevel)
+
+					luxury = math.ceil((cfg.size_x / 2) * (cfg.size_y / 2) * furnitureCfg.luxury)
+
+				else
+					luxury = furnitureCfg.luxury
+				end
+
+				luxuryNumText.text = tostring(luxury)
+
+			end
+		end
+	else
+		luxuryNumImg.enabled = false
+		local equipCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(data.itemId)
+		if(equipCfg ~= nil)then
+			
+			if(icon ~= nil)then
+				icon:SetSprite(equipCfg.equipDrawingsConfig.atlas, equipCfg.equipDrawingsConfig.icon, CS.StaticConstants.qualityColor[equipCfg.equipQualityConfig.quality - 1])
+			end
+			
+			if(nameText ~= nil)then
+				nameText.text = cs_LanguageManagerInst:GetValueByKey(equipCfg.equipDrawingsConfig.name)
+			end
+		end
+
+	end
+
+	if(finishImg ~= nil)then
+		finishImg:SetActive(data.curState == 2)
+	end
+	if(gouImg ~= nil)then
+		gouImg.enabled = data.curState == 3
+	end
+
+	if(numText ~= nil)then
+		numText.text = data.count
+	end
+end

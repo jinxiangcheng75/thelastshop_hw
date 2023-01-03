@@ -1,0 +1,122 @@
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("utils/XLuaUtils")
+require("ui/view/UseAdvancedOrLockEquip/UseAdvancedOrLockEquipTipsUI")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+--UseAdvancedOrLockEquipTipsMediator
+
+UseAdvancedOrLockEquipTipsMediator = class(BaseSystem)
+UseAdvancedOrLockEquipTipsMediator.super = BaseSystem
+
+function UseAdvancedOrLockEquipTipsMediator:ctor()
+	
+	self.datas = nil
+	self.agreeCount = 0
+	self.okEndCallback = nil
+	
+end
+
+function UseAdvancedOrLockEquipTipsMediator:OnInit()
+	
+end
+
+function UseAdvancedOrLockEquipTipsMediator:AddListeners()
+	
+	EventDispatcher:addEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquipTipsUIBtnClickBackHandler,self,self.useAdvancedOrLockEquipTipsUIBtnClickBackHandler)
+	EventDispatcher:addEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquip,self,self.useAdvancedOrLockEquip)
+	EventDispatcher:addEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquipFromCS,self,self.useAdvancedOrLockEquipFromCS)
+	
+end
+
+function UseAdvancedOrLockEquipTipsMediator:RemoveListeners()
+	
+	EventDispatcher:removeEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquipTipsUIBtnClickBackHandler,self,self.useAdvancedOrLockEquipTipsUIBtnClickBackHandler)
+	EventDispatcher:removeEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquip,self,self.useAdvancedOrLockEquip)
+	EventDispatcher:removeEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquipFromCS,self,self.useAdvancedOrLockEquipFromCS)
+	
+end
+
+function UseAdvancedOrLockEquipTipsMediator:useAdvancedOrLockEquipTipsUIBtnClickBackHandler(value)
+	
+	if value then --点击了ok按钮
+		
+		self.agreeCount = self.agreeCount + 1
+		if self.agreeCount >= #self.datas then
+			
+			--都同意了
+			if self.okEndCallback ~= nil then
+				self.okEndCallback()
+			end
+			self:hideUseAdvancedOrLockEquipTipsUI()
+			
+		else
+			
+			local useAdvancedOrLockEquipTipsUI = GUIManager.inst:GetWindow(Constants.ViewName.UseAdvancedOrLockEquipTipsUI, false)
+			if useAdvancedOrLockEquipTipsUI ~= nil and useAdvancedOrLockEquipTipsUI.isShowing then
+				useAdvancedOrLockEquipTipsUI:SetData(self.datas[self.agreeCount + 1])
+			end
+			
+		end
+		
+	else --点击了取消按钮
+		
+		self:hideUseAdvancedOrLockEquipTipsUI()
+		
+	end
+	
+end
+
+
+function UseAdvancedOrLockEquipTipsMediator:useAdvancedOrLockEquip(datas,callback) --data:{type: 0 --锁 1 --高品质 , equipId : number , title : string , content : string }
+	
+	if datas == nil then
+		return
+	end
+	
+	self.datas = datas
+	self.agreeCount = 0
+	self.okEndCallback = callback
+	
+	GUIManager.inst:OpenView(
+		Constants.ViewName.UseAdvancedOrLockEquipTipsUI,
+		function(view)
+			view:SetData(self.datas[self.agreeCount + 1])
+		end
+	)
+	
+	
+end
+
+function UseAdvancedOrLockEquipTipsMediator:useAdvancedOrLockEquipFromCS(datas,callback)
+	
+	if datas == nil then
+		return
+	end
+
+	self.datas = CSharpListToLuaTable(datas)
+	self.agreeCount = 0
+	self.okEndCallback = callback
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.UseAdvancedOrLockEquipTipsUI,
+		function(view)
+			view:SetData(self.datas[self.agreeCount + 1])
+		end
+	)
+	
+end
+
+
+function UseAdvancedOrLockEquipTipsMediator:hideUseAdvancedOrLockEquipTipsUI()
+	
+	GUIManager.inst:HideView(Constants.ViewName.UseAdvancedOrLockEquipTipsUI)
+	self.datas = nil
+	self.agreeCount = 0
+	self.okEndCallback = nil
+	
+end

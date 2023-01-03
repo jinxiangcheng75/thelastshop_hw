@@ -1,0 +1,496 @@
+
+--WelfareUI 福利界面
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_type_ToggleGroupMarget = typeof(CS.ToggleGroupMarget)
+local CS_type_ItemSubType = typeof(CS.ItemSubType)
+local CS_type_Toggle = typeof(CS.UnityEngine.UI.Toggle)
+
+local Vector2 = CS.UnityEngine.Vector2
+
+local CS_ItemBagProxyInst = CS.ItemBagProxy.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_UIUnLockConfigMrgInst = CS.UIUnLockConfigMrg.inst
+
+local CS_LotteryDataProxyInst = CS.LotteryDataProxy.inst
+local CS_SevenDayGoalDataProxyInst = CS.SevenDayGoalDataProxy.inst
+local CS_MoneyBoxDataProxyInst = CS.MoneyBoxDataProxy.inst
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+local luaClass_WelfareDailySign = require("ui/view/Welfare/Welfare_dailySign")
+local luaClass_WelfareMoneyBox = require("ui/view/Welfare/Welfare_moneyBox")
+local luaClass_WelfareLevelGrowth = require("ui/view/Welfare/Welfare_levelGrowth")
+local luaClass_WelfareLottery = require("ui/view/Welfare/Welfare_lottery")
+local luaClass_WelfareSevenDay = require("ui/view/Welfare/Welfare_sevenDay")
+
+WelfareContentType = --0 每日  1 七日  2 抽奖  3 成长礼包  4 储蓄罐
+{
+	dailySign = 0,
+	sevenDay = 1,
+	lottery = 2,
+	levelGrowth = 3,
+	moneyBox = 4,
+}
+
+
+WelfareUI = class(ViewBase)
+
+function WelfareUI:ctor()
+	self.viewID = Constants.ViewName.WelfareUI
+	WelfareUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+	--self.topResPanelType = CS.TopPlayerShowType.noRoleAndSettingAndEnergy
+end
+------------------------------------------------
+
+
+function WelfareUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.btn_close = contentPane:GetButton("btn_close")
+	self.rtf_coverBg = contentPane:GetObjByName("rtf_coverBg"):GetComponent("RectTransform")
+	self.obj_gold = contentPane:GetObjByName("obj_gold")
+	self.tx_gold = contentPane:GetText("tx_gold")
+	self.obj_lottery = contentPane:GetObjByName("obj_lottery")
+	self.tx_lotteryItem = contentPane:GetText("tx_lotteryItem")
+	self.btn_gem = contentPane:GetButton("btn_gem")
+	self.tx_gem = contentPane:GetText("tx_gem")
+
+	self.rtf_togglesContent = contentPane:GetObjByName("rtf_togglesContent"):GetComponent("RectTransform")
+	local obj_stateGroup = contentPane:GetObjByName("stateGroup")
+	self.stateGroup = obj_stateGroup:GetComponent(CS_type_ToggleGroupMarget)
+
+	self.toggles = {}
+	for i = 0, self.stateGroup.togglesBtn.Count - 1 do
+		self.toggles[#self.toggles + 1] = self.stateGroup.togglesBtn[i]:GetComponent(CS_type_Toggle)
+	end
+
+	self.redPoints = {}
+	local objs_redPoint = contentPane:GetObjByName("objs_redPoint"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objs_redPoint.Count - 1 do
+		self.redPoints[i] = objs_redPoint[i]
+	end
+
+	self.toggleLinkObjs = contentPane:GetObjByName("toggleLinkObjs"):GetComponent(CS_type_ObjList).objList
+
+	--签到
+	self.ctrl_dailySign = luaClass_WelfareDailySign.new()
+	self.ctrl_dailySign:Init(contentPane:GetObjByName("luaBehaviour_dailySign"):GetComponent(CS_type_LuaBehaviour))
+
+	--七日
+	self.ctrl_sevenDay = luaClass_WelfareSevenDay.new()
+	self.ctrl_sevenDay:Init(contentPane:GetObjByName("luaBehaviour_sevenDay"):GetComponent(CS_type_LuaBehaviour))
+
+	--储蓄罐
+	self.ctrl_moneyBox = luaClass_WelfareMoneyBox.new()
+	self.ctrl_moneyBox:Init(contentPane:GetObjByName("luaBehaviour_moneyBox"):GetComponent(CS_type_LuaBehaviour))
+
+	--抽奖
+	self.ctrl_lottery = luaClass_WelfareLottery.new()
+	self.ctrl_lottery:Init(contentPane:GetObjByName("luaBehaviour_lottery"):GetComponent(CS_type_LuaBehaviour))
+
+	--成长礼包
+	self.ctrl_levelGrowth = luaClass_WelfareLevelGrowth.new()
+	self.ctrl_levelGrowth:Init(contentPane:GetObjByName("luaBehaviour_levelGrowth"):GetComponent(CS_type_LuaBehaviour))
+
+
+end
+
+function WelfareUI:onInit()
+
+	self:initComp()
+
+	self.realIndex = WelfareContentType.dailySign
+	self.welfareCtrl = false;
+	self.extraParam = nil;
+
+	self.btn_close.onClick:AddListener(function ()
+			self:hide()
+		end)
+
+	self.btn_gem:ButtonClickTween(function ()
+			self:onGemBtnClick()
+		end)
+
+	self.stateGroup.OnSelectedIndexValueChange = function (index)
+		self:onSelectedIndexValueChange(index)
+	end
+
+
+	--local sizeDelta = CS.FGUI.inst.uiRootTF.sizeDelta
+
+	--local len = sizeDelta.x > sizeDelta.y and sizeDelta.x or sizeDelta.y
+
+	--self.rtf_coverBg.sizeDelta = Vector2.one * len
+
+end
+
+function WelfareUI:onGemBtnClick()
+
+	if CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver then
+		return
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallUI,3)
+
+end
+
+function WelfareUI:getShowToggles()
+
+	local ignoreTypes = {}
+
+	if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_dailySign") then
+
+		if not CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_dailySign") then
+			ignoreTypes[#ignoreTypes + 1] = WelfareContentType.dailySign
+		end
+
+	else
+
+		local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(136) --136 每日签到
+		if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+			ignoreTypes[#ignoreTypes + 1] = WelfareContentType.dailySign
+		end
+
+	end
+
+	if CS_SevenDayGoalDataProxyInst.isAllOver then
+		ignoreTypes[#ignoreTypes + 1] = WelfareContentType.sevenDay
+	else
+
+		if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_sevenDay") then
+
+			if not CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_sevenDay") then
+				ignoreTypes[#ignoreTypes + 1] = WelfareContentType.sevenDay
+			end
+
+		else
+
+			local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(135) --135 七日
+			if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+				ignoreTypes[#ignoreTypes + 1] = WelfareContentType.sevenDay
+			end
+
+		end
+
+	end
+
+
+	if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_moneyBox") then
+
+		if not CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_moneyBox") then
+			ignoreTypes[#ignoreTypes + 1] = WelfareContentType.moneyBox
+		end
+
+	else
+
+		local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(138) --138 储蓄罐
+		if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+			ignoreTypes[#ignoreTypes + 1] = WelfareContentType.moneyBox
+		end
+
+	end
+
+	if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_lottery") then
+
+		if not CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_lottery") then
+			ignoreTypes[#ignoreTypes + 1] = WelfareContentType.lottery
+		end
+
+	else
+
+		local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(100) --100 转盘
+		if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+			ignoreTypes[#ignoreTypes + 1] = WelfareContentType.lottery
+		end
+
+	end
+
+	if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_levelGrowth") then
+
+		if not CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_levelGrowth") then
+			ignoreTypes[#ignoreTypes + 1] = WelfareContentType.levelGrowth
+		end
+
+	else
+
+		local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(340) --340 成长礼包
+		if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+			ignoreTypes[#ignoreTypes + 1] = WelfareContentType.levelGrowth
+		end
+
+	end
+
+
+	local showToggles = {}
+	for i = 1, #self.toggles do
+
+		local toggle = self.toggles[i]
+		local itemSubType = toggle:GetComponent(CS_type_ItemSubType)
+
+		if itemSubType ~= nil then
+
+			local isIgnore = false
+
+			for k = 1, #ignoreTypes do
+				if ignoreTypes[k] == itemSubType.subType then
+					toggle.gameObject:SetActive(false)
+					isIgnore = true
+					break
+				end
+			end
+
+			if not isIgnore then
+				toggle.gameObject:SetActive(true)
+				showToggles[#showToggles + 1] = toggle
+			end
+
+		end
+	end
+
+	local toggleArray = get_csharp_array(CS_type_Toggle,#showToggles)
+	for i = 1, #showToggles do
+		toggleArray[i - 1] = showToggles[i]
+	end
+
+	return toggleArray
+
+end
+
+function WelfareUI:ShowByWelfareContentType(welfareContentType,extraParam)
+
+	self.stateGroup:ClearTogglesBtn();
+
+	self.stateGroup.togglesBtn:AddRange(self:getShowToggles())
+	self.extraParam = extraParam
+
+	if welfareContentType then
+
+		local hasContentType = false
+
+		for i = 0, self.stateGroup.togglesBtn.Count - 1 do
+
+			local toggle = self.stateGroup.togglesBtn[i]
+			local itemSubType = toggle:GetComponent(CS_type_ItemSubType)
+
+			if itemSubType ~= nil and itemSubType.subType == welfareContentType then
+
+				self.stateGroup:OnEnableMethod(i)
+				hasContentType = true
+				--if CS.FGUI.inst.isLandscape then
+				--self.rtf_togglesContent.anchoredPosition = Vector2(self.rtf_togglesContent.anchoredPosition.x,i > 0 and (50 + 156 * i) or 0)
+				--else
+				--self.rtf_togglesContent.anchoredPosition = Vector2(i > 0 and (-30 - 206 * i) or 0,self.rtf_togglesContent.anchoredPosition.y)
+				--end
+
+				break
+
+			end
+
+		end
+
+		if not hasContentType then
+			self.stateGroup:OnEnableMethod()
+		end
+
+		--有些需要前置执行，故仅赋值extraParam 拉到各个模块下进行具体逻辑处理
+		--if self.welfareCtrl then
+		--self.welfareCtrl:ExtraDispose(extraParam)
+		--end
+
+	else
+		self.stateGroup:OnEnableMethod()
+	end
+
+end
+
+function WelfareUI:updateTopShow()
+
+	self.obj_gold:SetActive(self.realIndex ~= WelfareContentType.lottery and self.realIndex ~= WelfareContentType.dailySign and self.realIndex ~= WelfareContentType.sevenDay)
+	self.btn_gem.gameObject:SetActive(self.realIndex ~= WelfareContentType.dailySign and self.realIndex ~= WelfareContentType.sevenDay)
+	self.obj_lottery:SetActive(self.realIndex == WelfareContentType.lottery)
+
+
+	self.tx_gold.text = CS.AbbreviationUtility.AbbreviateNumber(CS_UserDataProxyInst.playerData.gold , 2)
+	self.tx_gem.text = CS.AbbreviationUtility.AbbreviateNumber(CS_UserDataProxyInst.playerData.gem , 2)
+	self.tx_lotteryItem.text = CS.GUIHelper.GetMoneyStr(math.ceil(CS_ItemBagProxyInst:GetItem(140001).count))
+
+end
+
+function WelfareUI:updateRedPoints()
+
+	self.redPoints[WelfareContentType.dailySign]:SetActive(DailySignDataProxy.inst.isShowDailySignRedPoint)
+	self.redPoints[WelfareContentType.sevenDay]:SetActive(CS_SevenDayGoalDataProxyInst.isShowRedPoint and CS_UserDataProxyInst.playerData.level >= CS_WorldParConfigManagerInst:GetConfig(135).parameters)
+	self.redPoints[WelfareContentType.moneyBox]:SetActive(CS_MoneyBoxDataProxyInst.NeedShowRedPoint)
+	self.redPoints[WelfareContentType.lottery]:SetActive(CS_LotteryDataProxyInst.hasSingleRedPoint --[[or CS_LotteryDataProxyInst.hasRefreshRedPoint]])
+	self.redPoints[WelfareContentType.levelGrowth]:SetActive(MallDataProxy.inst:GetFirstGrowthReward() > 0)
+
+	self.redPoints[self.realIndex]:SetActive(false)
+
+end
+
+function WelfareUI:onHide()
+
+	if self.welfareCtrl then
+		self.welfareCtrl:Clear()
+		self.welfareCtrl = false
+	end
+
+end
+
+function WelfareUI:onSelectedIndexValueChange(index)
+
+
+	self.realIndex = index;
+	local itemSubType = self.stateGroup.togglesBtn[index]:GetComponent(CS_type_ItemSubType)
+
+	if itemSubType ~= nil then
+		self.realIndex = itemSubType.subType
+	end
+
+	for i = 0, self.toggleLinkObjs.Count - 1 do
+		self.toggleLinkObjs[i]:SetActive(false)
+	end
+
+	self.toggleLinkObjs[self.realIndex]:SetActive(true)
+
+	if self.welfareCtrl then
+		self.welfareCtrl:Clear()
+	end
+
+	if self.realIndex == WelfareContentType.dailySign then
+		self:setData_dailySign()
+	elseif self.realIndex == WelfareContentType.sevenDay then
+		self:setData_sevenDay()
+	elseif self.realIndex == WelfareContentType.moneyBox then
+		self:setData_moneyBox()
+	elseif self.realIndex == WelfareContentType.lottery then
+		self:setData_lottery()
+	elseif self.realIndex == WelfareContentType.levelGrowth then
+		self:setData_levelGrowth()
+	end
+
+	self:updateTopShow()
+	self:updateRedPoints()
+
+end
+
+function WelfareUI:Refresh(index)
+
+	if (self.realIndex == index and self.welfareCtrl) then
+		self.welfareCtrl:RefreshUIData()
+	end
+
+	self:updateTopShow()
+	self:updateRedPoints()
+
+end
+
+--每日
+function WelfareUI:setData_dailySign()
+
+	self.welfareCtrl = self.ctrl_dailySign
+	self.ctrl_dailySign:RefreshUIData()
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--七日
+function WelfareUI:setData_sevenDay()
+
+	self.welfareCtrl = self.ctrl_sevenDay
+
+	if self.extraParam then
+		self.ctrl_sevenDay:ExtraDispose(self.extraParam)
+	else
+		self.ctrl_sevenDay:SetUIData()
+	end
+
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--储蓄罐
+function WelfareUI:setData_moneyBox()
+
+	self.welfareCtrl = self.ctrl_moneyBox
+	self.ctrl_moneyBox:RefreshUIData()
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--抽奖
+function WelfareUI:setData_lottery()
+
+	self.welfareCtrl = self.ctrl_lottery
+	self.ctrl_lottery:RefreshUIData()
+
+end
+
+function WelfareUI:refreshLotteryBtnTx()
+
+	if self.realIndex == WelfareContentType.lottery then
+		self.ctrl_lottery:RefreshBtnText()
+	end
+
+end
+
+function WelfareUI:refreshLotteryCumulativeData(isChangeNext)
+
+	if self.realIndex == WelfareContentType.lottery then
+		self.ctrl_lottery:RefreshCumulativeData(isChangeNext)
+	end
+
+end
+
+function WelfareUI:RefreshLottery(usetype)
+
+	if self.realIndex == WelfareContentType.lottery then
+		self.ctrl_lottery:RefreshLottery(usetype)
+	end
+
+end
+
+function WelfareUI:LotteryGetJackpotDatas(datas,type)
+
+	self:updateTopShow()
+
+	if self.realIndex == WelfareContentType.lottery then
+		self.ctrl_lottery:GetSingleLotteryData(datas,type)
+	end
+
+end
+
+function WelfareUI:LotteryJackpotJumpAnim(needRequest)
+
+	self:updateTopShow()
+
+	if self.realIndex == WelfareContentType.lottery then
+		self.ctrl_lottery:PlayLotteryJump(needRequest)
+	end
+
+end
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--成长礼包
+function WelfareUI:setData_levelGrowth()
+
+	self.welfareCtrl = self.ctrl_levelGrowth
+	self.ctrl_levelGrowth:RefreshUIData()
+	self.ctrl_levelGrowth:ToFirstGrowthReward()
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--next?
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

@@ -1,0 +1,262 @@
+
+local Time = CS.UnityEngine.Time
+local Helper = CS.Helper
+local CS_IndoorRoleActionConfigManagerInst = CS.IndoorRoleActionConfigManager.inst
+local CS_AITalkProbConfigManagerInst = CS.AITalkProbConfigManager.inst
+local CS_AITalkConfigManagerInst = CS.AITalkConfigManager.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_StaticConstants = CS.StaticConstants
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+
+
+require("utils/StateBase")
+
+
+local ShopkeeperRambleState = class(StateBase)
+
+
+function ShopkeeperRambleState:init(shopkeeper)
+
+	self.shopkeeper = shopkeeper
+	self.isWaiting = false
+	self.timer = 0
+	self.waitTime = 0
+	self.weights = CS_AITalkProbConfigManagerInst:GetWeights(CS_StaticConstants.shopkeeperWeightBase,CS_StaticConstants.shopkeeperWeightBase + 1000)
+
+	self.needSubPetSeeCount = false
+	self._petUid = -1
+
+end
+
+--[[
+* 条件无法满足 过渡到4  若4无法移动 直接站立等待
+* 1.有空货架时，行走至空货架附近空地后，站立并停止。  弹出aitalk，对应9类对话
+* 2.常规状态（无视是否有空货架）闲逛后在空地站立并停止。 弹出aitalk，对应10类对话
+* 3.店主闲逛后站立行走至空货架旁站立并停止。  不说话
+* 4.店主闲逛后站立在空第站立并停止。   不说话
+* 5.店主走到宠物处停留并说话。说完话后原地停留。  弹出aitalk，对应12类对话。
+]]
+
+
+function ShopkeeperRambleState:getStateType()
+
+	return MachineShopkeeperState.ramble
+
+end
+
+function ShopkeeperRambleState:onEnter(info)
+
+	local index = CS.Helper.getRandomValuefromweights(self.weights)
+
+	self.timer = 0
+	self.isWaiting = false
+
+	self.shopkeeper.rambleType = index + CS_StaticConstants.shopkeeperWeightBase + 1
+
+	if index + 1 == 1 then
+		self:scroll_one()
+	elseif index + 1 == 2 then
+		self:scroll_two()
+	elseif index + 1 == 3 then
+		self:scroll_three()
+	elseif index + 1 == 4 then
+		self:scroll_four()
+	elseif index + 1 == 5 then
+		self:scroll_five()
+	end
+
+end
+
+function ShopkeeperRambleState:beginWait()
+
+	local time_min = CS_WorldParConfigManagerInst:GetConfig(1103).parameters
+	local time_max = CS_WorldParConfigManagerInst:GetConfig(1104).parameters
+
+	local waitTime = CS.UnityEngine.Random.Range(time_min, time_max);
+
+	self.timer = 0
+	self.waitTime = waitTime
+	self.isWaiting = true
+
+end
+
+-- 1.有空货架时，行走至空货架附近空地后，站立并停止。  弹出aitalk，对应13类对话
+function ShopkeeperRambleState:scroll_one()
+
+	local shelfUid = CS_UserDataProxyInst:GetOneEmptyShelfUid();
+
+	if shelfUid ~= -1 and self.shopkeeper:MoveToFurniture(shelfUid) then
+
+		self.shopkeeper.onMoveEndCompleteHandler = function()
+
+			local uid = shelfUid
+			self.shopkeeper:FaceToFurniture(uid)
+			self.shopkeeper:Talk(CS_LanguageManagerInst:GetValueByKey(CS_AITalkConfigManagerInst:GetSpkeeperRandomTalk(CS.TalkConditionType.shopkeeper_shelfIsNull)))
+			self.shopkeeper.onMoveEndCompleteHandler = nil
+			self:beginWait()
+
+		end
+
+	else
+		self:scroll_four()
+	end
+
+end
+
+--2.常规状态（无视是否有空货架）闲逛后在空地站立并停止。 弹出aitalk，对应14类对话
+function ShopkeeperRambleState:scroll_two()
+
+	local canRamble = false
+	for i = 1, 3 do
+		if canRamble then
+			break
+		end
+		canRamble = self.shopkeeper:MoveToRandomPos()
+	end
+
+	if canRamble then
+
+		self.shopkeeper.onMoveEndCompleteHandler = function()
+
+			self.shopkeeper:Talk(CS_LanguageManagerInst:GetValueByKey(CS_AITalkConfigManagerInst:GetSpkeeperRandomTalk(CS.TalkConditionType.shopkeeper_rambleOver)))
+			self.shopkeeper.onMoveEndCompleteHandler = nil
+			self:beginWait()
+
+		end
+
+	else
+		self:scroll_four()
+	end
+
+end
+
+--3.店主闲逛后站立行走至空货架旁站立并停止。  不说话
+function ShopkeeperRambleState:scroll_three()
+
+	local shelfUid = CS_UserDataProxyInst:GetOneEmptyShelfUid();
+
+	if shelfUid ~= -1 and self.shopkeeper:MoveToFurniture(shelfUid) then
+
+		self.shopkeeper.onMoveEndCompleteHandler = function()
+
+			local uid = shelfUid
+			self.shopkeeper:FaceToFurniture(uid)
+			self.shopkeeper.onMoveEndCompleteHandler = nil
+			self:beginWait()
+
+		end
+
+	else
+		self:scroll_four()
+	end
+
+end
+
+--4.店主闲逛后站立在空第站立并停止。   不说话
+function ShopkeeperRambleState:scroll_four()
+
+	local canRamble = false
+	for i = 1, 3 do
+		if canRamble then
+			break
+		end
+		canRamble = self.shopkeeper:MoveToRandomPos()
+	end
+
+	if canRamble then
+
+		self.shopkeeper.onMoveEndCompleteHandler = function()
+			self.shopkeeper.onMoveEndCompleteHandler = nil
+			self:beginWait()
+		end
+
+	else
+		self:beginWait()
+	end
+
+end
+
+-- 5.店主走到宠物处停留并说话。说完话后原地停留。  弹出aitalk，对应12类对话。
+function ShopkeeperRambleState:scroll_five()
+
+	local petUid = CS_UserDataProxyInst:GetOnePetUid()
+
+	if petUid ~= -1 and self.shopkeeper:MoveToPet(petUid) then
+
+		local pet = CS.IndoorRoleSystem.inst:GetPetByUid(petUid)
+		pet.StayBySeeCount = pet.StayBySeeCount + 1
+		self._petUid = petUid
+		self.needSubPetSeeCount = true
+
+		self.shopkeeper.onMoveEndCompleteHandler = function()
+
+			if ShopkeeperHandler.inst.shopKeeper == nil then
+				return
+			end
+
+			self.shopkeeper:FaceToPet(petUid)
+
+			local lookAnimName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.shopkeeper.character.gender,CS.kIndoorRoleActionType.ornamental_pets)
+
+			if self.shopkeeper.character == nil then
+				return
+			end
+			
+			self.shopkeeper.character:Play(lookAnimName,false,1,0,function (t)
+
+					if self == nil or self.shopkeeper == nil or CS.UnityUtils.EqualsNull(self.shopkeeper.gameObject) == true or pet == nil or CS.UnityUtils.EqualsNull(pet.gameObject) == true then
+						return
+					end
+
+					local idleAnimationName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.shopkeeper.character.gender,CS.kIndoorRoleActionType.normal_standby)
+					self.shopkeeper.character:Play(idleAnimationName,true)
+					pet.StayBySeeCount = pet.StayBySeeCount - 1
+					self.needSubPetSeeCount = false
+					self.shopkeeper:Talk(CS_LanguageManagerInst:GetValueByKey(CS_AITalkConfigManagerInst:GetSpkeeperRandomTalk(CS.TalkConditionType.lookPet)))
+					self.shopkeeper.onMoveEndCompleteHandler = nil
+					self:beginWait()
+
+				end)
+
+		end
+
+	else
+		self:scroll_four()
+	end
+
+end
+
+
+function ShopkeeperRambleState:onExit()
+
+	if self.needSubPetSeeCount then
+
+		local pet = CS.IndoorRoleSystem.inst:GetPetByUid(self._petUid)
+
+		if pet ~= nil then
+			pet.StayBySeeCount = pet.StayBySeeCount - 1
+		end
+
+	end
+
+	self.shopkeeper.onMoveEndCompleteHandler = nil
+
+end
+
+function ShopkeeperRambleState:onUpdate()
+
+	if self.isWaiting then
+
+		self.timer = self.timer + Time.deltaTime
+
+		if self.timer >= self.waitTime then
+			self:onEnter()
+		end
+
+	end
+
+end
+
+
+return ShopkeeperRambleState

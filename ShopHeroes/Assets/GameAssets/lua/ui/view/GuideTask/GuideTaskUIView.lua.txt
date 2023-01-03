@@ -1,0 +1,453 @@
+--GuideTaskUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+require("data/GuideTaskDataProxy")
+require("manager/GuideTriggerManager")
+local CS_type_luaList = typeof(CS.LuaListItem)
+local CS_type_objList = typeof(CS.ObjList)
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGameTimerInst = CS.GameTimer.inst
+local EventDispatcher = require("event/EventDispatcher")
+local csShopperType = CS.EShopperType
+local csVector3 = CS.UnityEngine.Vector3
+local csVector2 = CS.UnityEngine.Vector2
+local cskGameState = CS.kGameState
+
+local targetObj
+local cloneFinger = nil
+local limitTime = 0
+local limitLv = 0
+local canDestroy
+
+local cumulativeTime = 0
+local makeFlag = false
+
+local targetBtn
+
+local operationTimerId = nil
+
+local btnEvent
+
+local bgState = 0 -- 0 - 打开 1 - 关上
+
+GuideTaskUIView = class(ViewBase)
+
+function GuideTaskUIView:ctor()
+	self.viewID = Constants.ViewName.GuideTaskUIView
+	GuideTaskUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "top"
+end
+
+function GuideTaskUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.finger = contentPane:GetObjByName("arrow")
+	self.imageFinger = contentPane:GetObjByName("imageFinger")
+	--self.gouImg = contentPane:GetImage("gou")
+	--self.tanhaoImg = contentPane:GetImage("tanhao")
+	self.descText = contentPane:GetText("descText")
+	self.iconBtn = contentPane:GetButton("icon")
+	self.bgBtn = contentPane:GetButton("bg")
+	self.contentCanvas = contentPane:GetObjByName("contentCanvas"):GetComponent("Canvas")
+	self.contentRect = contentPane:GetObjByName("contentCanvas"):GetComponent("RectTransform")
+	self.redPoint = contentPane:GetObjByName("redPoint")
+	self.bgRect = contentPane:GetObjByName("bg"):GetComponent("RectTransform")
+	self.gouImg1 = contentPane:GetImage("finishGou1")
+	self.gouImg2 = contentPane:GetImage("finishGou2")
+	self.gouImg3 = contentPane:GetImage("finishGou3")
+	self.contentIcon = contentPane:GetGUIIcon("contentIcon")
+	if(contentPane:GetObjByName("contentIcon") ~= nil)then
+		self.iconRect = contentPane:GetObjByName("contentIcon"):GetComponent("RectTransform")
+	end
+
+	self.inBtn = contentPane:GetButton("inBtn")
+	self.outBtn = contentPane:GetButton("outBtn")
+
+	self.promptText = contentPane:GetText("promptText")
+
+	self.contentCanvas.sortingLayerName = "window"
+
+	btnEvent = function()
+		self:SpecialTarget()
+	end
+end
+
+
+function GuideTaskUIView:onInit()
+
+	self:initComp()
+
+	self.iconBtn:ButtonClickTween(
+		function ()
+			EventDispatcher:dispatchEvent(GameEvent.GuideTask.ShowUI_GuideTaskInfo)
+		end
+	)
+
+	self.bgBtn.onClick:AddListener(
+		function ()
+			EventDispatcher:dispatchEvent(GameEvent.GuideTask.ShowUI_GuideTaskInfo)
+		end
+	)
+
+	self.inBtn.onClick:AddListener(
+		function ()
+			self:InPanel()
+		end
+	)
+
+	self.outBtn.onClick:AddListener(
+		function ()
+			self:OutPanel()
+		end
+	)
+end
+
+function GuideTaskUIView:InPanel()
+	bgState = 1
+	self.bgRect:DOSizeDelta(csVector2(240,self.bgRect.sizeDelta.y),0.6):OnStart(function()
+		self.descText.enabled = false end):SetEase(CS.DG.Tweening.Ease.OutQuint)
+	.onComplete = function()
+		self.inBtn.gameObject:SetActive(false)
+		self.outBtn.gameObject:SetActive(true)
+		self.promptText.enabled = true
+		self.promptText:DOFade(1,0.5):From(0)
+	end
+end
+
+function GuideTaskUIView:OutPanel()
+	bgState = 0
+	self.bgRect:DOSizeDelta(csVector2(635,self.bgRect.sizeDelta.y),0.6):SetEase(CS.DG.Tweening.Ease.OutQuint):OnStart(function()
+			self.promptText:DOFade(0,0.5):From(1)
+		end).onComplete = function()
+		self.inBtn.gameObject:SetActive(true)
+		self.outBtn.gameObject:SetActive(false)
+		self.descText.enabled = true
+	end
+end
+
+function GuideTaskUIView:onHide()
+	--print("GuideTaskUIView onHide")
+	--CS.AudioManager.inst:PlaySound(9);
+	self:DestroyFinger()
+	bgState = 0
+	if(targetBtn ~= nil)then
+		targetBtn.onClick:RemoveListener(btnEvent)
+	end
+	if(operationTimerId ~= nil)then
+		csGameTimerInst:RemoveTimer(operationTimerId)
+		operationTimerId = nil
+	end
+end
+
+function  GuideTaskUIView:onShowed()
+	--CS.AudioManager.inst:PlaySound(8);
+	--print("GuideTaskUIView onShowed")
+	self:SetUIData()
+
+end
+
+function GuideTaskUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function GuideTaskUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function GuideTaskUIView:SetUIData()
+	local data = GuideTaskDataProxy.inst.curData
+	if(data ~= nil and GuideTaskDataProxy.inst.guideTaskFlag ~= 1)then
+		self.contentCanvas.gameObject:SetActive(true)
+		--self.gouImg.enabled = data.state ~= 1
+		self.redPoint:SetActive(data.state ~= 1)
+		--self.tanhaoImg.enabled = data.state == 1
+		local taskState1,taskState2,taskState3 = data:GetFinishTaskNum()
+		--self.gouImg1.enabled = tonumber(taskState1) == 1
+		--self.gouImg2.enabled = tonumber(taskState2) == 1
+		--self.gouImg3.enabled = tonumber(taskState3) == 1
+		if(data.curIndex ~= -1)then
+			if(self.iconRect ~= nil)then
+				self.iconRect.sizeDelta = csVector2(140,140)
+			end
+			self.bgBtn.gameObject:SetActive(true)
+			local taskData = data.allTask[data.curIndex]
+			self.descText.text = cs_LanguageManagerInst:GetValueByKey(taskData.descSmall).."  ".."(<Color=#FF4660>"..taskData.param.."</Color>".."/"..taskData.limit..")"
+			self.contentIcon:SetSprite(taskData.atlas,taskData.icon)
+
+			local textHeight = self.descText.preferredHeight
+			self.bgRect.sizeDelta = csVector2(self.bgRect.sizeDelta.x,textHeight + 40)
+		else
+			if(self.iconRect ~= nil)then
+				self.iconRect.sizeDelta = csVector2(160,160)
+			end
+			self.contentIcon:SetSprite("mainline_atlas","zhuejiemian_renwut")
+			self.bgBtn.gameObject:SetActive(false)
+		end
+		self.bgBtn.gameObject:SetActive(data.state == 1)
+		self.promptText.enabled = data.state ~= 1 or bgState == 1
+	else
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.HideUI_GuideTask)
+		print("没有当前正在做的待办任务数据")
+	end
+
+	if(not CS.FGUI.inst.isLandscape) then
+		if(CS.ManagerBinder.inst.mGameState == CS.kGameState.Town)then
+			if(CS.UIUnLockConfigMrg.inst:GetBtnInteractable("runisBtn")) then
+				self.contentRect.anchoredPosition = csVector2(self.contentRect.anchoredPosition.x,1098)
+			else
+				self.contentRect.anchoredPosition = csVector2(self.contentRect.anchoredPosition.x,900)
+			end
+		else
+			self.contentRect.anchoredPosition = csVector2(self.contentRect.anchoredPosition.x,960)
+		end
+	end
+	--self.contentRect
+
+	self:GuideOperation()
+end
+
+function GuideTaskUIView:RefreshUIData()
+	local data = GuideTaskDataProxy.inst.curData
+
+	if(data ~= nil and GuideTaskDataProxy.inst.guideTaskFlag ~= 1)then
+		if(self.contentCanvas ~= nil) then
+			self.contentCanvas.gameObject:SetActive(true)
+		end
+		self.redPoint:SetActive(data.state ~= 1)
+		self.bgBtn.gameObject:SetActive(data.curIndex ~= -1)
+		self.promptText.enabled = data.curIndex == -1
+
+		if(data.changeIndex1 ~= -1)then
+			data.changeIndex1 = -1
+			self:PlayDoneAnim(self.gouImg1,data)
+			return
+		end
+		if(data.changeIndex2 ~= -1)then
+			data.changeIndex2 = -1
+			self:PlayDoneAnim(self.gouImg2,data)
+			return
+		end
+		if(data.changeIndex3 ~= -1)then
+			data.changeIndex3 = -1
+			self:PlayDoneAnim(self.gouImg3,data)
+			return
+		end
+
+		local taskData = data.allTask[data.curIndex]
+		if(taskData ~= nil) then
+			if(self.iconRect ~= nil)then
+				self.iconRect.sizeDelta = csVector2(140,140)
+			end
+			self.descText.text = cs_LanguageManagerInst:GetValueByKey(taskData.descSmall).."  ".."(<Color=#FF4660>"..taskData.param.."</Color>".."/"..taskData.limit..")"
+			self.contentIcon:SetSprite(taskData.atlas,taskData.icon)
+		else
+			if(self.iconRect ~= nil)then
+				self.iconRect.sizeDelta = csVector2(160,160)
+			end
+			self.contentIcon:SetSprite("mainline_atlas","zhuejiemian_renwut")
+		end
+
+		local textHeight = self.descText.preferredHeight
+		self.bgRect.sizeDelta = csVector2(self.bgRect.sizeDelta.x,textHeight + 40)
+
+		--self.bgBtn.gameObject:SetActive(data.state == 1)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.HideUI_GuideTask)
+	end
+end
+
+function GuideTaskUIView:PlayDoneAnim(gouImg,data)
+	gouImg.enabled = false
+	gouImg.transform.localScale = csVector3(8,8,8)
+	local tween = gouImg.transform:DOScale(csVector3(1,1,1),0.6):SetEase(CS.DG.Tweening.Ease.OutQuint):OnStart(function()
+			CS.FGUI.inst:onMouseClick(CS.FGUI.inst.uiCamera:WorldToScreenPoint(gouImg.transform.position))
+		end)
+	tween.onComplete = function()
+		self.descText:DOText(" ",0.8).onComplete = function()
+			local taskData = data.allTask[data.curIndex]
+			if(self.iconRect ~= nil)then
+				self.iconRect.sizeDelta = csVector2(120,120)
+			end
+			self.contentIcon:SetSprite(taskData.atlas,taskData.icon)
+			self.descText:DOText(cs_LanguageManagerInst:GetValueByKey(taskData.descSmall).."  ".."(<Color=#FF4660>"..taskData.param.."</Color>".."/"..taskData.limit..")",0.8).onUpdate = function()
+				local textHeight = self.descText.preferredHeight
+				self.bgRect.sizeDelta = csVector2(self.bgRect.sizeDelta.x,textHeight + 40)
+			end
+		end
+	end
+end
+
+function GuideTaskUIView:GuideOperation()
+	if(limitLv == 0)then
+		limitLv = tonumber(CS.WorldParConfigManager.inst:GetConfig(166).parameters)
+	end
+
+	if(limitTime == 0)then
+		limitTime = tonumber(CS.WorldParConfigManager.inst:GetConfig(165).parameters)
+	end
+
+	if(CS.UserDataProxy.inst.playerData.level >= limitLv or GuideTaskDataProxy.inst.guideTaskFlag == 1)then
+		if(operationTimerId ~= nil)then
+			csGameTimerInst:RemoveTimer(operationTimerId)
+			operationTimerId = nil
+		end
+		self:DestroyFinger()
+		return
+	end
+
+	if(operationTimerId ~= nil)then
+		csGameTimerInst:RemoveTimer(operationTimerId)
+		operationTimerId = nil
+	end
+
+	operationTimerId = csGameTimerInst:AddTimer(0.1,
+		function()
+			if(not CS.GoOperationManager.inst.isDoing and not GuideTriggerManager.inst.isInTrigger)then
+				if(GuideTaskDataProxy.inst.curWindowName == CS.ViewPrefabName.MainUI and CS.ManagerBinder.inst.mGameState == cskGameState.Shop)then
+					if(cumulativeTime ~= -1)then
+						cumulativeTime = cumulativeTime + 1
+					end
+					if(makeFlag and canDestroy)then
+						cumulativeTime = 0
+						makeFlag = false
+						canDestroy = false
+						if(cloneFinger ~= nil)then
+							self:DestroyFinger()
+						end
+					end
+				else
+					if(GuideTaskDataProxy.inst.curWindowName == CS.ViewPrefabName.EquipMakeUI and makeFlag)then
+						cumulativeTime = 0
+					else
+						cumulativeTime = 0
+						makeFlag = false
+						if(cloneFinger ~= nil)then
+							self:DestroyFinger()
+						end
+					end
+				end
+
+				if(cumulativeTime >= limitTime / 0.1)then
+					self:SwitchTypeOperation()
+				end
+			else
+				self:DestroyFinger()
+			end
+		end
+	)
+end
+
+function GuideTaskUIView:SwitchTypeOperation()
+	cumulativeTime = -1
+	if(CS.EquipDataProxy.inst:GetIdleEquipMakeSlotNum() == CS.EquipDataProxy.inst.mskeSlotCount)then
+		self:FindTargetObj(CS.ViewPrefabName.MainUI,"makeButton")
+		return
+	end
+
+	local shopperList = CS.IndoorRoleSystem.inst:GetAllShopperList()
+	for i = 0, shopperList.Count - 1 do
+		local curShopper = shopperList[i]
+		if(csShopperType.__CastFrom(curShopper.shopperData.data.shopperType) == csShopperType.Buy and curShopper.shopperData.data.shopperState == 99 and not curShopper.isMoving)then
+			targetObj = curShopper.Attacher.sp_bgIcon
+			self:CloneFingerToTarget(1)
+			return
+		end
+	end
+
+	self:FindTargetObj("GuideTaskUIView",self.iconBtn.gameObject.name)
+end
+
+function GuideTaskUIView:FindTargetObj(panelName,btnName)
+
+	local panelObj = CS.FGUI.inst.uiRootTF:Find(panelName)
+	if(panelObj ~= nil)then
+		panelObj = panelObj.gameObject
+		local targetGo = panelObj:FindHideChildGameObject(btnName)
+		if(targetGo ~= nil)then
+			targetObj = targetGo
+			if(btnName == "makeButton")then
+				targetBtn = targetObj:GetComponent("Button")
+
+				targetBtn.onClick:RemoveListener(btnEvent)
+				targetBtn.onClick:AddListener(btnEvent)
+			end
+			if(panelName == "EquipMakeUI")then
+				canDestroy = true
+				self:CloneFingerToTarget(2)
+			else
+				self:CloneFingerToTarget(1)
+			end
+
+		end
+	end
+end
+
+local panelTimerId = nil
+function GuideTaskUIView:SpecialTarget()
+	makeFlag = true
+	local equipList = CS.EquipDataProxy.inst:GetCompareEquipDatas()
+	local equipId = ""
+	if(equipList ~= nil and equipList.Count > 0)then
+		equipId = equipList[0].equipDrawingId
+	end
+
+	if(panelTimerId ~= nil)then
+		csGameTimerInst:RemoveTimer(panelTimerId)
+		panelTimerId = nil
+	end
+	panelTimerId = csGameTimerInst:AddTimer(0.1,function()
+			if(GuideTaskDataProxy.inst.curWindowName == CS.ViewPrefabName.EquipMakeUI)then
+				self:FindTargetObj("EquipMakeUI",equipId)
+				csGameTimerInst:RemoveTimer(panelTimerId)
+				panelTimerId = nil
+			end
+		end)
+
+	targetBtn.onClick:RemoveListener(btnEvent)
+end
+
+function GuideTaskUIView:CloneFingerToTarget(fromType) -- 1 - normal 2 - imageFinger
+	if(targetObj ~= nil)then
+		if(cloneFinger ~= nil)then
+			CS.UnityEngine.GameObject.Destroy(cloneFinger)
+			cloneFinger = nil
+		end
+		if(fromType == 1)then
+			cloneFinger = CS.UnityEngine.GameObject.Instantiate(self.finger,targetObj.transform)
+		else
+			cloneFinger = CS.UnityEngine.GameObject.Instantiate(self.imageFinger,targetObj.transform)
+		end
+		cloneFinger:SetActive(true)
+		local upNum = 0
+		local cloneRect = targetObj:GetComponent("RectTransform")
+		if(cloneRect ~= nil)then
+			--upNum = cloneRect.sizeDelta.y
+			if(fromType == 2)then
+				cloneFinger.transform.localScale = csVector3(0.7,0.7,0.7)
+			end
+		else
+			local cloneSpriteRender = targetObj:GetComponent("SpriteRenderer")
+			if(cloneSpriteRender ~= nil)then
+				--upNum = cloneSpriteRender.size.y
+				--cloneFinger.transform.localScale = csVector3(upNum,upNum,upNum)
+				cloneFinger.transform.localPosition = csVector3.zero
+				cloneFinger.transform.localScale = csVector3(0.02,0.02,0.02)
+			end
+		end
+		cloneFinger.transform.localPosition = cloneFinger.transform.localPosition --+ csVector3(0,upNum / 2,0)
+	end
+end
+
+function GuideTaskUIView:DestroyFinger()
+	cumulativeTime = 0
+	if(cloneFinger == nil) then return end
+	CS.UnityEngine.GameObject.Destroy(cloneFinger)
+	cloneFinger = nil
+	targetObj = nil
+end
+------------------------------------------------

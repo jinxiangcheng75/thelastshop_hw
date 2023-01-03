@@ -1,0 +1,704 @@
+--RefugePrepareUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/RefugeTowerDataProxy")
+require("utils/XLuaUtils")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local CS_type_luaList = typeof(CS.LuaListItem)
+
+local csGameTimerInst = CS.GameTimer.inst
+local csTimeUtils = CS.TimeUtils
+
+local levelData
+local floorData
+local data
+local dataList = {}
+
+local sumNum = 0
+local teamFightSum = 0
+
+local itemAttPercent = -1
+local itemAddExpPercent = 1
+local itemTimePercent = 1
+
+local selectItem
+
+local isAuto = false
+
+local str = {}
+
+RefugePrepareUIView = class(ViewBase)
+
+function RefugePrepareUIView:ctor()
+	self.viewID = Constants.ViewName.RefugePrepareUIView
+	RefugePrepareUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function RefugePrepareUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+
+	self.remainTimeBg = contentPane:GetObjByName("remainTimeBg")
+	self.remainTimeText = contentPane:GetText("remainTimeText")
+	self.allHeroes = get_csharp_list(CS.ExploreHeroItemView)
+	self.allHeroes:Add(contentPane:GetObjByName("heroItem1"):GetComponent("ExploreHeroItemView"))
+	self.allHeroes:Add(contentPane:GetObjByName("heroItem2"):GetComponent("ExploreHeroItemView"))
+	self.allHeroes:Add(contentPane:GetObjByName("heroItem3"):GetComponent("ExploreHeroItemView"))
+	self.allHeroes:Add(contentPane:GetObjByName("heroItem4"):GetComponent("ExploreHeroItemView"))
+	self.allHeroes:Add(contentPane:GetObjByName("heroItem5"):GetComponent("ExploreHeroItemView"))
+
+	self.timeText = contentPane:GetText("timeText")
+	self.renshuText = contentPane:GetText("renshuText")
+	self.bossDescText = contentPane:GetText("bossDescText")
+	self.bossRewardText = contentPane:GetText("bossRewardText")
+	self.exploreBtn = contentPane:GetButton("exploreBtn")
+	self.useItemBtn = contentPane:GetButton("useItemBtn")
+	self.notUse = contentPane:GetObjByName("notUse")
+	self.use = contentPane:GetObjByName("use")
+	self.useItemIcon = contentPane:GetGUIIcon("useItemIcon")
+	self.numBg = contentPane:GetObjByName("numBg")
+	self.numText = contentPane:GetText("numText")
+	self.btmInfoBtn = contentPane:GetButton("btmInfoBtn")
+	self.icon = contentPane:GetGUIIcon("icon")
+	self.levelIcon = contentPane:GetGUIIcon("levelIcon")
+	self.nameText = contentPane:GetText("nameText")
+	self.middleText = contentPane:GetText("middleText")
+	self.levelText = contentPane:GetText("levelText")
+	self.suggestFightingText = contentPane:GetText("suggestFightingText")
+	self.normalNameText = contentPane:GetText("normalNameText")
+	self.normalLevelText = contentPane:GetText("normalLevelText")
+	self.normalIcon = contentPane:GetGUIIcon("normalIcon")
+	self.descObj1 = contentPane:GetObjByName("descObj1")
+	self.descObj2 = contentPane:GetObjByName("descObj2")
+	self.descObj3 = contentPane:GetObjByName("descObj3")
+	self.descText1 = contentPane:GetText("descText1")
+	self.descText2 = contentPane:GetText("descText2")
+	self.descText3 = contentPane:GetText("descText3")
+	self.refugePrepareItem = contentPane:GetObjByName("refugePrepareItem"):GetComponent("LuaListItem")
+	self.refugePrepareItem2 = contentPane:GetObjByName("refugePrepareItem2"):GetComponent("LuaListItem")
+	self.heroCanvas = contentPane:GetObjByName("allHeroes"):GetComponent("Canvas")
+	self.exploreText = contentPane:GetText("exploreText")
+	
+	self.showTalentObj = contentPane:GetButton("showTalentObj")
+	self.showTalentIcon = contentPane:GetGUIIcon("showTalentIcon")
+	self.showItemObj = contentPane:GetButton("showItemObj")
+	self.showItemIcon = contentPane:GetGUIIcon("showItemIcon")
+	self.talentTipObj = contentPane:GetButton("talentTipObj")
+	self.talentNameText = contentPane:GetText("talentNameText")
+	self.talentDescText = contentPane:GetText("talentDescText")
+end
+
+function RefugePrepareUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.exploreBtn:ButtonClickTween(
+		function ()
+			local slotData = CS.ExploreDataProxy.inst:GetFreeSlotData()
+			if(slotData == nil)then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+				func(
+					csEventControllerInst,
+					csGameEventType.SHOWUI_TEXTMSGTIP,
+					cs_LanguageManagerInst:GetValueByKey("无可用探索栏位"),
+					csGUIHelper.GetColorByColorHex("FF2828")
+				)
+				return
+			else
+				CS.ExploreDataProxy.inst.curSlotId = slotData.slotId
+			end
+
+			local combatHeroList = ""
+			local roleSum = 0
+
+			for i = 0, self.allHeroes.Count - 1 do
+				if (self.allHeroes[i].Data ~= nil) then
+					if(i == 0)then
+						combatHeroList = self.allHeroes[i].Data.uid
+					else
+						combatHeroList = combatHeroList .. ":" .. self.allHeroes[i].Data.uid
+					end
+
+					roleSum = roleSum + 1
+				else
+					if(i == 0)then
+						combatHeroList = self.allHeroes[i].indexState
+					else
+						combatHeroList = combatHeroList .. ":" .. self.allHeroes[i].indexState
+					end
+
+				end
+			end
+
+			if(roleSum <= 0)then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+				func(
+					csEventControllerInst,
+					csGameEventType.SHOWUI_TEXTMSGTIP,
+					cs_LanguageManagerInst:GetValueByKey("请先选择英雄参战"),
+					csGUIHelper.GetColorByColorHex("FF2828")
+				)
+			else
+				for i = 0, self.allHeroes.Count - 1 do
+					local index = i
+					if (self.allHeroes[index].Data ~= nil) then
+						if(self.allHeroes[index].Data.equip1.equipId ~= 0)then
+							local equipCfg = CS.EquipConfigManager.inst:GetEquipInfoConfig(self.allHeroes[index].Data.equip1.equipId)
+							if(equipCfg ~= nil)then
+								local action = CS.EquipActionConfigManager.inst:GetCfg(equipCfg.equipDrawingId)
+								self.allHeroes[index].heroDress:Play(action.act_skill,false,1,0,function ()
+										self.allHeroes[index].heroDress:Play(action.act_combat_standby,true)
+									end)
+							end
+						else
+							local action = CS.EquipActionConfigManager.inst:GetCfg(999999)
+							self.allHeroes[index].heroDress:Play(action.act_skill,false,1,0,function ()
+									self.allHeroes[index].heroDress:Play(action.act_combat_standby,true)
+								end)
+						end
+						--self.allHeroes[index].heroDress:Play("happy")
+					end
+				end
+
+				CS.AudioManager.inst:PlaySound(149)
+
+				local useItemId = 0
+				if(selectItem ~= nil)then
+					useItemId = selectItem.id
+				end
+
+				--self.closeBtn.interactable = false
+				--self.exploreBtn.interactable = false
+				CS.FGUI.inst:showGlobalMask(1.5)
+				csGameTimerInst:AddLoopTimerComp(self.contentObject,1.5,function ()
+						EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Request_RefugeStart,CS.ExploreDataProxy.inst.curSlotId,data.id,useItemId,combatHeroList)
+					end,1)
+			end
+
+			--
+			--self:closeBtnClick()
+		end
+	)
+
+	self.useItemBtn:ButtonClickTween(
+		function ()
+			if(self.use.activeSelf)then
+				self:SwitchItemTypeAdd(false)
+				self.use:SetActive(false)
+				self.notUse:SetActive(true)
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+				func(
+					csEventControllerInst,
+					csGameEventType.SHOWUI_TEXTMSGTIP,
+					cs_LanguageManagerInst:GetValueByKey("{0}已移除", cs_LanguageManagerInst:GetValueByKey(selectItem.name)),
+					csGUIHelper.GetColorByColorHex("FF2828")
+				)
+				self.numBg:SetActive(true)
+				selectItem = nil
+				self.showItemObj.gameObject:SetActive(false)
+			else
+				EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.ShowUI_RefugeSelectItem,1)
+			end
+			--self:closeBtnClick()
+		end
+	)
+
+	self.btmInfoBtn:ButtonClickTween(
+		function ()
+			--EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.ShowUI_RefugePanelUI)
+			self:closeBtnClick()
+		end
+	)
+	
+	self.showTalentObj:ButtonClickTween(
+		function ()
+			if(self.selectTalent == nil)then return end
+			
+			self.talentTipObj.gameObject:SetActive(true)
+			self.talentDescText.text = cs_LanguageManagerInst:GetValueByKey(CS.HeroBuffConfigManager.inst:GetConfig(self.selectTalent.type).name, tostring(math.floor(self.selectTalent.value)))
+			self.talentNameText.text = cs_LanguageManagerInst:GetValueByKey(self.selectTalent.talentDesc)
+		end
+	)
+	
+	self.showItemObj:ButtonClickTween(
+		function ()
+			if(selectItem == nil)then return end
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+			local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+			local commonData = CS.CommonRewardData(selectItem.id,1,1,selectItem.type)
+			func(csEventControllerInst, csGameEventType.CommonEvent.COMMONTIPS_SETINFO, commonData, self.showItemObj.transform)
+		end
+	)
+	
+	self.talentTipObj:ButtonClickTween(
+		function ()
+			self.talentTipObj.gameObject:SetActive(false)
+		end
+	)
+
+	for i = 0, self.allHeroes.Count - 1 do
+		local index = i
+		self.allHeroes[index]:setData(index,function (heroIndex)
+				self:HeroItemAddClickHandler(heroIndex)
+			end,function (heroUid,index)
+				self:RemoveHeroCom(heroUid,index)
+			end)
+	end
+
+	self.timerId = 0
+	self.selectTalent = nil
+end
+
+function RefugePrepareUIView:onHide()
+	--print("RefugePrepareUIView onHide")
+	if(self.timerId ~= 0)then
+		csGameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+
+	self.use:SetActive(false)
+	self.notUse:SetActive(true)
+	self.showTalentObj.gameObject:SetActive(false)
+	self.showItemObj.gameObject:SetActive(false)
+	self.talentTipObj.gameObject:SetActive(false)
+
+	for i = 0, self.allHeroes.Count - 1 do
+		local index = i
+		if (self.allHeroes[index].Data ~= nil) then
+			self:RemoveHeroCom(self.allHeroes[index].Data.uid, index)
+		else
+			self.allHeroes[index]:clearHeroData()
+		end
+	end
+
+	selectItem = nil
+	isAuto = false
+	sumNum = 0
+	teamFightSum = 0
+	itemAddExpPercent = 1
+	itemAttPercent = -1
+	itemTimePercent = 1
+	self.selectTalent = nil
+end
+
+function  RefugePrepareUIView:onShowed()
+	--print("RefugePrepareUIView onShowed")
+	self.showItemObj.gameObject:SetActive(false)
+	self.talentTipObj.gameObject:SetActive(false)
+	self.heroCanvas.sortingOrder = self._uiCanvas.sortingOrder + 2
+end
+
+function RefugePrepareUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function RefugePrepareUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RefugePrepareUIView:closeBtnClick()
+	self:hide()
+end
+
+function RefugePrepareUIView:SortAllHeroList()
+	self.allHeroes:Sort(function (hero1, hero2)
+			if(hero1.index < hero2.index)then
+				return -1
+			else
+				return 1
+			end
+		end)
+	
+	self.talentTipObj.gameObject:SetActive(false)
+
+	self:RefreshShowTalent()
+end
+
+function RefugePrepareUIView:RefreshHero()
+	isAuto = false
+	self:SetUIData()
+end
+
+function RefugePrepareUIView:SetUIData()
+	levelData = RefugeTowerDataProxy.inst.refugeData
+	floorData = RefugeTowerDataProxy.inst:GetTowerDataById(RefugeTowerDataProxy.inst.nextIndex)
+	data = CS.ExploreInstanceConfigManager.inst:GetConfig(floorData.configData.instance_id)
+	self.suggestFightingText.text = tostring(data.recommend_power)
+	--self.icon:SetSprite(CS.StaticConstants.exploreAtlas,data.instance_icon)
+	self.levelIcon:SetSprite(levelData.atlas_icon,levelData.icon)
+	self.middleText.text = cs_LanguageManagerInst:GetValueByKey(floorData.configData.floor_name)
+
+	self.levelText.text = floorData.index .. "/" .. RefugeTowerDataProxy.inst.maxTowerFloor
+	self.normalNameText.text = cs_LanguageManagerInst:GetValueByKey(floorData.configData.floor_name)
+	self.normalLevelText.text = tostring(floorData.index)
+	self.normalIcon:SetSprite(floorData.configData.atlas,floorData.configData.icon)
+	local translateStr = cs_LanguageManagerInst:GetValueByKey(floorData.configData.dec)
+	str = split(translateStr,"|")
+	self.descObj1:SetActive(#str >= 1)
+	self.descObj2:SetActive(#str >= 2)
+	self.descObj3:SetActive(#str >= 3)
+
+	if(#str >= 1)then
+		self.descText1.text = str[1]
+	end
+	if(#str >= 2)then
+		self.descText2.text = str[2]
+	end
+	if(#str >= 3)then
+		self.descText3.text = str[3]
+	end
+	local sum = 0
+
+	if(floorData.configData.reward1_id ~= "" and tonumber(floorData.configData.reward1_id) ~= 0)then
+		sum = sum + 1
+	end
+
+	if(floorData.configData.reward2_id ~= "" and tonumber(floorData.configData.reward2_id) ~= 0)then
+		sum = sum + 1
+	end
+	self.refugePrepareItem.gameObject:SetActive(sum >= 1)
+	self.refugePrepareItem2.gameObject:SetActive(sum >= 2)
+
+	local itemData = RefugeRewardData:new()
+	if(sum == 1)then
+		itemData:InitData(floorData.configData.reward1_id,floorData.configData.reward1_num,floorData.normalState,false,0)
+		self.refugePrepareItem:SetData(itemData)
+	elseif sum == 2then
+		itemData:InitData(floorData.configData.reward1_id,floorData.configData.reward1_num,floorData.normalState,false,0)
+		self.refugePrepareItem:SetData(itemData)
+		itemData:InitData(floorData.configData.reward2_id,floorData.configData.reward2_num,floorData.vipState,true,0)
+		self.refugePrepareItem2:SetData(itemData)
+	end
+
+	local types = get_csharp_array(CS.ItemType,3)
+	types[0] = CS.ItemType.ExploreTimeItem
+	types[1] = CS.ItemType.ExploreAttBonus
+	types[2] = CS.ItemType.ExploreExpBonusItem
+	local allItems = CS.ItemBagProxy.inst:GetItemsByTypes(types, false)
+	self.numText.text = allItems.Count
+
+	self:setHeroPositionData()
+
+	self:setAutomaticHeroData()
+	self:RefreshTime()
+	self:calculateTime()
+
+	self.renshuText.text = sumNum
+end
+
+function RefugePrepareUIView:RefreshTime()
+	if(self.timerId ~= 0)then
+		csGameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+
+	self.exploreText.text = cs_LanguageManagerInst:GetValueByKey("探索副本")
+	self.exploreBtn.enabled = true
+	if(RefugeTowerDataProxy.inst.remainTime > 0)then
+		self.remainTimeText.text = csTimeUtils.timeSpan3Str(RefugeTowerDataProxy.inst.remainTime)
+
+		self.timerId = csGameTimerInst:AddTimer(1,RefugeTowerDataProxy.inst.remainTime,function ()
+				if(RefugeTowerDataProxy.inst.remainTime > 0)then
+					self.remainTimeText.text = csTimeUtils.timeSpan3Str(RefugeTowerDataProxy.inst.remainTime)
+				else
+					self.exploreText.text = cs_LanguageManagerInst:GetValueByKey("活动已结束")
+					self.exploreBtn.enabled = false
+					self.remainTimeText.text = cs_LanguageManagerInst:GetValueByKey("活动已结束")
+					csGameTimerInst:RemoveTimer(self.timerId)
+					self.timerId = 0
+					--self:closeBtnClick()
+
+				end
+			end)
+	else
+		self.exploreText.text = cs_LanguageManagerInst:GetValueByKey("活动已结束")
+		self.exploreBtn.enabled = false
+		self.remainTimeText.text = cs_LanguageManagerInst:GetValueByKey("活动已结束")
+		--self:closeBtnClick()
+	end
+end
+
+function RefugePrepareUIView:SwitchItemTypeAdd(isAdd)
+	if(selectItem.type == 20)then
+		if(isAdd)then
+			itemTimePercent = 1 - selectItem.effect / 100
+		else
+			itemTimePercent = 1
+		end
+		self:calculateTime()
+	elseif selectItem.type == 24 then
+		if(isAdd)then
+			itemAddExpPercent = 1 + selectItem.effect / 100
+		else
+			itemAddExpPercent = 1
+		end
+		local AddExpPercent = 1
+		local buff = CS.GlobalBuffDataProxy.inst:GetGlobalBuffData(CS.GlobalBuffType.explore_heroExpUp)
+		if(buff ~= nil)then
+			AddExpPercent = AddExpPercent * (1 + buff.buffInfo.buffParam / 100)
+		end
+		local unionBuffData = CS.UserDataProxy.inst:GetUnionBuffData(CS.EUnionScienceType.ExpSkill)
+		if(unionBuffData ~= nil)then
+			AddExpPercent = AddExpPercent * (1 + unionBuffData.config.add2_num / 100)
+		end
+		local canAddExp = data.hero_exp * AddExpPercent * itemAddExpPercent
+
+		for i = 0, self.allHeroes.Count - 1 do
+			local index = i
+			if (self.allHeroes[index].Data ~= nil) then
+				self.allHeroes[index]:setHeroTween(canAddExp)
+			end
+		end
+	elseif selectItem.type == 22 then
+		if(isAdd)then
+			itemAttPercent = selectItem.effect / 100
+		else
+			itemAttPercent = -1
+		end
+		teamFightSum = 0
+		for i = 0, self.allHeroes.Count - 1 do
+			local index = i
+			if (self.allHeroes[index].Data ~= nil) then
+				self.allHeroes[index]:setHeroFightCount(itemAttPercent)
+			end
+		end
+		for i = 0, self.allHeroes.Count - 1 do
+			local index = i
+			if (self.allHeroes[index].Data ~= nil) then
+				teamFightSum = teamFightSum + self.allHeroes[index].fightingCount
+			end
+		end
+
+		for i = 0, self.allHeroes.Count - 1 do
+			local index = i
+			if (self.allHeroes[index].Data ~= nil) then
+				self.allHeroes[index]:setHeroFighit(itemAttPercent, data.recommend_power, teamFightSum, data.team_strength)
+			end
+		end
+	end
+end
+
+function RefugePrepareUIView:SelectItemComplete(itemId)
+	selectItem = CS.ItemconfigManager.inst:GetConfig(itemId)
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+	func(
+		csEventControllerInst,
+		csGameEventType.SHOWUI_TEXTMSGTIP,
+		cs_LanguageManagerInst:GetValueByKey("{0}添加为强化品", cs_LanguageManagerInst:GetValueByKey(selectItem.name)),
+		csGUIHelper.GetColorByColorHex("FF2828")
+	)
+	self.numBg:SetActive(false)
+	self.use:SetActive(true)
+	self.notUse:SetActive(false)
+	self.useItemIcon:SetSprite(selectItem.atlas, selectItem.icon)
+	
+	self.showItemObj.gameObject:SetActive(true)
+	self.showItemIcon:SetSprite(selectItem.atlas, selectItem.icon)
+
+	self:SwitchItemTypeAdd(true)
+end
+
+function RefugePrepareUIView:calculateTime()
+	local exploreTime = data.explore_time
+	local numPercent = math.ceil(exploreTime * data.decreas_formula / 100)
+	exploreTime = exploreTime - sumNum * numPercent
+	exploreTime = math.ceil(exploreTime * itemTimePercent)
+	local buff = CS.GlobalBuffDataProxy.inst:GetGlobalBuffData(CS.GlobalBuffType.explore_speedUp)
+	if(buff ~= nil)then
+		exploreTime = exploreTime - math.ceil(exploreTime * buff.buffInfo.buffParam / 100)
+	end
+	local unionBuffData = CS.UserDataProxy.inst:GetUnionBuffData(CS.EUnionScienceType.ExploreSkill)
+	if(unionBuffData ~= nil)then
+		exploreTime = exploreTime - math.ceil(exploreTime * unionBuffData.config.add2_num / 100)
+	end
+
+	self.timeText.text = CS.TimeUtils.timeSpanStrip(exploreTime)
+end
+
+function RefugePrepareUIView:exploreHeroNumChange(isAdd)
+	if(isAdd)then
+		sumNum = sumNum + 1
+	else
+		sumNum = sumNum - 1
+	end
+	self.renshuText.text = tostring(sumNum)
+
+	self:calculateTime()
+end
+
+function RefugePrepareUIView:setAutomaticHeroData()
+	for i = 0,self.allHeroes.Count - 1 do
+		local index = i
+		if (self.allHeroes[index].Data == nil and self.allHeroes[index].gameObject.activeSelf) then
+			local heroUid = CS.RoleDataProxy.inst:GetHeroUidByExploreIndex(index)--data.recommend_power
+			if (heroUid ~= -1) then
+				self:AddHeroCom(heroUid, self.allHeroes[index].index)
+			end
+		end
+	end
+
+	isAuto = true
+end
+
+function RefugePrepareUIView:setHeroPositionData()
+
+	for i = 0, self.allHeroes.Count - 1 do
+
+		local index = i
+		if (data.people_number == 5)then
+
+			self.allHeroes[index]:setIndexState(0)
+			self.allHeroes[index].gameObject:SetActive(true)
+		elseif (data.people_number == 4) then
+
+			if (index + 1 == data.position_open[0] or index + 1 == data.position_open[1] or index + 1 == data.position_open[2] or index + 1 == data.position_open[3]) then
+
+				self.allHeroes[index]:setIndexState(0)
+				self.allHeroes[index].gameObject:SetActive(true)
+			else
+
+				self.allHeroes[index]:setIndexState(-1)
+				self.allHeroes[index]:clearHeroData()
+				self.allHeroes[index].gameObject:SetActive(false)
+			end
+		elseif (data.people_number == 3) then
+
+			if (index + 1 == data.position_open[0] or index + 1 == data.position_open[1] or index + 1 == data.position_open[2]) then
+
+				self.allHeroes[index]:setIndexState(0)
+				self.allHeroes[index].gameObject:SetActive(true)
+			else
+
+				self.allHeroes[index]:setIndexState(-1)
+				self.allHeroes[index]:clearHeroData()
+				self.allHeroes[index].gameObject:SetActive(false)
+			end
+		end
+	end
+end
+
+function RefugePrepareUIView:HeroItemAddClickHandler(heroIndex)
+	EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.ShowUI_RefugeSelectHero,heroIndex,data.id,itemAddExpPercent,1)
+end
+
+function RefugePrepareUIView:AddHeroCom(heroUid,index)
+	local heroData = CS.RoleDataProxy.inst:GetHeroDataByUid(heroUid)
+	heroData.isSelect = true
+	local AddExpPercent = 1
+	local buff = CS.GlobalBuffDataProxy.inst:GetGlobalBuffData(CS.GlobalBuffType.explore_heroExpUp)
+	if(buff ~= nil)then
+		AddExpPercent = AddExpPercent * (1 + buff.buffInfo.buffParam / 100)
+	end
+	local unionBuffData = CS.UserDataProxy.inst:GetUnionBuffData(CS.EUnionScienceType.ExpSkill)
+	if(unionBuffData ~= nil)then
+		AddExpPercent = AddExpPercent * (1 + unionBuffData.config.add2_num / 100)
+	end
+
+	local canAddExp = data.hero_exp * itemAddExpPercent * AddExpPercent
+	self.allHeroes[index]:setHeroData(heroData, self._uiCanvas.sortingLayerName, self._uiCanvas.sortingOrder, canAddExp)
+	self:exploreHeroNumChange(true)
+	teamFightSum = teamFightSum + self.allHeroes[index].fightingCount
+	self:setFightChange()
+
+	if(isAuto)then
+		self.allHeroes[index]:CheckPosAndProfessionType()
+	end
+	
+	self:RefreshShowTalent()
+end
+
+function RefugePrepareUIView:RemoveHeroCom(heroUid,index)
+	local heroData = CS.RoleDataProxy.inst:GetHeroDataByUid(heroUid)
+	heroData.isSelect = false
+	self.allHeroes[index]:clearHeroData()
+	self:exploreHeroNumChange(false)
+	teamFightSum = teamFightSum - self.allHeroes[index].fightingCount
+	self:setFightChange()
+	
+	self:RefreshShowTalent()
+end
+
+function RefugePrepareUIView:RefreshShowTalent()
+	local heroTypes = {}
+	heroTypes[1] = 0
+	heroTypes[2] = 0
+	heroTypes[3] = 0
+
+	self.selectTalent = nil
+
+	for i = 0, self.allHeroes.Count - 1 do
+		local heroIndex = i
+		if self.allHeroes[heroIndex].Data ~= nil then
+			heroTypes[self.allHeroes[heroIndex].Data.config.type] = heroTypes[self.allHeroes[heroIndex].Data.config.type] + 1
+		end
+	end
+
+	for i = self.allHeroes.Count - 1, 0 ,-1 do
+		local heroIndex = i
+
+		if(self.allHeroes[heroIndex].Data ~= nil)then
+			local curTalentData = self.allHeroes[heroIndex].Data.talentConfig:GetRingVal()
+			if (curTalentData ~= nil)then
+				if (heroTypes[curTalentData:GetRingHeroType()] >= 3) then
+					self.selectTalent = curTalentData
+					self.selectTalent.isOpen = true
+				end
+			end
+		end
+	end
+
+	if (self.selectTalent ~= nil) then
+		self.showTalentObj.gameObject:SetActive(self.selectTalent.isOpen)
+		if (self.selectTalent.isOpen) then
+			local skillShowCfg = CS.HeroSkillShowConfigManager.inst:GetConfig(self.selectTalent.talentId)
+			if (skillShowCfg ~= null) then
+				self.showTalentIcon:SetSprite(skillShowCfg.skill_atlas, skillShowCfg.skill_icon)
+			end
+		end
+	else
+		self.showTalentObj.gameObject:SetActive(false)
+	end
+end
+
+function RefugePrepareUIView:setFightChange()
+	teamFightSum = 0
+	for i = 0, self.allHeroes.Count - 1 do
+		local index = i
+		if (self.allHeroes[index].Data ~= nil) then
+			self.allHeroes[index]:setHeroFightCount(itemAttPercent)
+		end
+	end
+	for i = 0, self.allHeroes.Count - 1 do
+		local index = i
+		if (self.allHeroes[index].Data ~= nil) then
+			teamFightSum = teamFightSum + self.allHeroes[index].fightingCount
+		end
+	end
+	for i = 0, self.allHeroes.Count - 1 do
+		local index = i
+		if (self.allHeroes[index].Data ~= nil) then
+			self.allHeroes[index]:setHeroFighit(itemAttPercent, data.recommend_power, teamFightSum,data.team_strength)
+		end
+	end
+end
+------------------------------------------------

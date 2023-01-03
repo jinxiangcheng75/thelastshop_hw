@@ -1,0 +1,60 @@
+--TestNewSystem
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+local EventDispatcher = require("event/EventDispatcher")
+
+TestNewSystem = class(BaseSystem)
+
+TestNewSystem.super = BaseSystem
+
+function TestNewSystem:ctor()
+	print("TestNewSystem:ctor Class.super:", TestNewSystem.super)
+	print("TestNewSystem:ctor self.super:", self.super)
+end
+
+function TestNewSystem:AddListeners()
+	print("TestNewSystem:AddListeners")
+	EventDispatcher:addEvent(GameEvent.UI.ShowUI_TestNew, self, self.onShowUI)
+	EventDispatcher:addEvent(GameEvent.UI.HideUI_TestNew, self, self.onHideUI)
+end
+
+function TestNewSystem:RemoveListeners()
+	print("TestNewSystem:RemoveListeners")
+	EventDispatcher:removeEvent(GameEvent.UI.ShowUI_TestNew, self, self.onShowUI)
+	EventDispatcher:removeEvent(GameEvent.UI.HideUI_TestNew, self, self.onHideUI)
+end
+
+function TestNewSystem:onShowUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.TestNew,
+		function(view)
+			print("TestNewView open callback")
+		end
+	)
+
+	CS.NetworkEvent.SetCallback(
+		MsgType.Response_User_Login_Cmd,
+		function(resp)
+		end,
+		function(resp)
+		end
+	)
+end
+
+function TestNewSystem:onHideUI()
+	GUIManager.inst:HideView(Constants.ViewName.TestNew)
+end
+
+function TestNewSystem:OnEnter()
+	TestNewSystem.super.OnEnter(self)
+end
+
+function TestNewSystem:OnExit()
+	TestNewSystem.super.OnExit(self)
+end
+
+function TestNewSystem:testSend()
+end

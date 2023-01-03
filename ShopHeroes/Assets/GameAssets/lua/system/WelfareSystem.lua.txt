@@ -1,0 +1,165 @@
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("utils/XLuaUtils")
+
+require("ui/view/Welfare/WelfareUI")
+require("ui/view/Welfare/SevenDayBuyPassUI")
+
+local EventDispatcher= require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+WelfareSystem = class(BaseSystem)
+WelfareSystem.super = BaseSystem
+
+function WelfareSystem:ctor()
+end
+
+function WelfareSystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.WelfareEvent.ShowUI_WelfareUI,self,self.showWelfareUI)
+	EventDispatcher:addEvent(GameEvent.WelfareEvent.HideUI_WelfareUI,self,self.hideWelfareUI)
+	EventDispatcher:addEvent(GameEvent.WelfareEvent.RefreshUI_WelfareContent,self,self.refreshWelfareContent)
+		
+		
+	--转盘刷新相关
+	EventDispatcher:addEvent(GameEvent.WelfareEvent.Lottery_refreshBtnTx,self,self.refreshLotteryBtnTx)
+	EventDispatcher:addEvent(GameEvent.WelfareEvent.Lottery_refreshCumulativeData,self,self.refreshLotteryCumulativeData)
+	EventDispatcher:addEvent(GameEvent.WelfareEvent.Lottery_refresh,self,self.refreshLottery)
+	EventDispatcher:addEvent(GameEvent.WelfareEvent.Lottery_getJackpotDatas,self,self.lotteryGetJackpotDatas)
+	EventDispatcher:addEvent(GameEvent.WelfareEvent.Lottery_JackpotJumpAnim,self,self.lotteryJackpotJumpAnim)
+	----------------------------------------------------------------------------------------------------------------------------------
+
+	--七日 大亨通行证购买
+	EventDispatcher:addEvent(GameEvent.WelfareEvent.ShowUI_SevenDayBuyPassUI,self,self.showSevenDayBuyPassUI)
+	EventDispatcher:addEvent(GameEvent.WelfareEvent.HideUI_SevenDayBuyPassUI,self,self.hideSevenDayBuyPassUI)
+	----------------------------------------------------------------------------------------------------------------------------------
+	
+end
+
+function WelfareSystem:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.WelfareEvent.ShowUI_WelfareUI,self,self.showWelfareUI)
+	EventDispatcher:removeEvent(GameEvent.WelfareEvent.HideUI_WelfareUI,self,self.hideWelfareUI)
+	EventDispatcher:removeEvent(GameEvent.WelfareEvent.RefreshUI_WelfareContent,self,self.refreshWelfareContent)
+	
+	--转盘刷新相关
+	EventDispatcher:removeEvent(GameEvent.WelfareEvent.Lottery_refreshBtnTx,self,self.refreshLotteryBtnTx)
+	EventDispatcher:removeEvent(GameEvent.WelfareEvent.Lottery_refreshCumulativeData,self,self.refreshLotteryCumulativeData)
+	EventDispatcher:removeEvent(GameEvent.WelfareEvent.Lottery_refresh,self,self.refreshLottery)
+	EventDispatcher:removeEvent(GameEvent.WelfareEvent.Lottery_getJackpotDatas,self,self.lotteryGetJackpotDatas)
+	EventDispatcher:removeEvent(GameEvent.WelfareEvent.Lottery_JackpotJumpAnim,self,self.lotteryJackpotJumpAnim)
+	----------------------------------------------------------------------------------------------------------------------------------
+	
+	--七日 大亨通行证购买
+	EventDispatcher:removeEvent(GameEvent.WelfareEvent.ShowUI_SevenDayBuyPassUI,self,self.showSevenDayBuyPassUI)
+	EventDispatcher:removeEvent(GameEvent.WelfareEvent.HideUI_SevenDayBuyPassUI,self,self.hideSevenDayBuyPassUI)
+	----------------------------------------------------------------------------------------------------------------------------------
+
+end
+
+function WelfareSystem:showWelfareUI(welfareContentType,extraParam)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.WelfareUI,
+		function(view)
+			view:ShowByWelfareContentType(welfareContentType,extraParam)
+		end
+	)
+
+end
+
+function WelfareSystem:hideWelfareUI()
+
+	GUIManager.inst:HideView(Constants.ViewName.WelfareUI)
+
+end
+
+
+function WelfareSystem:refreshWelfareContent(welfareContentType)
+
+	welfareContentType = welfareContentType or WelfareContentType.dailySign
+
+	local welfareUI = GUIManager.inst:GetWindow(Constants.ViewName.WelfareUI, false)
+
+	if welfareUI ~= nil and welfareUI.isShowing then
+		welfareUI:Refresh(welfareContentType)
+	end
+
+end
+
+--转盘相关刷新
+function WelfareSystem:refreshLotteryBtnTx()
+	
+	local welfareUI = GUIManager.inst:GetWindow(Constants.ViewName.WelfareUI, false)
+
+	if welfareUI ~= nil and welfareUI.isShowing then
+		welfareUI:refreshLotteryBtnTx()
+	end
+	
+end
+
+function WelfareSystem:refreshLotteryCumulativeData(isChangeNext)
+	
+	local welfareUI = GUIManager.inst:GetWindow(Constants.ViewName.WelfareUI, false)
+
+	if welfareUI ~= nil and welfareUI.isShowing then
+		welfareUI:refreshLotteryCumulativeData(isChangeNext)
+	end
+	
+end
+
+function WelfareSystem:refreshLottery(usetype)
+	
+	local welfareUI = GUIManager.inst:GetWindow(Constants.ViewName.WelfareUI, false)
+
+	if welfareUI ~= nil and welfareUI.isShowing then
+		welfareUI:RefreshLottery(usetype)
+	end
+	
+end
+
+function WelfareSystem:lotteryGetJackpotDatas(datas,type)
+	
+	local welfareUI = GUIManager.inst:GetWindow(Constants.ViewName.WelfareUI, false)
+
+	if welfareUI ~= nil and welfareUI.isShowing then
+		welfareUI:LotteryGetJackpotDatas(datas,type)
+	end
+	
+end
+
+function WelfareSystem:lotteryJackpotJumpAnim(needRequest)
+	
+	local welfareUI = GUIManager.inst:GetWindow(Constants.ViewName.WelfareUI, false)
+
+	if welfareUI ~= nil and welfareUI.isShowing then
+		welfareUI:LotteryJackpotJumpAnim(needRequest)
+	end
+	
+end
+
+----------------------------------------------------------------------
+
+--七日 大亨通行证购买界面
+function WelfareSystem:showSevenDayBuyPassUI()
+	
+	GUIManager.inst:OpenView(
+		Constants.ViewName.SevenDayBuyPassUI,
+		function(view)
+			
+		end
+	)
+	
+end
+
+function WelfareSystem:hideSevenDayBuyPassUI()
+	
+	GUIManager.inst:HideView(Constants.ViewName.SevenDayBuyPassUI)
+	
+end
+
+----------------------------------------------------------------------

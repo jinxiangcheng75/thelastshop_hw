@@ -1,0 +1,140 @@
+---------------------------------------------------------------------
+
+require("utils/XLuaUtils")
+
+local Vector2 = CS.UnityEngine.Vector2
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_GUIHelper = CS.GUIHelper
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+local EventDispatcher = require("event/EventDispatcher")
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_PetDataProxyInst = CS.PetDataProxy.inst
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+local CS_UnityUtils = CS.UnityUtils
+
+--PetBreedItem
+
+local icon
+local notSeletedObj
+local notSeleted_bgIcon
+local notSeleted_lockObj
+local tx_notSeleted_lock
+local seletedObj
+local seleted_bgIcon
+local seleted_lockObj
+local tx_seleted_lock
+local icon_giftBg
+local icon_gift
+local button
+
+local clickHandler
+local handlerexecutor
+local data
+
+----
+
+function InitComp()
+
+	icon = self:GetObjByName("icon"):GetComponent(CS_type_GUIIcon)
+	notSeletedObj = self:GetObjByName("notSeletedObj")
+	notSeleted_bgIcon = self:GetObjByName("notSeleted_bgIcon"):GetComponent(CS_type_GUIIcon)
+	notSeleted_lockObj = self:GetObjByName("notSeleted_lockObj")
+	tx_notSeleted_lock = self:GetText("tx_notSeleted_lock")
+	seletedObj = self:GetObjByName("seletedObj")
+	seleted_bgIcon = self:GetObjByName("seleted_bgIcon"):GetComponent(CS_type_GUIIcon)
+	seleted_lockObj = self:GetObjByName("seleted_lockObj")
+	tx_seleted_lock = self:GetText("tx_seleted_lock")
+	icon_giftBg = self:GetObjByName("giftBgIcon"):GetComponent(CS_type_GUIIcon)
+	icon_gift = self:GetObjByName("giftIcon"):GetComponent(CS_type_GUIIcon)
+	button = self.transform:GetComponent("Button")
+
+	init()
+
+end
+
+function init()
+
+	button:ButtonClickTween(function ()
+			clickHandler(handlerexecutor,data)
+		end)
+
+end
+
+function SetData(param)
+
+	handlerexecutor = param.handlerexecutor
+	clickHandler = param.clickHandler
+	
+	data = param.data
+	
+	
+	notSeletedObj:SetActive(not param.isSeleted)
+	seletedObj:SetActive(param.isSeleted)
+	
+	local haveBuy = CS_PetDataProxyInst.CanChangePetIds:Find(function(t)
+			return t.petId == data.id
+		end)
+	
+	local active = haveBuy == nil or (CS_UnityUtils.EqualsNull(haveBuy) == true)
+	
+	icon_giftBg.gameObject:SetActive(false)
+
+	tx_notSeleted_lock.text = CS_LanguageManagerInst:GetValueByKey("解锁")
+	tx_notSeleted_lock.color = CS_GUIHelper.GetColorByColorHex("#DFA3B1")
+	tx_seleted_lock.text = CS_LanguageManagerInst:GetValueByKey("解锁")
+	
+	if active then 
+
+		if data.unlock_type == 2 then --礼包解锁的
+			
+			icon_giftBg.gameObject:SetActive(true)
+
+			local directPurchaseData = DirectPurchaseProxy.inst:GetDirectPurchaseDataById(data.unlock_sale_id)
+			icon_giftBg:SetSprite(directPurchaseData.data.atlasIcon,directPurchaseData.data.icon1)
+			icon_gift:SetSprite(directPurchaseData.btnIconAtlas,directPurchaseData.btnIcon)
+
+			tx_notSeleted_lock.text = CS_LanguageManagerInst:GetValueByKey("礼包解锁")
+			tx_notSeleted_lock.color = CS_GUIHelper.GetColorByColorHex("#F3C710")
+			tx_seleted_lock.text = CS_LanguageManagerInst:GetValueByKey("礼包解锁")
+
+		elseif data.unlock_type == 3 then --巧匠大赛活动解锁的
+			
+			tx_notSeleted_lock.text = CS_LanguageManagerInst:GetValueByKey("活动解锁")
+			tx_notSeleted_lock.color = CS_GUIHelper.GetColorByColorHex("#F3C710")
+			tx_seleted_lock.text = CS_LanguageManagerInst:GetValueByKey("活动解锁")
+			
+		end
+		
+	end
+	
+	icon:SetSprite("petIcon_atlas",data.icon)
+	icon.transform:GetComponent("RectTransform").anchoredPosition = Vector2(0,active and 33.2 or 0)
+
+	notSeleted_lockObj:SetActive(active)
+	seleted_lockObj:SetActive(active)
+	
+	if param.isSeleted then
+		
+		if not active then
+			seleted_bgIcon:SetSprite("pets_atlas","chongwu_jiesuo3")
+		else
+			seleted_bgIcon:SetSprite("pets_atlas","chongwu_jiesuo1")
+		end 
+		
+	else
+		
+		if not active then
+			notSeleted_bgIcon:SetSprite("pets_atlas","chongwu_ditu")
+		else
+			notSeleted_bgIcon:SetSprite("pets_atlas","chongwu_jiesuo2")
+		end
+		
+	end
+	
+	
+end

@@ -1,0 +1,31 @@
+--TestNewView
+
+require("class")
+require("ui/ViewBase")
+
+local type_cs_Button = typeof(CS.UnityEngine.UI.Button)
+local type_cs_Text = typeof(CS.UnityEngine.UI.Text)
+local type_cs_Image = typeof(CS.UnityEngine.UI.Image)
+
+TestNewView = class(ViewBase)
+
+function TestNewView:ctor()
+	print("TestNewView:ctor")
+	self.viewID = "TestNewUI"
+	TestNewView.super.init(self, self.viewID)
+end
+
+function TestNewView:onInit()
+	self.sortingLayerName = "window"
+	local comp = self.contentPanel
+	local btnTest = comp:GetComponentInChildren(type_cs_Button)
+	local txtTest = comp:GetComponentInChildren(type_cs_Text)
+	local imgTest = comp:GetComponentInChildren(type_cs_Image)
+	btnTest:ButtonClickTween(
+		function()
+			print("btn_test onClicked")
+			self:hide()
+		end
+	)
+	txtTest.text = "text set in lua"
+end

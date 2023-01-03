@@ -1,0 +1,472 @@
+--ShopRankUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local CS_type_luaList = typeof(CS.LuaListItem)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local csGameTimerInst = CS.GameTimer.inst
+local csVector2 = CS.UnityEngine.Vector2
+local csVector3 = CS.UnityEngine.Vector3
+local csAbbreviationUtility = CS.AbbreviationUtility
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local csSpineUtils = CS.SpineUtils
+local csEGender = CS.EGender
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_IndoorRoleActionConfigManagerInst = CS.IndoorRoleActionConfigManager.inst
+
+local dataList = {}
+local timerId = nil
+
+local curIndex = -1
+local isInit = true
+
+ShopRankUIView = class(ViewBase)
+
+function ShopRankUIView:ctor()
+	self.viewID = Constants.ViewName.ShopRankUIView
+	ShopRankUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function ShopRankUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.bgBtn = contentPane:GetButton("bg")
+
+	self.scrollView = contentPane:GetObjByName("allRank"):GetComponent(CS_type_superList)
+	self.listItemCount = 0
+
+	self.group = contentPane:GetObjByName("group"):GetComponent("ToggleGroupMarget")
+
+	self.selfRankIcon = contentPane:GetGUIIcon("selfRankIcon")
+	self.selfRankNum = contentPane:GetText("selfRankNum")
+	self.selfRankNumText = contentPane:GetText("selfRankNumText")
+	self.sectionText = contentPane:GetText("sectionText")
+	self.selfHeadObj = contentPane:GetObjByName("selfHeadObj")
+	self.selfHeadIconTf = contentPane:GetObjByName("selfHeadIconTf").transform
+	self.selfNameText = contentPane:GetText("selfNameText")
+	self.selfUnionName = contentPane:GetText("selfUnionName")
+	self.unionTextRect = contentPane:GetObjByName("selfUnionName"):GetComponent("RectTransform")
+	self.refreshMask = contentPane:GetObjByName("refreshMask")
+	self.selfRankNumIcon = contentPane:GetGUIIcon("selfRankNumIcon")
+	self.selfRankNumObj = contentPane:GetObjByName("selfRankNumBg")
+	self.noUnionPrompt = contentPane:GetText("noUnionPrompt")
+	self.bottomObj = contentPane:GetObjByName("bottomObj")
+	self.obj_top = contentPane:GetObjByName("tf_top")
+	local objList = self.obj_top:GetComponent(CS_type_ObjList).objList
+	self.topRoleTfList = {}
+	for i = 0, objList.Count - 1 do
+		self.topRoleTfList[#self.topRoleTfList + 1] = objList[i]:GetComponent("RectTransform")
+	end
+
+	self.uiAnimator = contentPane.uiAnimator
+end
+
+function ShopRankUIView:onInit()
+
+	self:initComp()
+	self.topRoleDressUpSystemList = {}
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	--self.bgBtn.onClick:AddListener(
+		--function ()
+			--self:closeBtnClick()
+		--end
+	--)
+
+	self.scrollView.itemRenderer = function(index,item)
+		self:ListItemRenderer(index,item)
+	end
+
+	self.group.OnSelectedIndexValueChange = function(index)
+		self:ToggleSelectChange(index)
+	end
+
+	if(CS.FGUI.inst.isLandscape)then
+		self.group:SetToggleSize(csVector2(272,104),csVector2(250,96),false)
+	else
+		self.group:SetToggleSize(csVector2(300,104),csVector2(278,96),false)
+	end
+
+end
+
+function ShopRankUIView:ToggleSelectChange(index)
+	if(curIndex == index)then
+		print("当前的类型index是",index,"与当前设置的index相同不刷新数据")
+		return
+	end
+	curIndex = index
+	self:SwitchQequestInfo(index)
+	self:ShowRefreshMask()
+end
+
+function ShopRankUIView:SetTargetToggle(index)
+	self.group.selectedIndex = index
+	if(index == 0)then
+		self.group:OnEnableMethod(0)
+	end
+end
+
+function ShopRankUIView:ShowRefreshMask()
+	if(isInit)then
+		isInit = false
+		return
+	end
+	self.refreshMask:SetActive(true)
+	self.scrollView.gameObject:SetActive(false)
+	self.bottomObj:SetActive(false)
+
+	timerId = csGameTimerInst:AddTimer(
+		0.5,
+		1,
+		function ()
+			self.refreshMask:SetActive(false)
+			self.scrollView.gameObject:SetActive(true)
+			self.bottomObj:SetActive(true)
+		end
+	)
+end
+
+function ShopRankUIView:DoShowAnimation()
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+end
+
+function ShopRankUIView:DoHideAnimation()
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	csGameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end
+	)
+end
+
+function ShopRankUIView:onHide()
+	--print("ShopRankUIView onHide")
+	if(timerId ~= nil)then
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = nil
+	end
+
+	isInit = true
+	curIndex = -1
+	ShopRankDataProxy.inst:ClearPool()
+end
+
+function  ShopRankUIView:onShowed()
+	--print("ShopRankUIView onShowed")
+end
+
+function ShopRankUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function ShopRankUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function ShopRankUIView:closeBtnClick()
+	self:hide()
+end
+
+function ShopRankUIView:SetUIData(rankId,rankList,selfRankInfo)
+	local data = RankConfigManager:GetConfig(rankId)
+	if(data ~= nil)then
+		self.sectionText.text = cs_LanguageManagerInst:GetValueByKey(data.name)
+	else
+		print("ShopRankUIView - SetUIData - 等级区间的config没找到")
+		self.sectionText.text = cs_LanguageManagerInst:GetValueByKey("--暂无--")
+	end
+
+	if(rankList ~= nil)then
+		dataList = rankList
+	end
+
+	self:setTopDress()
+	self:SetSelfData(selfRankInfo)
+	self:SetListItemTotalCount(#dataList)
+	self.scrollView:ScrollToTop()
+end
+
+function ShopRankUIView:getTopDressList()
+
+	self.topRoleDressList = {}
+
+	local rankType = ShopRankDataProxy.inst.rankListType
+
+	if rankType == 4 then --英雄取英雄装扮
+
+		for i = 1, #dataList do
+
+			if i <= 3 then --只取前三
+
+				self.topRoleDressList[#self.topRoleDressList + 1] =
+				{
+					gender = dataList[i].gender,
+					dress = dataList[i].userDress,
+					equipList = dataList[i].heroEquipList
+				}
+
+			else
+				break
+			end
+
+		end
+
+	else
+
+		for i = 1, #dataList do
+
+			if i <= 3 then --只取前三
+
+				self.topRoleDressList[#self.topRoleDressList + 1] =
+				{
+					gender = dataList[i].gender,
+					dress = dataList[i].userDress
+				}
+
+			else
+				break
+			end
+
+		end
+
+	end
+
+end
+
+function ShopRankUIView:setTopDress()
+
+	if ShopRankDataProxy.inst.rankListType == 3 then --联盟无前三形象展示
+		self.obj_top:SetActive(false)
+	else
+
+		self.obj_top:SetActive(true)
+		self:getTopDressList()
+
+		for i = 1, #self.topRoleTfList do
+			if i <= #self.topRoleDressList then
+				self.topRoleTfList[i].gameObject:SetActive(true)
+				local dressData = self.topRoleDressList[i]
+
+				if self.topRoleDressUpSystemList[i] == nil then
+					if(ShopRankDataProxy.inst.rankListType == 4)then
+						local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByHero")
+						local func = funcGeneric(CS.GraphicDressUpSystem)
+
+						func(CS_CharacterManagerInst,CS.EGender.__CastFrom(dressData.gender),dressData.equipList,csSpineUtils.RoleDressToUintList(dressData.dress),1.4,true,function (system)
+								self.topRoleDressUpSystemList[i] = system
+								system.transform:SetParent(self.topRoleTfList[i])
+								system.transform.localScale = csVector3.one * 0.5
+								system.transform.localPosition = csVector3.zero
+								local idleAnimationName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(system.gender, CS.kIndoorRoleActionType.normal_standby)
+								system:Play(idleAnimationName, true)
+								system:SetDirection(CS.RoleDirectionType.Right)
+							end)
+					else
+						local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+						local func = funcGeneric(CS.GraphicDressUpSystem)
+
+						func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(dressData.gender),csSpineUtils.RoleDressToUintList(dressData.dress),CS.EGender.__CastFrom(dressData.gender),1.4,true,function (system)
+								self.topRoleDressUpSystemList[i] = system
+								system.transform:SetParent(self.topRoleTfList[i])
+								system.transform.localScale = csVector3.one * 0.5
+								system.transform.localPosition = csVector3.zero
+								local idleAnimationName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(system.gender, CS.kIndoorRoleActionType.normal_standby)
+								system:Play(idleAnimationName, true)
+								system:SetDirection(CS.RoleDirectionType.Right)
+							end)
+					end
+				else
+					if(ShopRankDataProxy.inst.rankListType == 4)then
+						CS_CharacterManagerInst:ReSetCharacterByHero(self.topRoleDressUpSystemList[i],CS.EGender.__CastFrom(dressData.gender),dressData.equipList,csSpineUtils.RoleDressToUintList(dressData.dress))
+					else
+						CS_CharacterManagerInst:ReSetCharacter(self.topRoleDressUpSystemList[i],CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(dressData.gender),csSpineUtils.RoleDressToUintList(dressData.dress),CS.EGender.__CastFrom(dressData.gender))
+					end
+				end
+			else
+				self.topRoleTfList[i].gameObject:SetActive(false)
+			end
+		end
+	end
+end
+
+function ShopRankUIView:SetSelfData(selfRankInfo)
+	if(selfRankInfo == nil)then print("ShopRankUIView - SetSelfData - player info is empty") return end
+	if(tonumber(selfRankInfo.rank) == 1)then
+		self.selfRankIcon.iconImage.enabled = true
+		self.selfRankIcon:SetSprite("luxury_atlas","jiaju_paiming1")
+	elseif tonumber(selfRankInfo.rank) == 2 then
+		self.selfRankIcon.iconImage.enabled = true
+		self.selfRankIcon:SetSprite("luxury_atlas","jiaju_paiming2")
+	elseif tonumber(selfRankInfo.rank) == 3 then
+		self.selfRankIcon.iconImage.enabled = true
+		self.selfRankIcon:SetSprite("luxury_atlas","jiaju_paiming3")
+	else
+		self.selfRankIcon.iconImage.enabled = false
+	end
+
+	self.selfRankNum.text = tostring(selfRankInfo.rank)
+
+	local rankType = ShopRankDataProxy.inst.rankListType
+
+	if(selfRankInfo.unionName ~= nil and string.len(selfRankInfo.unionName) > 0)then
+		self.selfUnionName.text = cs_LanguageManagerInst:GetValueByKey(selfRankInfo.unionName)
+	else
+		self.selfUnionName.text = cs_LanguageManagerInst:GetValueByKey("无公会")
+	end
+
+	self.selfUnionName.fontSize = 32
+	self.selfUnionName.color = CS.GUIHelper.GetColorByColorHex("#BA8793")
+
+	if rankType == 1 or rankType == 2 or rankType == 4 then
+		if(tonumber(selfRankInfo.rank) ~= 0)then
+			self.selfHeadObj:SetActive(true)
+			self.selfRankIcon.gameObject:SetActive(true)
+			self.selfRankNumObj:SetActive(true)
+			self.selfNameText.enabled = true
+			self.noUnionPrompt.enabled = false
+			self.selfUnionName.enabled = true
+			self.selfNameText.text = cs_LanguageManagerInst:GetValueByKey(selfRankInfo.name) .. "#" .. selfRankInfo.userId
+			self.unionTextRect.anchoredPosition = csVector2(self.unionTextRect.anchoredPosition.x,-22)
+			self:SetSelfDress(selfRankInfo.userDress,selfRankInfo.gender,selfRankInfo.userId,rankType,selfRankInfo.heroEquipList)
+		else
+			self.selfHeadObj:SetActive(false)
+			self.selfNameText.enabled = false
+			self.selfRankIcon.gameObject:SetActive(false)
+			self.selfRankNumObj:SetActive(false)
+			self.noUnionPrompt.enabled = true
+			self.selfUnionName.enabled = false
+			self.noUnionPrompt.text = cs_LanguageManagerInst:GetValueByKey("未上榜")
+		end
+	elseif rankType == 3 then
+		self.selfUnionName.fontSize = 50
+		self.selfUnionName.color = CS.UnityEngine.Color.white
+		self.selfHeadObj:SetActive(false)
+		self.selfNameText.enabled = false
+		if(selfRankInfo.userId == nil or selfRankInfo.userId == "0")then
+			self.selfRankIcon.gameObject:SetActive(false)
+			--self.selfRankNumText.enabled = false
+			self.selfRankNumObj:SetActive(false)
+			self.noUnionPrompt.enabled = true
+			self.selfUnionName.enabled = false
+			self.noUnionPrompt.text = cs_LanguageManagerInst:GetValueByKey("无联盟")
+		else
+			self.selfRankIcon.gameObject:SetActive(true)
+			--self.selfRankNumText.enabled = true
+			self.selfRankNumObj:SetActive(true)
+			self.noUnionPrompt.enabled = false
+			self.selfUnionName.enabled = true
+		end
+		self.unionTextRect.anchoredPosition = csVector2(self.unionTextRect.anchoredPosition.x,0)
+	end
+
+
+	self.selfRankNumText.text = csAbbreviationUtility.AbbreviateNumber(selfRankInfo.number,2)
+
+	local rankNumIconAtlas = "luxury_atlas"
+	local rankNumIconName = ShopRankDataProxy.inst.numberIcon[rankType]
+
+	if rankType == 4 then
+		local heroCfg = CS.HeroProfessionConfigManager.inst:GetConfig(selfRankInfo.heroId)
+		if(heroCfg ~= nil)then
+			rankNumIconAtlas = heroCfg.atlas
+			rankNumIconName = heroCfg.ocp_icon
+		end
+	end
+
+	self.selfRankNumIcon:SetSprite(rankNumIconAtlas,rankNumIconName)
+
+end
+
+function ShopRankUIView:SetSelfDress(roleDress,gender,userId,rankType,heroEquipList)
+	if(roleDress == nil) then print("ShopRankUIView - SetSelfDress - roleDress is Empty Data") return end
+	local uid = userId .. "self"
+	if(ShopRankDataProxy.inst.headPrefabPool[uid] == nil)then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		if(rankType == 4)then
+			local equipIdList = get_csharp_list(CS.System.Int32)
+			equipIdList:AddRange(csSpineUtils.RoleDressToHeadDressIdList(roleDress))
+			equipIdList:AddRange(CS.CharacterManager.inst:EquipIdsToDressIds(heroEquipList))
+			func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(csEGender.__CastFrom(gender)),equipIdList,csEGender.__CastFrom(gender),0.35,true,function (system)
+					system.transform:SetParent(self.selfHeadIconTf)
+					system.transform.localScale = csVector3(1,1,1) * 0.35
+					system.transform.localPosition = csVector3(0,-220,0)
+					system:SetDirection(CS.RoleDirectionType.Left)
+					ShopRankDataProxy.inst.headPrefabPool[uid] = system
+				end,nil)
+		else
+			func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(csEGender.__CastFrom(gender)),csSpineUtils.RoleDressToHeadDressIdList(roleDress),csEGender.__CastFrom(gender),0.35,true,function (system)
+					system.transform:SetParent(self.selfHeadIconTf)
+					system.transform.localScale = csVector3(1,1,1) * 0.35
+					system.transform.localPosition = csVector3(0,-220,0)
+					system:SetDirection(CS.RoleDirectionType.Left)
+					ShopRankDataProxy.inst.headPrefabPool[uid] = system
+				end,nil)
+		end
+	else
+		local system = ShopRankDataProxy.inst.headPrefabPool[uid]
+		CS_CharacterManagerInst:ReSetCharacterByHero(system, csEGender.__CastFrom(gender), heroEquipList, csSpineUtils.RoleDressToUintList(roleDress))
+		system.transform:SetParent(self.selfHeadIconTf)
+		system.transform.localScale = csVector3(1,1,1) * 0.35
+		system.transform.localPosition = csVector3(0,-220,0)
+		system:SetDirection(CS.RoleDirectionType.Left)
+	end
+end
+
+function ShopRankUIView:RefreshData()
+
+end
+
+function ShopRankUIView:SwitchQequestInfo(index)
+	--if index == 3 then --test hero
+	--self:SetUIData(0,{},{})
+	--else
+	EventDispatcher:dispatchEvent(GameEvent.RankEvent.Request_RankList,index + 1)
+	--end
+end
+
+function ShopRankUIView:ListItemRenderer(index,item)
+	local prefabItem = item
+	if(index >= self.listItemCount)then
+		prefabItem.gameObject:SetActive(false)
+		prefabItem:ClearData()
+	end
+
+	if(index < self.listItemCount)then
+		prefabItem.gameObject:SetActive(true)
+		prefabItem:SetData(dataList[index + 1])
+	end
+end
+
+function ShopRankUIView:SetListItemTotalCount(count)
+	self.listItemCount = count
+	if(count < 0)then
+		self.listItemCount = 0
+	end
+
+	self.scrollView.totalItemCount = count
+end
+------------------------------------------------

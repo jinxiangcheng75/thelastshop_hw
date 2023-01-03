@@ -1,0 +1,15 @@
+--AbstractHandlerFactory
+
+AbstractHandlerFactory = class()
+
+function AbstractHandlerFactory:ctor()
+	self.mHandlers = {}
+end
+
+function AbstractHandlerFactory:add(type, handler)
+	self.mHandlers[type] = handler
+end
+
+function AbstractHandlerFactory:getHandler(type)
+	return self.mHandlers[type];
+end

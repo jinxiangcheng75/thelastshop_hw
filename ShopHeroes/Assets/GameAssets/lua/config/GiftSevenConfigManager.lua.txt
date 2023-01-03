@@ -1,0 +1,70 @@
+--GiftSevenConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local CS_CSVParser = CS.CSVParser
+
+GiftSevenConfig =
+class({
+		id = 1,
+		days = 1,
+		roleImg_icon = "",
+		prop_type = 1,
+		prop_id = 1,
+		prop_quantity = 1,
+		prop_dec = "",
+	})
+
+GiftSevenConfigManager = class()
+--GiftSevenConfigManager.cfgDict = {}
+local csv_name = "first_recharge_reward"
+
+function GiftSevenConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = CS_CSVParser.GetCSV(csv_name)
+
+	local cfgs = CSVParser:parseClass(csv, 3, GiftSevenConfig)
+	GiftSevenConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("GiftSevenConfigManager  错误")
+	end
+end
+
+function GiftSevenConfigManager:processConfigs(cfgs)
+
+	for i=1, #cfgs do
+
+		local c = cfgs[i]
+
+		c.id = tonumber(c.id)
+		c.days = tonumber(c.days)
+		c.prop_type = tonumber(c.prop_type)
+		c.prop_id = tonumber(c.prop_id)
+		c.prop_quantity = tonumber(c.prop_quantity)
+
+		self.cfgDict[tonumber(c.id)] = c
+	end
+
+end
+
+function GiftSevenConfigManager:GetAllConfig()
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+		tempList[index] = v
+		index = index + 1
+	end
+	
+	table.sort(tempList,function (a,b)
+		return a.id < b.id
+	end)
+
+	return tempList
+end
+
+
+
+function GiftSevenConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

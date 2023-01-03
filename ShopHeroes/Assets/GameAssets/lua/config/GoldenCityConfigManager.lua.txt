@@ -1,0 +1,123 @@
+--GoldenCityConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local CS_CSVParser = CS.CSVParser
+
+GoldenCityConfig =
+class({
+		id = 1,
+		instance_name = "",
+		instance_type = 1,
+		difficulty = 1,
+		instance_id = 1,
+		unlock_num = 1,
+		ic_probability = 1,
+		box_probability = 1,
+		ic_id = 1,
+		box_id = 1,
+	})
+
+GoldenCityConfigManager = class()
+--GoldenCityConfigManager.cfgDict = {}
+local csv_name = "instance_raiders"
+
+function GoldenCityConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = CS_CSVParser.GetCSV(csv_name)
+
+	local cfgs = CSVParser:parseClass(csv, 3, GoldenCityConfig)
+	GoldenCityConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("GoldenCityConfigManager  错误")
+	end
+end
+
+function GoldenCityConfigManager:processConfigs(cfgs)
+
+	for i=1, #cfgs do
+
+		local c = cfgs[i]
+
+		c.id = tonumber(c.id)
+		c.instance_type = tonumber(c.instance_type)
+		c.difficulty = tonumber(c.difficulty)
+		c.instance_id = tonumber(c.instance_id)
+		c.unlock_num = tonumber(c.unlock_num)
+		c.ic_probability = tonumber(c.ic_probability)
+		c.box_probability = tonumber(c.box_probability)
+		c.ic_id = tonumber(c.ic_id)
+		c.box_id = tonumber(c.box_id)
+
+		self.cfgDict[tonumber(c.id)] = c
+	end
+
+end
+
+function GoldenCityConfigManager:GetAllConfig()
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+		tempList[index] = v
+		index = index + 1
+	end
+
+	table.sort(tempList,function (a,b)
+			return a.id < b.id
+		end)
+
+	return tempList
+end
+
+function GoldenCityConfigManager:GetConfigByType(type)
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+		if(v.instance_type == type)then
+			tempList[index] = v
+			index = index + 1
+		end
+	end
+
+	table.sort(tempList,function (a,b)
+			return a.difficulty < b.difficulty
+		end)
+
+	return tempList
+end
+
+function GoldenCityConfigManager:GetConfigByTypeAndDifficult(type,difficult)
+	local data = nil
+	for i, v in ipairs(self.cfgDict) do
+		if(v.instance_type == type and v.difficulty == difficult)then
+			data = v
+			break
+		end
+	end
+	
+	return data
+end
+
+function GoldenCityConfigManager:GetLastBossConfig()
+	local bossList = self:GetConfigByType(2)
+	
+	return bossList[#bossList]
+end
+
+function GoldenCityConfigManager:GetConfigByInstanceId(instanceId)
+	local data = nil
+	for i, v in ipairs(self.cfgDict) do
+		if(v.instance_id == instanceId)then
+			data = v
+			break
+		end
+	end
+
+	return data
+end
+
+
+function GoldenCityConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

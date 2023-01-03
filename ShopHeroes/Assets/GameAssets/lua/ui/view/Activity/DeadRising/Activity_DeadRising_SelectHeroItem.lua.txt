@@ -1,0 +1,298 @@
+
+-- Activity_DeadRising_SelectHeroItem
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_RoleDataProxyInst = CS.RoleDataProxy.inst
+local CS_ItemBagProxyInst = CS.ItemBagProxy.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_StaticConstants = CS.StaticConstants
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+
+local CS_SpineUtils = CS.SpineUtils
+local Vector3 = CS.UnityEngine.Vector3
+local CS_TimeUtils = CS.TimeUtils
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+
+local obj_hero
+local obj_recover
+local obj_heroIdle
+local obj_heroRest
+local img_gray
+local tx_allRestItemCount
+local tx_allRestGemCount
+local tx_restTime
+local tx_lv
+local icon_headBg
+local icon_typeBg
+local icon_type
+local tx_fighting
+local btn_self
+local btn_info
+local tx_name
+local tx_limit
+local stars
+local tf_headParent
+
+local isRecoverHero = false
+local data
+local timerId = 0
+local graphicDressUp
+
+function InitComp()
+
+	obj_hero = self:GetObjByName("obj_hero")
+	obj_recover = self:GetObjByName("obj_recover")
+	obj_heroIdle = self:GetObjByName("obj_heroIdle")
+	obj_heroRest = self:GetObjByName("obj_heroRest")
+	img_gray = self:GetImage("img_gray")
+	tx_allRestItemCount = self:GetText("tx_allRestItemCount")
+	tx_allRestGemCount = self:GetText("tx_allRestGemCount")
+	tx_restTime = self:GetText("tx_restTime")
+	tx_lv = self:GetText("tx_lv")
+	icon_headBg = self:GetGUIIcon("icon_headBg")
+	icon_typeBg = self:GetGUIIcon("icon_typeBg")
+	icon_type = self:GetGUIIcon("icon_type")
+	tx_fighting = self:GetText("tx_fighting")
+	btn_self = self:GetButton("btn_self")
+	btn_info = self:GetButton("btn_info")
+	tx_name = self:GetText("tx_name")
+	tx_limit = self:GetText("tx_limit")
+	stars = {}
+
+	local objList_star = self:GetObjByName("objList_star"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList_star.Count - 1 do
+		stars[#stars + 1] = objList_star[i]:GetComponent(CS_type_GUIIcon)
+	end
+
+	tf_headParent = self:GetObjByName("tf_headParent"):GetComponent("RectTransform")
+
+	btn_info.onClick:AddListener(function ()
+			onInfoBtnClick()
+		end)
+
+	btn_self.onClick:AddListener(function ()
+			onSelfBtnClick()
+		end)
+
+end
+
+function SetData(obj)
+
+	isRecoverHero = obj.isRecoverHero
+	data = obj.data
+
+	if isRecoverHero then
+		setRecoverHeroState()
+	else
+		setHeroState()
+	end
+
+end
+
+function setRecoverHeroState()
+
+	btn_info.gameObject:SetActive(false)
+	obj_hero:SetActive(false)
+	obj_recover:SetActive(true)
+	img_gray.enabled = false
+
+	local itemData = CS_ItemBagProxyInst:GetItem(150001)
+	tx_allRestItemCount.text = tostring(math.floor(itemData.count))
+	tx_allRestItemCount.color = itemData.count >= 1 and CS.UnityEngine.Color.white or CS.UnityEngine.Color.red
+
+
+	if (timerId > 0) then
+		CS_GameTimerInst:RemoveTimer(timerId);
+		timerId = 0;
+	end
+
+	local allRestingHero = CS_RoleDataProxyInst:GetRestingStateHeroCount();
+	local result = 0
+
+	for i = 0, allRestingHero.Count - 1 do
+		result = result + CS.DiamondCountUtils.GetHeroRestingFastCost(allRestingHero[i].remainTime);
+	end
+
+	tx_allRestGemCount.text = CS.System.String.Format("{0:N0}",result)
+	tx_allRestGemCount.color = CS_UserDataProxyInst.playerData.gem >= result and CS.UnityEngine.Color.white or CS.UnityEngine.Color.red;
+
+	timerId = CS_GameTimerInst:AddTimer(1,function()
+
+			result = 0;
+
+			for i = 0, allRestingHero.Count - 1 do
+				result = result + CS.DiamondCountUtils.GetHeroRestingFastCost(allRestingHero[i].remainTime);
+			end
+
+			tx_allRestGemCount.text = CS.System.String.Format("{0:N0}",result)
+			tx_allRestGemCount.color = CS_UserDataProxyInst.playerData.gem >= result and CS.UnityEngine.Color.white or CS.UnityEngine.Color.red;
+
+		end)
+
+end
+
+function setHeroState()
+
+	obj_hero:SetActive(true)
+	obj_recover:SetActive(false)
+	btn_info.gameObject:SetActive(true)
+	tx_lv.text = tostring(data.level)
+	tx_fighting.text = tostring(data.fightingNum)
+	tx_name.text = CS_LanguageManagerInst:GetValueByKey(data.nickName)
+	local rarity = CS_RoleDataProxyInst:ReturnRarityByAptitude(data.intelligence)
+	icon_headBg:SetSprite(CS_StaticConstants.roleAtlasName,CS_StaticConstants.roleHeroBgIconName[rarity - 1])
+	icon_typeBg:SetSprite(CS_StaticConstants.roleAtlasName,CS_StaticConstants.heroTypeBgIconName[data.config.type - 1])
+	icon_type:SetSprite(data.config.atlas,data.config.ocp_icon)
+
+	setHeroHeadIcon();
+	setStarShow();
+	setStateData();
+
+
+end
+
+function setHeroHeadIcon()
+
+	if graphicDressUp == nil then
+
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+
+		func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(data.gender)),data:GetHeadDressIds(),CS.EGender.__CastFrom(data.gender),1.4,true,function (system)
+
+				graphicDressUp = system
+				system.transform:SetParent(tf_headParent);
+				system.transform.localScale = Vector3.one;
+				system.transform.localPosition = Vector3.zero;
+
+			end)
+
+	else
+		CS_CharacterManagerInst:ReSetCharacter(graphicDressUp, CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(data.gender)), data:GetHeadDressIds(), CS.EGender.__CastFrom(data.gender));
+	end
+
+end
+
+function setStarShow()
+
+	for i = 1, #stars do
+
+		if i - 1 < data.config.hero_grade then
+
+			stars[i].gameObject:SetActive(true)
+			stars[i]:SetSprite(CS_StaticConstants.roleAtlasName,"yingxiong_xingcheng")
+
+		else
+
+			if i - 1 < data.transferNumLimit then
+
+				stars[i].gameObject:SetActive(true)
+				stars[i]:SetSprite(CS_StaticConstants.roleAtlasName,"yingxiong_xingcheng1")
+
+			else
+
+				stars[i].gameObject:SetActive(false)
+
+			end
+
+		end
+
+	end
+
+end
+
+function setStateData()
+
+	obj_heroIdle:SetActive(data.currentState == 0)
+	obj_heroRest:SetActive(data.currentState == 1)
+	img_gray.enabled = data.currentState == 1
+
+	if data.currentState == 1 then
+
+		if timerId <= 0 then
+
+			tx_restTime.text = CS_TimeUtils.timeSpanStrip(data.remainTime)
+
+			timerId = CS_GameTimerInst:AddTimer(1,function()
+
+					if data.remainTime <= 0 then
+
+						CS_GameTimerInst:RemoveTimer(timerId);
+						timerId = 0;
+
+					else
+
+						tx_restTime.text = CS_TimeUtils.timeSpanStrip(data.remainTime)
+
+					end
+
+				end)
+
+		end
+
+	end
+
+
+end
+
+
+function onInfoBtnClick()
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.Int32)
+	func(
+		CS_EventControllerInst,
+		CS_GameEventType.RoleEvent.ROLEINFO_SHOWUI,
+		data.uid
+	)
+
+end
+
+function onSelfBtnClick()
+
+	if isRecoverHero then
+		CS_EventControllerInst:TriggerEvent(CS_GameEventType.RoleEvent.ALLROLERESTING_SHOWUI)
+	else
+
+		if data.currentState == 0 then
+
+			if #Activity_DeadRisingDataProxy.inst.heroFightDatas >= Activity_DeadRisingDataProxy.inst.heroTeamLimit then
+				EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("小队人数已满"),"FF2828")
+			else
+				EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelHero, data.uid, 0)
+			end
+			
+			
+		elseif data.currentState == 1 then
+
+			GUIManager.inst:OpenViewCS(typeof(CS.RoleRestingView),function (view)
+					view:setSingleData(data,0)
+				end)
+
+		end
+
+	end
+
+end
+
+
+function onDisable()
+
+	if timerId > 0 then
+
+		CS_GameTimerInst:RemoveTimer(timerId);
+		timerId = 0;
+
+	end
+
+end
+
+

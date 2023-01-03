@@ -1,0 +1,222 @@
+
+-- ScoreAwardGame_ScoreRewardItem
+
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local csSpineUtils = CS.SpineUtils
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_StaticConstants = CS.StaticConstants
+local CS_ItemType = CS.ItemType
+
+local scoreAwardGame_ScoreRewardItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	scoreAwardGame_ScoreRewardItem_dlc = ScoreAwardGame_ScoreRewardItem_dlc.new()
+	scoreAwardGame_ScoreRewardItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if scoreAwardGame_ScoreRewardItem_dlc~=nil then
+		scoreAwardGame_ScoreRewardItem_dlc:Clear()
+		scoreAwardGame_ScoreRewardItem_dlc = nil
+	end
+end
+
+function SetData(_data)
+	if scoreAwardGame_ScoreRewardItem_dlc~=nil then
+		scoreAwardGame_ScoreRewardItem_dlc:SetData(_data)
+	end
+end
+
+ScoreAwardGame_ScoreRewardItem_dlc = class()
+
+function ScoreAwardGame_ScoreRewardItem_dlc:ctor()
+
+end
+
+function ScoreAwardGame_ScoreRewardItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+
+	self.data = nil
+	self.groupId = 0
+	self.userNeedPoint = 0
+	self.unionNeedPoint = 0
+end
+
+function ScoreAwardGame_ScoreRewardItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.icon = self.contentPane:GetObjByName("icon"):GetComponent("GUIIcon")
+	self.numText = self.contentPane:GetObjByName("numText"):GetComponent("Text")
+	self.obj_canReward = self.contentPane:GetObjByName("obj_canReward")
+	self.obj_reward = self.contentPane:GetObjByName("obj_reward")
+	self.selfBtn = self.gameObject:GetComponent("Button")
+	self.huangguanImg = self.contentPane:GetObjByName("huangguanImg"):GetComponent("Image")
+	self.luxuryNumImg = self.contentPane:GetObjByName("luxuryNumImg"):GetComponent("Image")
+	self.luxuryNumText = self.contentPane:GetObjByName("luxuryNumText"):GetComponent("Text")
+
+	self.selfBtn.onClick:AddListener(function ()
+			self:ClickAwardMethod()
+		end)
+end
+
+function ScoreAwardGame_ScoreRewardItem_dlc:SetData(_data)
+	if(_data == nil) then return end
+
+	self.data = _data.data
+	self.groupId = _data.groupId
+	self.userNeedPoint = _data.userNeedPoint
+	self.unionNeedPoint = _data.unionNeedPoint
+
+	self.selfBtn.enabled = self.data.state ~= MsgType.EOperatingActivityRewardState.Rewarded
+
+	self.huangguanImg.enabled = self.data.vipFlag == 1
+
+	if self.data.state == MsgType.EOperatingActivityRewardState.None then --不可领取
+
+		self.obj_canReward:SetActive(false)
+		self.obj_reward:SetActive(false)
+
+
+	elseif self.data.state == MsgType.EOperatingActivityRewardState.CanReward then --可领取
+		if(Activity_ScoreAwardGameProxy.inst.scorePoint >= self.unionNeedPoint)then -- 判断公会积分是否满足(防止出现公会成员退公会导致 状态仍是可领取状态但是积分已经不能领取的情况)
+			self.obj_canReward:SetActive(true)
+		else
+			self.obj_canReward:SetActive(false)
+		end
+		self.obj_reward:SetActive(false)
+
+	elseif self.data.state == MsgType.EOperatingActivityRewardState.Rewarded then --已领取
+
+		self.obj_canReward:SetActive(false)
+		self.obj_reward:SetActive(true)
+
+	end
+
+	local itemCfg = CS.ItemconfigManager.inst:GetConfig(self.data.item.itemId)
+
+	self.luxuryNumText.text = ""
+
+	if itemCfg == nil then
+
+		self.luxuryNumImg.enabled = false
+		local equipCfg = CS_EquipConfigManagerInst:GetEquipInfoConfig(self.data.item.itemId)
+		self.icon:SetSprite(equipCfg.equipDrawingsConfig.atlas, equipCfg.equipDrawingsConfig.icon, CS_StaticConstants.qualityColor[equipCfg.equipQualityConfig.quality - 1])
+
+	else
+
+		self.luxuryNumImg.enabled = CS_ItemType.__CastFrom(itemCfg.type) == CS_ItemType.Furniture
+		if CS_ItemType.__CastFrom(itemCfg.type) == CS_ItemType.EquipmentDrawing then
+
+			local equipCfg = CS_EquipConfigManagerInst:GetEquipDrawingsCfg(itemCfg.effect)
+			self.icon:SetSprite(equipCfg.atlas, equipCfg.icon)
+
+		elseif CS_ItemType.__CastFrom(itemCfg.type) == CS_ItemType.Equip then
+
+			local equipCfg = CS_EquipConfigManagerInst:GetEquipInfoConfig(self.data.item.itemId)
+			self.icon:SetSprite(equipCfg.equipDrawingsConfig.atlas, equipCfg.equipDrawingsConfig.icon, CS_StaticConstants.qualityColor[equipCfg.equipQualityConfig.quality - 1])
+
+		else
+
+			if(CS_ItemType.__CastFrom(itemCfg.type) == CS_ItemType.Furniture)then
+				local furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(tonumber(itemCfg.effect))
+
+				if furnitureCfg ~= nil then
+
+					local luxury = 0
+
+					if furnitureCfg.type_1 == 1 then --墙壁
+
+						local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS.UserDataProxy.inst.shopData.shopLevel)
+
+						luxury = math.ceil((cfg.size_x / 2 + cfg.size_y / 2 ) * furnitureCfg.luxury)
+
+					elseif furnitureCfg.type_1 == 2 then --地板
+
+						local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS.UserDataProxy.inst.shopData.shopLevel)
+
+						luxury = math.ceil((cfg.size_x / 2) * (cfg.size_y / 2) * furnitureCfg.luxury)
+
+					else
+						luxury = furnitureCfg.luxury
+					end
+
+					self.luxuryNumText.text = tostring(luxury)
+
+				end
+			end
+			self.icon:SetSprite(itemCfg.atlas, itemCfg.icon)
+
+		end
+
+	end
+
+	self.numText.text = tostring(self.data.item.count)
+end
+
+function ScoreAwardGame_ScoreRewardItem_dlc:ClickAwardMethod()
+	if self.data == nil then
+		return
+	end
+
+	if 	self.data.state == MsgType.EOperatingActivityRewardState.None then
+
+		local commonData = CS.CommonRewardData(self.data.item.itemId,self.data.item.count,self.data.item.quality,self.data.item.itemType)
+		commonData.specialType = self.data.vipFlag
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+		func(csEventControllerInst, csGameEventType.CommonEvent.COMMONTIPS_SETINFO, commonData, self.transform)
+
+	elseif self.data.state == MsgType.EOperatingActivityRewardState.CanReward then
+
+		if(Activity_ScoreAwardGameProxy.inst.scorePoint < self.unionNeedPoint)then -- 判断公会积分是否满足(防止出现公会成员退公会导致 状态仍是可领取状态但是积分已经不能领取的情况)
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+			local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+			func(
+				csEventControllerInst,
+				csGameEventType.SHOWUI_TEXTMSGTIP,
+				cs_LanguageManagerInst:GetValueByKey("积分不足，无法领取"),
+				csGUIHelper.GetColorByColorHex("FF2828")
+			)
+			return
+		end
+
+		if Activity_ScoreAwardGameProxy.inst.scorePoint_self < self.userNeedPoint then --提示它个人积分不足
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua3")
+			local func = funcGeneric(CS.System.String, CS.System.String, CS.UnityEngine.Transform)
+			func(csEventControllerInst, csGameEventType.CommonEvent.COMMONMORETITLECONTENT_SETINFO, cs_LanguageManagerInst:GetValueByKey("需要个人积分达到："), tostring(Activity_ScoreAwardGameProxy.inst.scorePoint_self).."/"..tostring(self.userNeedPoint) ,self.transform)
+
+		else
+			if(self.data.vipFlag == 1 and CS.K_Vip_State.__CastFrom(CS.UserDataProxy.inst.playerData.vipState) ~= CS.K_Vip_State.Vip)then
+				EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_BuyVipUI,1)
+				return
+			end
+			EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_Reward,self.groupId,self.data.id)
+		end
+
+	end
+end
+
+function ScoreAwardGame_ScoreRewardItem_dlc:Clear()
+
+	self:removeListeners()
+
+end
+
+function ScoreAwardGame_ScoreRewardItem_dlc:addListeners()
+
+end
+
+function ScoreAwardGame_ScoreRewardItem_dlc:removeListeners()
+
+end

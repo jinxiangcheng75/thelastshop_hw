@@ -1,0 +1,57 @@
+-- RankConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+RankConfigData =
+class(
+	{
+		id,
+		guild_type,
+		rank_lv_min,
+		rank_lv_max,
+		name,
+	}
+)
+
+RankConfigManager = class()
+--RankConfigManager.cfgDict = {}
+local csv_name = "rank"
+
+function RankConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("RankConfigManager:InitCSVConfig csv:", csv)
+	local cfgs = CSVParser:parseClass(csv, 3, RankConfigData)
+	RankConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("RankConfigManager  错误")
+	end
+end
+
+function RankConfigManager:processConfigs(cfgs)
+	--print("RankConfigManager:processConfigs ", cfgs, " len:", #cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		--print("RankConfigManager c i:", i," c:", c, " idtype:", type(c.level))
+		self.cfgDict[tonumber(c.id)] = c
+	end
+	print("RankConfigManager:processConfigs completed")
+end
+
+function RankConfigManager:GetAllConfigs()
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+		tempList[index] = v
+		index = index + 1
+	end
+
+	return tempList
+end
+
+function RankConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

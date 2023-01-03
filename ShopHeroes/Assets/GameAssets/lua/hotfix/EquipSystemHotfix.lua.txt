@@ -1,0 +1,210 @@
+
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+local CS_EquipDataProxyInst = CS.EquipDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_AudioManagerInst = CS.AudioManager.inst
+local CS_ItemBagProxyInst = CS.ItemBagProxy.inst
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+-- EquipSystemHotfix C#已同步逻辑 新包需要
+
+xlua.private_accessible(CS.EquipSystem)
+xlua.hotfix(
+	CS.EquipSystem,
+	"EquipMakeStart",
+	function(self, _equipDrawingid)
+
+
+		if self.currSlotHandler == -1 then
+
+			--查找一个空闲slot
+			self.currSlotHandler = CS_EquipDataProxyInst:GetIdleEquipMakeSlot();
+
+		end
+
+		if self.currSlotHandler == -1 then
+
+			CS_AudioManagerInst:PlaySound(39);
+			EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("没有空的槽"),"FFFFFF")
+			return;
+
+		end
+
+		if not self:CheckMakeEquipRes(_equipDrawingid) then
+
+			CS_AudioManagerInst:PlaySound(39);
+			return
+
+		end
+
+		--检测消耗有没有高阶
+		local data = CS_EquipDataProxyInst:GetEquipData(_equipDrawingid);
+		if data == nil then
+			return
+		end
+
+		local needAdvancedOrLockEquipDatas = {}
+
+		if data.specialRes_1.needId > 0 then
+
+			if data.specialRes_1.type == 1 then
+
+				local equipconfig = CS_EquipConfigManagerInst:GetEquipQualityConfig(data.specialRes_1.needId);
+				local count = 0
+				local hcount = data.specialRes_1.needCount;
+				local commonQuality = equipconfig.quality
+
+				for q = commonQuality, 5 do
+
+					local equipItem = CS_ItemBagProxyInst:GetEquipItem(equipconfig.equip_id, q)
+
+					if equipItem ~= nil then
+
+						count = equipItem.count
+
+						if count > 0 then
+
+							equipconfig = CS_EquipConfigManagerInst:GetEquipQualityConfig(equipconfig.equip_id, q);
+
+							if equipItem.isLock then --先加锁着的
+								needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 0, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("物品已锁定"), content = CS_LanguageManagerInst:GetValueByKey("此物品当前已锁定。任要使用？") }
+							end
+
+							if q > commonQuality then
+								needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 1, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("正在使用高稀物品"), content = CS_LanguageManagerInst:GetValueByKey("会被用于这次制作，仍要继续吗？") }
+							end
+
+						end
+
+						if count >= hcount then
+							break
+						end
+
+						hcount = hcount - count;
+
+					end
+				end
+
+				if count < hcount then --超凡装备
+
+					for q = equipconfig.quality > CS.StaticConstants.SuperEquipBaseQuality and equipconfig.quality or CS.StaticConstants.SuperEquipBaseQuality + equipconfig.quality, CS.StaticConstants.SuperEquipBaseQuality + 5 do
+
+						local equipItem = CS_ItemBagProxyInst:GetEquipItem(equipconfig.equip_id, q);
+
+						if equipItem ~= nil then
+
+							count = equipItem.count
+							if count > 0 then
+
+								equipconfig = CS_EquipConfigManagerInst:GetEquipQualityConfig(equipconfig.equip_id, q);
+								if equipItem.isLock then --先加锁着的
+									needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 0, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("物品已锁定"), content = CS_LanguageManagerInst:GetValueByKey("此物品当前已锁定。任要使用？") }
+								end
+
+								needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 1, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("正在使用高稀物品"), content = CS_LanguageManagerInst:GetValueByKey("会被用于这次制作，仍要继续吗？") }
+
+							end
+
+							if count >= hcount then
+								break
+							end
+
+							hcount = hcount - count
+						end
+					end
+				end
+
+			end
+		end
+
+		if data.specialRes_2.needId > 0 then
+
+			if data.specialRes_2.type == 1 then
+
+				local count = 0
+				local equipconfig = CS_EquipConfigManagerInst:GetEquipQualityConfig(data.specialRes_2.needId);
+				local hcount = data.specialRes_2.needCount;
+				local commonQuality = equipconfig.quality
+
+				for q = commonQuality, 5 do
+
+					local equipItem = CS_ItemBagProxyInst:GetEquipItem(equipconfig.equip_id, q)
+					if equipItem ~= nil then
+
+						count = equipItem.count
+						if count > 0 then
+
+							equipconfig = CS_EquipConfigManagerInst:GetEquipQualityConfig(equipconfig.equip_id, q);
+
+							if equipItem.isLock then --先加锁着的
+								needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 0, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("物品已锁定"), content = CS_LanguageManagerInst:GetValueByKey("此物品当前已锁定。任要使用？") }
+							end
+
+							if q > commonQuality then
+								needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 1, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("正在使用高稀物品"), content = CS_LanguageManagerInst:GetValueByKey("会被用于这次制作，仍要继续吗？") }
+							end
+
+						end
+
+						if count >= hcount then
+							break;
+						end
+
+						hcount = hcount - count;
+
+					end
+
+				end
+
+				if count < hcount then
+
+					for q = equipconfig.quality > CS.StaticConstants.SuperEquipBaseQuality and equipconfig.quality or CS.StaticConstants.SuperEquipBaseQuality + equipconfig.quality, CS.StaticConstants.SuperEquipBaseQuality + 5 do
+
+						local equipItem = CS_ItemBagProxyInst:GetEquipItem(equipconfig.equip_id, q);
+
+						if equipItem ~= nil then
+
+
+							count = CS_ItemBagProxyInst:getEquipNumber(equipconfig.equip_id, q);
+							if count > 0 then
+
+								equipconfig = CS_EquipConfigManagerInst:GetEquipQualityConfig(equipconfig.equip_id, q);
+								if equipItem.isLock then --先加锁着的
+									needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 0, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("物品已锁定"), content = CS_LanguageManagerInst:GetValueByKey("此物品当前已锁定。任要使用？") }
+								end
+
+								needAdvancedOrLockEquipDatas[#needAdvancedOrLockEquipDatas + 1] = { type = 1, equipId = equipconfig.id, title = CS_LanguageManagerInst:GetValueByKey("正在使用高稀物品"), content = CS_LanguageManagerInst:GetValueByKey("会被用于这次制作，仍要继续吗？") }
+
+
+							end
+
+							if count >= hcount then
+								break
+							end
+
+							hcount = hcount - count
+
+						end
+					end
+				end
+			end
+		end
+
+		if #needAdvancedOrLockEquipDatas > 0 then
+			
+			EventDispatcher:dispatchEvent(GameEvent.UseAdvancedOrLockEquipTipsEvent.UseAdvancedOrLockEquip,needAdvancedOrLockEquipDatas, function ()
+				self:requestEquipMake(_equipDrawingid);
+			end)
+
+		else
+			self:requestEquipMake(_equipDrawingid);
+		end
+
+	end
+)
+
+

@@ -1,0 +1,84 @@
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("config/TestNewConfig")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_GameEventType = CS.GameEventType
+
+---@每日免费奖励
+DailyRewardDataProxy = class(BaseDataProxy)
+DailyRewardDataProxy.inst = DailyRewardDataProxy:new()
+
+function DailyRewardDataProxy:Init()
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_User_DailyBoxInfo_Cmd,
+		function(resp)
+			print("Response_User_DailyBoxInfo_Cmd success", resp)
+			self:OnDailyBoxInfoResponse(resp)
+		end,
+		function(code)
+			print("Response_User_DailyBoxInfo_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_User_DailyBoxReward_Cmd,
+		function(resp)
+			print("Response_User_DailyBoxReward_Cmd success", resp)
+			self:OnDailyBoxRewardResponse(resp)
+		end,
+		function(code)
+			print("Response_User_DailyBoxReward_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+	
+	self.data = {dailyBoxState = 0, vipDailyBoxState = 0}
+	
+end
+
+function DailyRewardDataProxy:Clear()
+end
+
+function DailyRewardDataProxy:OnDailyBoxInfoResponse(msg)
+	local data = MsgType.Response_User_DailyBoxInfo:New(msg)
+	if data.errorCode == nil or data.errorCode ~= 0 then
+		return
+	end
+	self.data.dailyBoxState = data.dailyBoxState
+	self.data.vipDailyBoxState = data.vipBoxState
+	--
+	EventDispatcher:dispatchEvent(GameEvent.MallEvent.RefreshUI_MallContent,MallContentType.daily)
+end
+
+function DailyRewardDataProxy:OnDailyBoxRewardResponse(msg)
+	local data = MsgType.Response_User_DailyBoxReward:New(msg)
+	if data.errorCode == nil or data.errorCode ~= 0 then
+		return
+	end
+
+	--获得奖励界面
+	local tempList = {}
+	--for i = 1, #data.rewardItemList do
+		local tempCommonRewardData =
+			CS.CommonRewardData(data.rewardItem.itemId, data.rewardItem.count, 0, data.rewardItem.itemType)
+		tempList[1] = tempCommonRewardData
+	--end
+	local awardItem = CS.Award_AboutCommon()
+	awardItem.type = CS.ReceiveInfoUIType.CommonReward
+	awardItem.allRewardList = tempList
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.Award_AboutCommon)
+	func(CS.EventController.inst, CS_GameEventType.ReceiveEvent.NEWITEM_MSG, awardItem)
+end
+
+function DailyRewardDataProxy:GetData()
+	return self.data
+end
+
+function DailyRewardDataProxy:HasReward()
+	return self.data.dailyBoxState ~= 1 or self.data.vipDailyBoxState ~= 1
+end

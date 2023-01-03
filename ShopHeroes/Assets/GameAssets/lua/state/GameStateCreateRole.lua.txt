@@ -1,0 +1,53 @@
+--GameStateCreateRole
+require("class")
+require("utils/XLuaUtils")
+local BaseState = require("state/BaseState")
+local coroutine_cs = require("coroutine_cs")
+local EventDispatcher = require("event/EventDispatcher")
+
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csSceneManager = CS.UnityEngine.SceneManagement.SceneManager
+local csManagerBinder = CS.ManagerBinder
+local csAudioManager = CS.AudioManager
+local csFGUI = CS.FGUI
+
+local GameStateCreateRole = class(BaseState)
+
+local startLoadScene = false
+
+function GameStateCreateRole:onEnter(transition)
+	CS.ManagerBinder.inst.mGameState = CS.kGameState.CreatRole
+	startLoadScene = false
+	
+	self:loadCreatRoleScene()
+end
+
+function GameStateCreateRole:loadCreatRoleScene()
+	coroutine_cs.start(
+		function()
+			if (startLoadScene == false) then
+				startLoadScene = true
+
+				local aop = csManagerBinder.inst.mSceneMgr:loadScene("CreatRoleScene")
+				coroutine.yield(aop)
+				coroutine_cs.wait(0.6)
+
+				csAudioManager.inst:PlayMusic(2)
+				csFGUI.inst:StartExcessAnimation(false, false)
+				
+				EventDispatcher:dispatchEvent(GameEvent.CreatRoleEvent.ShowUI_CreatRoleUI)
+			end
+			CS.ManagerBinder.inst.stateIsChanging = false
+			csManagerBinder.inst:GC();
+		end
+	)
+end
+
+function GameStateCreateRole:onExit()
+	startLoadScene = false
+	csSceneManager.UnloadSceneAsync("CreatRoleScene")
+	--EventDispatcher:dispatchEvent(GameEvent.CreatRoleEvent.HideUI_CreatRoleUI)
+end
+
+return GameStateCreateRole

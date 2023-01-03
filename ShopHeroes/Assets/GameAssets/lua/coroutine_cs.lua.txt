@@ -1,0 +1,30 @@
+local GameObject = CS.UnityEngine.GameObject
+local WaitForSeconds = CS.UnityEngine.WaitForSeconds
+
+local coroutine_cs = {}
+--协程 利用了lua的 coroutine.wrap 创建协程 coroutine.yield挂起协程 coroutine.resume	重启协程
+
+local util = require("xlua/util")
+--Main是挂载在GameObjet的继承Mono的脚本 永不销毁
+local cor_runner = GameObject.Find("GameStart"):GetComponent("CSGameStart")
+
+--开启协程
+function coroutine_cs.start(...)
+	local action = util.cs_generator(...)
+	local cor = cor_runner:StartCoroutine(action)
+	return cor
+end
+
+--挂起
+function coroutine_cs.wait(seconds)
+	coroutine.yield(WaitForSeconds(seconds)) --调起Unity 挂起若干秒
+end
+
+--停止协程
+function coroutine_cs.stop(cor)
+	if (cor) then
+		cor_runner:StopCoroutine(cor)
+	end
+end
+
+return coroutine_cs

@@ -1,0 +1,234 @@
+--DailySignUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/DailySignDataProxy")
+require("utils/XLuaUtils")
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_luaList = typeof(CS.LuaListItem)
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local GameTimerInst = CS.GameTimer.inst
+local csTimeUtils = CS.TimeUtils
+local EventDispatcher = require("event/EventDispatcher")
+local timerId
+
+DailySignUIView = class(ViewBase)
+
+function DailySignUIView:ctor()
+	self.viewID = Constants.ViewName.DailySignUIView
+	DailySignUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function DailySignUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.countText = contentPane:GetText("countText")
+	--self.descText =  contentPane:GetText("descText");
+	local superList = contentPane:GetObjByName("ItemList")
+	self.scrollView = superList:GetComponent(CS_type_superList)
+	self.signBtn = contentPane:GetButton("signBtn")
+	self.signText = contentPane:GetText("signText")
+	self.timeObj = contentPane:GetObjByName("timeObj")
+	self.timeText = contentPane:GetText("timeText")
+	self.promptText = contentPane:GetText("promptText")
+	self.lockImg = contentPane:GetImage("lockImg")
+	self.bgBtn = contentPane:GetButton("bg")
+	self.horizontalRect = contentPane:GetObjByName("cumulativeCount"):GetComponent("RectTransform")
+	self.listItemCount = 0
+
+	self.uiAnimator = contentPane.uiAnimator
+end
+
+function DailySignUIView:onInit()
+	self:initComp()
+
+	self.scrollView.itemRenderer = function(index, item)
+		self:ListItemRenderer(index, item)
+	end
+
+	self.scrollView.itemUpdateInfo = function(index, item)
+		self:ListItemRenderer(index, item)
+	end
+
+	self.closeBtn:ButtonClickTween(
+		function()
+			self:closeBtnClick()
+		end
+	)
+
+	self.bgBtn.onClick:AddListener(
+		function()
+			self:closeBtnClick()
+		end
+	)
+
+	self.signBtn:ButtonClickTween(
+		function()
+			self:SignBtnClick()
+		end
+	)
+end
+
+function DailySignUIView:DoShowAnimation()
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+end
+
+function DailySignUIView:DoHideAnimation()
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	GameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end
+	)
+end
+
+function DailySignUIView:onHide()
+	--print("DailySignUIView onHide")
+	--CS.AudioManager.inst:PlaySound(9)
+	if (timerId ~= nil) then
+		GameTimerInst:RemoveTimer(timerId)
+		timerId = nil
+	end
+end
+
+function DailySignUIView:onShowed()
+	self:RefreshUIData()
+end
+
+function DailySignUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function DailySignUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function DailySignUIView:closeBtnClick()
+	self:hide()
+end
+
+function DailySignUIView:ListItemRenderer(index, item)
+	local itemScript = item
+	--:GetComponent(typeof(CS.BtnList))
+	--cast(item,typeof(CS.BtnList))
+	for i = 1, 6 do
+		local itemIndex = index * 6 + i
+		local smallObj = itemScript.buttonList[i - 1].gameObject
+		if (itemIndex > self.listItemCount) then
+			--break
+			smallObj:SetActive(false)
+		else
+			if (itemIndex <= self.listItemCount) then
+				smallObj:SetActive(true)
+				local smallItem = smallObj:GetComponent(CS_type_luaList)
+				smallItem:SetData(itemIndex)
+			else
+				smallObj:SetActive(false)
+			end
+		end
+	end
+end
+
+function DailySignUIView:SetListItemTotalCount(count)
+	self.listItemCount = count
+	if (self.listItemCount < 0) then
+		self.listItemCount = 0
+	end
+	local count1 = math.floor(self.listItemCount / 6)
+	if (self.listItemCount % 6 > 0) then
+		count1 = count1 + 1
+	end
+	self.scrollView.totalItemCount = count1
+end
+
+function DailySignUIView:SetUIData()
+	local data = DailySignDataProxy.inst.dailyData
+	local countText = data.totalGiftCount
+
+	self.countText.text = cs_LanguageManagerInst:GetValueByKey("{0}次", tostring(countText))
+	
+	CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.horizontalRect)
+	if (data.nextTime > 0) then
+		self.signText.enabled = false
+		self.timeObj:SetActive(true)
+		self.promptText.enabled = true
+		self.lockImg.enabled = true
+	else
+		self.signText.enabled = true
+		self.timeObj:SetActive(false)
+		self.promptText.enabled = false
+		self.lockImg.enabled = false
+	end
+
+	if (timerId ~= nil) then
+		GameTimerInst:RemoveTimer(timerId)
+		timerId = nil
+	end
+
+	self.timeText.text = csTimeUtils.timeSpan3Str(data.nextTime)
+
+	timerId =
+		GameTimerInst:AddTimer(
+		1,
+		data.nextTime,
+		function()
+			if data.nextTime > 0 then
+				self:RefreshTimeContent(data.nextTime)
+			else
+				GameTimerInst:RemoveTimer(timerId)
+				timerId = nil
+			end
+		end
+	)
+end
+
+function DailySignUIView:RefreshTimeContent(curTime)
+	self.timeText.text = csTimeUtils.timeSpan3Str(curTime)
+end
+
+function DailySignUIView:RefreshUIData()
+	if CS.UserDataProxy.inst.isShowDailySignRedPoint then
+		CS.UserDataProxy.inst.isShowDailySignRedPoint = false
+	end
+	self:SetListItemTotalCount(#(DailySignDataProxy.inst.dailyData.rewardList))
+	local targetIndex = math.floor(DailySignDataProxy.inst.dailyData.totalGiftCount / 4)
+	--self.scrollView:scrollByItemIndex(targetIndex)
+	self:SetUIData()
+end
+
+function DailySignUIView:SignBtnClick()
+	if (DailySignDataProxy.inst.dailyData.nextTime > 0) then
+		--local func = get_generic_method(CS.EventController,"TriggerEvent_Lua2",
+		--CS.System.String,CS.UnityEngine.Color)
+		--func(csEventControllerInst,csGameEventType.SHOWUI_TEXTMSGTIP,cs_LanguageManagerInst:GetValueByKey("冷却中无法签到"),csGUIHelper.GetColorByColorHex("FF2828"))
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+		func(
+			csEventControllerInst,
+			csGameEventType.SHOWUI_TEXTMSGTIP,
+			cs_LanguageManagerInst:GetValueByKey("冷却中无法签到"),
+			csGUIHelper.GetColorByColorHex("FF2828")
+		)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.DailySignEvent.REQUEST_DAILYGIFTREWARD)
+	end
+end
+
+------------------------------------------------

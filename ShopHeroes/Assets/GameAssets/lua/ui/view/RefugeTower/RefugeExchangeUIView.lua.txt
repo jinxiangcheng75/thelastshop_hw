@@ -1,0 +1,244 @@
+--RefugeExchangeUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/RefugeTowerDataProxy")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local CS_type_luaList = typeof(CS.LuaListItem)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+
+local csGameTimerInst = CS.GameTimer.inst
+local csTimeUtils = CS.TimeUtils
+
+local data
+local dataList = {}
+local isHave
+
+local tempComp = nil
+
+local refugeSlotData
+
+RefugeExchangeUIView = class(ViewBase)
+
+function RefugeExchangeUIView:ctor()
+	self.viewID = Constants.ViewName.RefugeExchangeUIView
+	RefugeExchangeUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function RefugeExchangeUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("backBtn")
+	self.climbBtn = contentPane:GetButton("climbBtn")
+	self.floorText = contentPane:GetText("floorText")
+	self.icon = contentPane:GetGUIIcon("icon")
+	self.nameText = contentPane:GetText("nameText")
+	self.descText = contentPane:GetText("descText")
+	self.scrollView = contentPane:GetObjByName("itemList"):GetComponent(CS_type_superList)
+	self.normalText = contentPane:GetText("normalText")
+	self.otherText = contentPane:GetText("otherText")
+
+	self.listItemCount = 0
+end
+
+function RefugeExchangeUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.climbBtn:ButtonClickTween(
+		function ()
+			if(isHave)then
+				if(refugeSlotData.exploreState == 1)then
+					EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.ShowUI_RefugeAdventure,refugeSlotData.slotId)
+				elseif refugeSlotData.exploreState == 2 then
+					--self:hide()
+					CS.GUIManager.BackMainView()
+					EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Request_RefugeEnd,refugeSlotData.slotId)
+				end
+			else
+				EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.ShowUI_RefugePrepareUI)
+			end
+			--self:closeBtnClick()
+		end
+	)
+
+	self.scrollView.itemRenderer = function(index, item)
+		self:ListItemRenderer(index, item)
+	end
+	
+	self.timerId = 0
+end
+
+function RefugeExchangeUIView:ListItemRenderer(index, item)
+
+
+	local smallItem = item.gameObject:GetComponent(CS_type_luaList)
+	if (index >= self.listItemCount) then
+		smallItem.gameObject:SetActive(false)
+		smallItem.gameObject.name = "item"
+	end
+
+	if (index < self.listItemCount) then
+		if(CS.FGUI.inst.isLandscape) then
+			smallItem.gameObject:SetActive(true)
+			smallItem:SetData(dataList[index + 1])
+		else
+			if(index == 0)then
+				smallItem.gameObject:SetActive(false)
+			elseif index == self.listItemCount - 1 then
+				smallItem.gameObject:SetActive(false)
+			else
+				smallItem.gameObject:SetActive(true)
+				smallItem:SetData(dataList[self.listItemCount - index - 1])
+			end
+		end
+	else
+		smallItem.gameObject:SetActive(false)
+		smallItem.gameObject.name = "item"
+	end
+end
+
+function RefugeExchangeUIView:SetListItemTotalCount(count)
+	self.listItemCount = count
+	if (self.listItemCount < 0) then
+		self.listItemCount = 0
+	end
+
+	self.scrollView.totalItemCount = count
+end
+
+function RefugeExchangeUIView:onHide()
+	--print("RefugeExchangeUIView onHide")
+	if(self.timerId ~= 0)then
+		csGameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+end
+
+function  RefugeExchangeUIView:onShowed()
+	--print("RefugeExchangeUIView onShowed")
+end
+
+function RefugeExchangeUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function RefugeExchangeUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RefugeExchangeUIView:closeBtnClick()
+	self:hide()
+end
+
+function RefugeExchangeUIView:SetUIData()
+	data = RefugeTowerDataProxy.inst.refugeData
+	dataList = RefugeTowerDataProxy.inst.towerList
+
+	self.icon:SetSprite(data.atlas_icon,data.icon)
+	self.descText.text = cs_LanguageManagerInst:GetValueByKey(data.dec)
+	self.floorText.text = tostring(RefugeTowerDataProxy.inst.nextIndex)
+	if(RefugeTowerDataProxy.inst.nextIndex > #dataList)then
+		self.floorText.text = tostring(#dataList)
+	end
+
+	self:RefreshText()
+
+	self.climbBtn.interactable = tonumber(RefugeTowerDataProxy.inst.remainTime) > 0
+	self.climbBtn.interactable = not RefugeTowerDataProxy.inst.isAllOver
+
+	if(CS.FGUI.inst.isLandscape)then
+		self:SetListItemTotalCount(#dataList)
+	else
+		self:SetListItemTotalCount(#dataList + 2)
+	end
+
+	local scrollIndex = 0
+	if(CS.FGUI.inst.isLandscape)then
+		scrollIndex = tonumber(RefugeTowerDataProxy.inst.nextIndex) - 1
+	else
+		scrollIndex = (#dataList - tonumber(RefugeTowerDataProxy.inst.nextIndex))
+	end
+
+	--
+
+	self.scrollView:scrollByItemIndex(scrollIndex)
+	--
+	csGameTimerInst:AddTimerFrame(5,1,function ()
+			self.scrollView:refresh()
+
+		end)
+end
+
+function RefugeExchangeUIView:RefreshText()
+	isHave = CS.ExploreDataProxy.inst:IsHaveRefugeSlot()
+	if(isHave) then
+		--self.climbBtn.enabled = false
+		self.otherText.gameObject:SetActive(true)
+		self.normalText.enabled = false
+
+		refugeSlotData = CS.ExploreDataProxy.inst:GetRefugeSlotData()
+		if(refugeSlotData ~= nil)then
+			if(refugeSlotData.exploreState == 1)then
+				--self.otherText
+				if(self.timerId ~= 0)then
+					csGameTimerInst:RemoveTimer(self.timerId)
+					self.timerId = 0
+				end
+				if(refugeSlotData.exploringRemainTime <= 0)then
+					self.otherText.text = cs_LanguageManagerInst:GetValueByKey("完成")
+				else
+					self.otherText.text = csTimeUtils.timeSpanStrip(refugeSlotData.exploringRemainTime)
+				end
+
+				self.timerId = csGameTimerInst:AddTimer(1,refugeSlotData.exploringRemainTime,function ()
+						if(refugeSlotData.exploringRemainTime <= 0)then
+							self.otherText.text = cs_LanguageManagerInst:GetValueByKey("完成")
+							csGameTimerInst:RemoveTimer(self.timerId)
+							self.timerId = 0
+						else
+							self.otherText.text = csTimeUtils.timeSpanStrip(refugeSlotData.exploringRemainTime)
+						end
+					end)
+			elseif refugeSlotData.exploreState == 2 then
+				self.otherText.text = cs_LanguageManagerInst:GetValueByKey("完成")
+			end
+		end
+	else
+		--self.climbBtn.enabled = true
+		self.normalText.enabled = true
+		if(tonumber(RefugeTowerDataProxy.inst.remainTime) <= 0)then
+			self.normalText.gameObject:SetActive(false)
+			self.otherText.gameObject:SetActive(true)
+			self.otherText.text = cs_LanguageManagerInst:GetValueByKey("活动已结束")
+		else
+			if(RefugeTowerDataProxy.inst.isAllOver)then
+				self.otherText.gameObject:SetActive(true)
+				self.normalText.gameObject:SetActive(false)
+				self.otherText.text = cs_LanguageManagerInst:GetValueByKey("已通关")
+			else
+				self.otherText.gameObject:SetActive(false)
+				self.normalText.gameObject:SetActive(true)
+			end
+		end
+	end
+end
+
+function RefugeExchangeUIView:RefreshUIData()
+	self:RefreshText()
+	self.scrollView:refresh()
+end
+------------------------------------------------

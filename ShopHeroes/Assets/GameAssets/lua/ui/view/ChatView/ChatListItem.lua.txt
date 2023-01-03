@@ -1,0 +1,48 @@
+
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+
+-- ChatListItem
+
+local ChatListItem = class()
+----
+
+function ChatListItem:ctor()
+
+end
+
+
+function ChatListItem:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+
+	local contentPane = self.gameObject:GetComponent(CS_type_LuaBehaviour)
+
+	self.headIconParent = contentPane:GetObjByName("headIconParent")
+	if self.headIconParent ~= nil then
+		self.headIconParent = self.headIconParent.transform
+	end
+
+
+	self.headIcon = contentPane:GetGUIIcon("headIcon")
+	self.obj_headVip = contentPane:GetObjByName("obj_headVip")
+	self.tx_headVipLv = contentPane:GetText("tx_headVipLv")
+	self.levelText = contentPane:GetText("levelText")
+	self.nameText = contentPane:GetText("nameText")
+	self.msgText = contentPane:GetText("msgText")
+	self.timeText = contentPane:GetText("timeText") 
+	self.tx_emojiTime = contentPane:GetText("tx_emojiTime") 
+	self.button = contentPane:GetButton("button")
+	self.obj_msg = contentPane:GetObjByName("obj_msg")
+	self.obj_emoji = contentPane:GetObjByName("obj_emoji")
+	self.button_2 = contentPane:GetButton("button_2")
+	self.icon_emoji = contentPane:GetGUIIcon("icon_emoji")
+	self.tx_emojiLv = contentPane:GetText("tx_emojiLv")
+	self.tx_emojiName = contentPane:GetText("tx_emojiName")
+	
+	self.headGraphicSystem = nil
+
+end
+
+
+return ChatListItem

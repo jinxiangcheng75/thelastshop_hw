@@ -1,0 +1,16 @@
+--GameStateTavern
+
+require("class")
+local BaseState = require("state/BaseState")
+
+local GameStateTavern = class(BaseState)
+
+function GameStateTavern:onEnter(transition)
+	CS.ManagerBinder.inst.stateIsChanging = false
+end
+
+function GameStateTavern:onExit()
+
+end
+
+return GameStateTavern

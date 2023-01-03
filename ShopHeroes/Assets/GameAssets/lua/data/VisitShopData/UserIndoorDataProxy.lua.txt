@@ -1,0 +1,55 @@
+require("class")
+require("data/BaseDataProxy")
+local EventDispatcher = require("event/EventDispatcher")
+
+local UserIndoorData = {}
+UserIndoorData.userUId = ""
+UserIndoorData.userData = nil
+UserIndoorData.guildData = nil
+UserIndoorData.shopData = nil
+UserIndoorData.floorData = nil
+UserIndoorData.wallData = nil
+UserIndoorData.furnitureList = nil
+UserIndoorData.petList = nil
+UserIndoorData.unionId = nil
+UserIndoorDataProxy = class(BaseDataProxy)
+
+UserIndoorDataProxy.inst = UserIndoorDataProxy:new()
+
+function UserIndoorDataProxy:Init()
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_User_Detail_Cmd,
+		function(resp)
+			self:setUserDetail(resp)
+		end,
+		function(code)
+			csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取玩家数据失败!")
+		end
+	)
+end
+
+function UserIndoorDataProxy:Clear()
+end
+
+function UserIndoorDataProxy:GetData()
+	return UserIndoorData
+end
+
+function UserIndoorDataProxy:setUserDetail(msg)
+	local data = MsgType.Response_User_Detail:New(msg)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+	UserIndoorData.userUId = data.userId
+	UserIndoorData.userData = data.userData
+	UserIndoorData.guildData = data.guildData
+	UserIndoorData.shopData = data.shopData
+	UserIndoorData.floorData = data.floorData
+	UserIndoorData.wallData = data.wallData
+	UserIndoorData.furnitureList = data.furnitureList
+	UserIndoorData.petList = data.petList
+	UserIndoorData.unionId = data.unionId
+	EventDispatcher:dispatchEvent(GameEvent.OnGetVisitUserData)  --获得摆放玩家信息
+	
+	print("获得拜访玩家信息")
+end

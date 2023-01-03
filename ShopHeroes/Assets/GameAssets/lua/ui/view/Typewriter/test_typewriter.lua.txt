@@ -1,0 +1,26 @@
+local luaClass_Typewriter = require("ui/view/Typewriter/Typewriter")
+
+local typewriter
+
+
+function awake()
+	
+	
+	typewriter = luaClass_Typewriter.new()
+	typewriter:init(self:GetObjByName("luaBehaviour_typewriterUI"))
+	
+end
+
+
+function update()
+	
+	if CS.UnityEngine.Input.GetKeyDown(CS.UnityEngine.KeyCode.C) then
+		typewriter:StartStringTween()
+	end
+	
+	--if CS.UnityEngine.Input.GetKeyDown(CS.UnityEngine.KeyCode.Z) then
+		--typewriter:GotoStepEnd()
+	--end
+	
+	
+end

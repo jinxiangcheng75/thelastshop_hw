@@ -1,0 +1,22 @@
+--FunctionalTest
+
+local FunctionalTest = class()
+
+FunctionalTest.inst = FunctionalTest:new()
+
+function FunctionalTest:ctor()
+
+end
+
+function FunctionalTest:funcA()
+	print("funcA")
+	return FunctionalTest.inst
+end
+
+function FunctionalTest:funcB()
+	print("funcB")
+	return FunctionalTest.inst
+end
+
+
+return FunctionalTest.inst

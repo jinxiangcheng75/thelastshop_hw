@@ -1,0 +1,232 @@
+---------------------------------------------------------------------
+
+require("class")
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_GUIHelper = CS.GUIHelper
+
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+
+--PetBoothItem
+
+PetBoothItem = class()
+----
+
+function PetBoothItem:ctor()
+
+end
+
+
+function PetBoothItem:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.btn = self.transform:GetComponent("Button")
+
+	self.lockStateObj = self.contentPane:GetObjByName("lockStateObj")
+
+	self.addStateObj = self.contentPane:GetObjByName("addStateObj")
+
+	self.emptyStateObj = self.contentPane:GetObjByName("emptyStateObj")
+
+	self.hasStateObj = self.contentPane:GetObjByName("hasStateObj")
+	self.has_lvTxt = self.contentPane:GetObjByName("has_lvTxt"):GetComponent("Text")
+	self.has_petIcon = self.contentPane:GetObjByName("has_petIcon"):GetComponent(CS_type_GUIIcon)
+	self.has_petNameTx = self.contentPane:GetObjByName("has_petNameTx"):GetComponent("Text")
+	self.has_reputationTx = self.contentPane:GetObjByName("has_reputationTx"):GetComponent("Text")
+	self.has_energyTx = self.contentPane:GetObjByName("has_energyTx"):GetComponent("Text")
+	self.has_feedStateTx = self.contentPane:GetObjByName("has_feedStateTx"):GetComponent("Text")
+	self.has_lvBg = self.contentPane:GetObjByName("has_lvBg")
+	self.has_mainToggle = self.contentPane:GetObjByName("has_mainToggle"):GetComponent("Toggle")
+
+end
+
+function PetBoothItem:init(obj)
+
+	self.state = 0
+	self.timerId = 0
+
+	self:initComp(obj)
+
+	self.btn:ButtonClickTween(function ()
+			self:onBtnClick()
+		end)
+
+	self.has_mainToggle.onValueChanged:AddListener(
+		function (isOn)
+			if (CS_UserDataProxyInst.playerData.mainPetUid == self.data.petUid) ~= isOn then
+
+				if isOn then
+					EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("{0} 已设为主宠物",self.data.petInfo.petName),"FFFFFF")
+				else
+					EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("{0} 不再是你的主宠物",self.data.petInfo.petName),"FFFFFF")
+				end
+
+				EventDispatcher:dispatchEvent(GameEvent.PetEvent.REQUEST_PET_SETMAIN,self.data.petUid)
+			end
+		end)
+
+end
+
+
+function PetBoothItem:SetData(petData)
+
+	if petData.petInfo.petId == 0 then
+
+		self:SetState(2)
+		self.data = petData
+
+	else
+
+
+		self:SetState(3)
+		self.data = petData
+
+		local curConfig = PetUpdateConfigManager:GetConfig(self.data.petInfo.petLevel)
+		
+		self.has_mainToggle.isOn = CS_UserDataProxyInst.playerData.mainPetUid == self.data.petUid
+
+		--self.has_maskObj:SetActive(self.data.petInfo.petState ~= 2)
+		if self.data.petInfo.petState ~= 2 then --置灰
+			CS_GUIHelper.SetUIGray(self.hasStateObj.transform,true)
+			CS_GUIHelper.SetUIGray(self.has_lvBg.transform,false)
+		else
+			CS_GUIHelper.SetUIGray(self.hasStateObj.transform,false)
+		end
+
+		local petCfg = PetConfigManager:GetConfig(self.data.petInfo.petId)
+		
+		self.has_petIcon:SetSprite("petIcon_atlas",petCfg.icon)
+
+		self.has_lvTxt.text = tostring(petData.petInfo.petLevel)
+		self.has_petNameTx.text = petData.petInfo.petName
+		self.has_reputationTx.text = tostring(petData.petInfo.petReputation)
+		self.has_energyTx.text = tostring(curConfig.energy)
+		self.has_energyTx.color = CS_GUIHelper.GetColorByColorHex("ffffff")
+
+		if petData.petNextFeedTime > 0 then
+			self:setTimer()
+		else
+			self.has_energyTx.text = tostring(math.ceil(curConfig.energy / 2))
+			self.has_energyTx.color = CS_GUIHelper.GetColorByColorHex("fd4f4f")
+			self.has_feedStateTx.text = CS_LanguageManagerInst:GetValueByKey("饥饿")
+		end
+	end
+
+end
+
+--[[
+
+petState
+
+0 : lockState
+1 : addState
+2 : emptyState
+3 : hasState
+
+--]]
+
+function PetBoothItem:SetState(petState)
+
+	self.lockStateObj:SetActive(false)
+	self.addStateObj:SetActive(false)
+	self.emptyStateObj:SetActive(false)
+	self.hasStateObj:SetActive(false)
+	self.btn.interactable = true
+
+	if 	petState == 0 then
+		self.btn.interactable = false
+		self.lockStateObj:SetActive(true)
+	elseif petState == 1 then
+		self.addStateObj:SetActive(true)
+	elseif petState == 2 then
+		self.emptyStateObj:SetActive(true)
+	elseif  petState == 3 then
+		self.hasStateObj:SetActive(true)
+	end
+
+	self.data = nil
+	self.state = petState
+	self:clearTimer()
+
+end
+
+function PetBoothItem:onBtnClick()
+
+	print("宠物栏位按钮被点击——————")
+
+	if 	self.state == 0 then
+
+	elseif self.state == 1 then
+
+		EventDispatcher:dispatchEvent(GameEvent.PetEvent.ShowUI_BuyPetBoothUI)
+
+	elseif self.state == 2 then
+
+		EventDispatcher:dispatchEvent(GameEvent.PetEvent.ShowUI_CreateNewPetUI,self.data.petUid)
+
+	elseif self.state == 3 then
+
+		--宠物被收起来的状态
+		if 	self.data.petInfo.petState == 3  then
+
+			--进入宠物详情界面
+			EventDispatcher:dispatchEvent(GameEvent.PetEvent.ShowUI_PetDetailUI,self.data)
+
+		else
+
+			GUIManager.inst:HideView(Constants.ViewName.MainPetUI)
+			EventDispatcher:dispatchEvent(GameEvent.ShopDesignEvent.HideUI_ShopDesignUI)
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.IndoorData.ShopDesignItem)
+
+			func(CS_EventControllerInst,CS_GameEventType.ShopDesignEvent.LOOKPETHOUSE,CS_UserDataProxyInst:GetFuriture(self.data.petInfo.furnitureUid))
+		end
+
+	end
+
+
+end
+
+function PetBoothItem:setTimer()
+
+	self:clearTimer()
+
+	self.has_feedStateTx.text = CS_TimeUtils.timeSpanStrip(self.data.petNextFeedTime,true)
+
+	self.timerId = CS_GameTimerInst:AddTimer(1,function()
+
+			self.has_feedStateTx.text = CS_TimeUtils.timeSpanStrip(self.data.petNextFeedTime,true)
+
+		end)
+
+end
+
+function PetBoothItem:clearTimer()
+
+	if self.timerId ~= 0 then
+
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+
+	end
+
+end
+
+return PetBoothItem

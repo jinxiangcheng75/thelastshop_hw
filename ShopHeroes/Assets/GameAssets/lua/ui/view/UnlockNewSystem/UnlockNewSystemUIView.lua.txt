@@ -1,0 +1,97 @@
+--UnlockNewSystemUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("config/SystemUnlockConfigManager")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+
+UnlockNewSystemUIView = class(ViewBase)
+
+local data
+
+function UnlockNewSystemUIView:ctor()
+	self.viewID = Constants.ViewName.UnlockNewSystemUIView
+	UnlockNewSystemUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function UnlockNewSystemUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.nameText = contentPane:GetText("nameText")
+	self.icon = contentPane:GetGUIIcon("icon")
+	self.descText = contentPane:GetText("descText")
+	self.goBtn = contentPane:GetButton("goBtn")
+end
+
+function UnlockNewSystemUIView:onInit()
+
+	self:initComp()
+
+
+	self.goBtn.onClick:AddListener(
+		function ()
+			self:hide()
+			local operationData = CS.OperationData()
+			operationData.type = CS.K_Operation_DataType.NewFunction
+			operationData.task_scenes = data.task_scenes
+			operationData.condition_id = 0
+			operationData.dialog = data.dialog
+			if(data.task_guide_1 ~= nil)then
+				operationData.operations:Add(data.task_guide_1)
+			end
+			if(data.task_guide_2 ~= nil)then
+				operationData.operations:Add(data.task_guide_2)
+			end
+			if(data.task_guide_3 ~= nil)then
+				operationData.operations:Add(data.task_guide_3)
+			end
+			if(data.task_guide_4 ~= nil)then
+				operationData.operations:Add(data.task_guide_4)
+			end
+			if(data.task_guide_5 ~= nil)then
+				operationData.operations:Add(data.task_guide_5)
+			end
+			CS.GoOperationManager.inst:StartJumpOperation(operationData)
+		end
+	)
+end
+
+
+function UnlockNewSystemUIView:onHide()
+	--print("UnlockNewSystemUIView onHide")
+	csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON)
+end
+
+function  UnlockNewSystemUIView:onShowed()
+	--print("UnlockNewSystemUIView onShowed")
+	--self:SetUIData()
+end
+
+function UnlockNewSystemUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function UnlockNewSystemUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function UnlockNewSystemUIView:closeBtnClick()
+	self:hide()
+end
+
+function UnlockNewSystemUIView:SetUIData(cfgData)
+	self.contentObject:SetActive(false)
+	data = cfgData
+
+	self.nameText.text = cs_LanguageManagerInst:GetValueByKey(data.system_name)
+	self.descText.text = cs_LanguageManagerInst:GetValueByKey(data.system_des)
+	self.icon:SetSprite(data.atlas,data.icon)
+	self.icon.iconImage.enabled = true
+	self.contentObject:SetActive(true)
+end
+------------------------------------------------

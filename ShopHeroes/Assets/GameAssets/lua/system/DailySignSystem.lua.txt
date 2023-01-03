@@ -1,0 +1,70 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/DailySign/DailySignUIView")
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+
+DailySignSystem = class(BaseSystem)
+DailySignSystem.super = BaseSystem
+
+local dailySignUIView
+
+function DailySignSystem:ctor()
+end
+
+function DailySignSystem:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.DailySignEvent.ShowUI_DailySignUI,self,self.openDailySignUI)
+	EventDispatcherInis:addEvent(GameEvent.DailySignEvent.REQUEST_DAILYLIST,self,self.requestDailyList)
+	EventDispatcherInis:addEvent(GameEvent.DailySignEvent.RefreshUI_DailySignUI,self,self.refreshDailySignUI)
+	EventDispatcherInis:addEvent(GameEvent.DailySignEvent.REQUEST_DAILYGIFTREWARD,self,self.requestDailySignReward)
+end
+
+function DailySignSystem:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.DailySignEvent.ShowUI_DailySignUI,self.openDailySignUI)
+	EventDispatcherInis:removeEvent(GameEvent.DailySignEvent.REQUEST_DAILYLIST,self.requestDailyList)
+	EventDispatcherInis:removeEvent(GameEvent.DailySignEvent.RefreshUI_DailySignUI,self.refreshDailySignUI)
+	EventDispatcherInis:removeEvent(GameEvent.DailySignEvent.REQUEST_DAILYGIFTREWARD,self.requestDailySignReward)
+end
+
+function DailySignSystem:refreshDailySignUI()
+	dailySignUIView = GUIManager.inst:GetWindow(Constants.ViewName.DailySignUIView, false)
+	if(dailySignUIView ~= nil and dailySignUIView.isShowing)then
+		dailySignUIView:RefreshUIData()
+	end
+	
+	--福利界面里刷新
+	EventDispatcherInis:dispatchEvent(GameEvent.WelfareEvent.RefreshUI_WelfareContent,WelfareContentType.dailySign)
+	
+end
+
+function DailySignSystem:openDailySignUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.DailySignUIView,
+		function(view)
+			dailySignUIView = view
+		end
+	)
+end
+
+function DailySignSystem:requestDailySignReward()
+	local rep = MsgType.Request_Activity_DailyGiftReward:New()
+	rep:Send()
+end
+
+function DailySignSystem:requestDailyList()
+	local rep = MsgType.Request_Activity_List:New()
+	rep:Send()
+end
+
+
+function DailySignSystem:OnEnter()
+	DailySignSystem.super.OnEnter(self)
+end
+
+function DailySignSystem:OnExit()
+	DailySignSystem.super.OnExit(self)
+end

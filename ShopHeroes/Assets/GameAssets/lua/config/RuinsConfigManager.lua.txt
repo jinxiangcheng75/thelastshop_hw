@@ -1,0 +1,129 @@
+-- RuinsConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+RuinsConfigData =
+class(
+	{
+		id,
+		instance_name,
+		instance_group,
+		group_index,
+		instance_group_name,
+		instance_type,
+		scenes,
+		instance_atlas,
+		instance_icon,
+		instance_bg,
+		monster1_id,
+		monster2_id,
+		monster3_id,
+		monster4_id,
+		monster5_id,
+		monster6_id,
+		monster7_id,
+		monster8_id,
+		monster9_id,
+		monster10_id,
+		boss_id,
+		reward_type,
+		reward_id,
+		reward_num,
+		team_strength,
+		recommend_power,
+	}
+)
+
+RuinsConfigManager = class()
+--RuinsConfigManager.cfgDict = {}
+local csv_name = "instance_ruins"
+
+function RuinsConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	self.sumDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("RuinsConfigManager:InitCSVConfig csv:", csv)
+	local cfgs = CSVParser:parseClass(csv, 3, RuinsConfigData)
+	RuinsConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("RuinsConfigManager  错误")
+	end
+end
+
+function RuinsConfigManager:processConfigs(cfgs)
+	--print("RuinsConfigManager:processConfigs ", cfgs, " len:", #cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		print("RuinsConfigManager c i:", i," c:", c.instance_group_name, " idtype:", c.reward_id)
+		self.cfgDict[tonumber(c.id)] = c
+		if(self.sumDict[tonumber(c.instance_group)] == nil) then
+			self.sumDict[tonumber(c.instance_group)] = 1
+		else
+			self.sumDict[tonumber(c.instance_group)] = self.sumDict[tonumber(c.instance_group)] + 1
+		end
+
+	end
+	print("RuinsConfigManager:processConfigs completed")
+end
+
+function RuinsConfigManager:GetAllConfigs()
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+		tempList[index] = v
+		index = index + 1
+	end
+
+	return tempList
+end
+
+function RuinsConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end
+
+function RuinsConfigManager:GetConfigByHouseId(id)
+	for k, v in pairs(self.cfgDict) do
+		if(tonumber(v.instance_group) == id)then
+			return v
+		end
+	end
+end
+
+function RuinsConfigManager:GetNumByHouseId(id)
+	if(self.sumDict[id] ~= nil)then
+		return self.sumDict[id]
+	else
+		return -1
+	end
+end
+
+function RuinsConfigManager:GetAllWave(id)
+	local sum = 0
+	local cfg = self:GetConfig(id)
+
+	if(cfg ~= nil)then
+		sum = sum + self:GetNum(cfg.monster1_id)
+		sum = sum + self:GetNum(cfg.monster2_id)
+		sum = sum + self:GetNum(cfg.monster3_id)
+		sum = sum + self:GetNum(cfg.monster4_id)
+		sum = sum + self:GetNum(cfg.monster5_id)
+		sum = sum + self:GetNum(cfg.monster6_id)
+		sum = sum + self:GetNum(cfg.monster7_id)
+		sum = sum + self:GetNum(cfg.monster8_id)
+		sum = sum + self:GetNum(cfg.monster9_id)
+		sum = sum + self:GetNum(cfg.monster10_id)
+	end
+
+	return sum
+end
+
+function RuinsConfigManager:GetNum(monster_id)
+	local sum = 0
+	if(monster_id ~= nil and string.len(monster_id) > 0)then
+		sum = 1
+	end
+	return sum
+end

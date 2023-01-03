@@ -1,0 +1,340 @@
+--HotfixBridge
+require("event/GameEvent")
+require("network/NetworkManager")
+require("config/GuideTriggerConfigManager")
+require("config/LuxuryConfigManager")
+local EventDispatcherinst = require("event/EventDispatcher")
+
+local CS_ItemBagProxyInst = CS.ItemBagProxy.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_UIUnLockConfigMrgInst = CS.UIUnLockConfigMrg.inst
+
+local BridgeEvent = {}
+
+function Bridge_onBridgeEvent(eventName)
+	EventDispatcherinst:dispatchEventP0(eventName)
+end
+
+function Bridge_onBridgeEventP1(eventName, p1)
+	EventDispatcherinst:dispatchEventP1(eventName, p1)
+end
+
+function Bridge_onBridgeEventP2(eventName, p1, p2)
+	EventDispatcherinst:dispatchEventP2(eventName, p1, p2)
+end
+
+function Bridge_onBridgeEventP3(eventName, p1, p2, p3)
+	EventDispatcherinst:dispatchEventP3(eventName, p1, p2, p3)
+end
+
+function Bridge_onBridgeEventP4(eventName, p1, p2, p3, p4)
+	EventDispatcherinst:dispatchEventP4(eventName, p1, p2, p3, p4)
+end
+
+function Bridge_HandleBridgeEvent(eventName, ...)
+	local arg = {...}
+	print("lua: Bridge_HandleBridgeEvent:" .. eventName)
+	EventDispatcherinst:dispatchEvent(eventName, select(1, ...), select(2, ...), select(3, ...), select(4, ...))
+end
+
+function OnChangeState(csTransition)
+	EventDispatcherinst:dispatchEvent(GameEvent.CSEvent.Change_State, csTransition)
+end
+
+function ShowView(view, csCallback)
+	GUIManager.inst:ShowViewCs(view, csCallback)
+end
+function closeView(viewtype)
+	GUIManager.inst:CloseViewCS(viewtype)
+end
+
+function OpenView(csType, csCallback)
+	return GUIManager.inst:OpenViewCS(csType, csCallback)
+end
+
+function HideView(csType)
+	GUIManager.inst:HideViewCS(csType)
+end
+
+function OnGetWindow(csType, needNew)
+	return GUIManager.inst:GetWindowCs(csType, needNew)
+end
+
+function Showing(csType)
+	return GUIManager.inst:ShowingCs(csType)
+end
+
+function GetViewIsShowingByViewID(viewID)
+	return GUIManager.inst:GetViewIsShowingByViewID(viewID)
+end
+
+function GetWindowByViewId(viewid)
+	return GUIManager.inst:GetWindowByViewIdCs(viewid)
+end
+
+function CurrentWindow()
+	return GUIManager.inst:CurrWindowCs()
+end
+
+function CurrentWindowViewID()
+	return GUIManager.inst:CurrWindowViewID()
+end
+
+function allShowingView()
+	return GUIManager.inst:allShowingViewCs()
+end
+
+function onClearAllView()
+	GUIManager.inst:ClearAllView()
+end
+
+function OnNetworkSuccess(msg)
+	NetworkManager:handleReceiveSuccess(msg)
+end
+
+function OnNetworkFailed(pkg, code)
+	NetworkManager:handleReceiveFailed(pkg, code)
+end
+
+function test()
+	print("test in HotfixBridge")
+end
+
+function testAction(act)
+	print("testAction in HotfixBridge")
+	act()
+end
+
+function onBackToMainUI()
+	GUIManager.inst:BackMainView()
+end
+
+function onBackAndChangeMainView()
+	GUIManager.inst:BackAndChangeMainView()
+end
+
+function HasDirectPurchaseDataFunc(id)
+	return DirectPurchaseProxy.inst:GetDirectPurchaseDataById(id) ~= nil
+end
+
+function GetDirectPurchaseDataFunc(id)
+
+	local data = CS.DirectPurchaseData()
+
+	local directPurchaseData = DirectPurchaseProxy.inst:GetDirectPurchaseDataById(id)
+
+	if directPurchaseData ~= nil then
+		data.uid = directPurchaseData.data.uid
+		data.id = directPurchaseData.data.id
+		data.bgIconAtlas = directPurchaseData.data.atlasIcon
+		data.bgIcon = directPurchaseData.data.icon1
+		data.iconAtlas = directPurchaseData.btnIconAtlas
+		data.icon = directPurchaseData.btnIcon
+	end
+
+	return data
+end
+
+function HasBuyLevelGrowthFunc()
+
+	local LVGrowthData = MallDataProxy.inst:GetLVGrowthData()
+
+	return LVGrowthData.flag == "1"
+
+end
+
+function GetVipRemainTimeFunc()
+	local data = MallDataProxy.inst.vipData
+	return data.remainTime
+end
+
+function GetGuideTriggerState()
+	local isInTrigger = GuideTriggerManager.inst.isInTrigger
+	return isInTrigger
+end
+
+function GetCurTriggerData()
+	local triggerData = CS.TriggerData()
+	triggerData.triggerType = GuideTriggerManager.inst.severType
+	triggerData.triggerCondition = GuideTriggerManager.inst.severCondition
+	if (GuideTriggerManager.inst.curData ~= nil) then
+		if GuideTriggerManager.inst.curData.behavior_num ~= nil then
+			triggerData.triggerVal = GuideTriggerManager.inst.curData.behavior_num
+		end
+		if GuideTriggerManager.inst.curData.position ~= nil then
+			triggerData.position = GuideTriggerManager.inst.curData.position
+		else
+			triggerData.position = nil
+		end
+	end
+	return triggerData
+end
+
+function GetActivity_WorkerGameFlag()
+
+	if not Activity_WorkerGameProxy.inst.flag or (CS_UserDataProxyInst.playerData.level < CS_WorldParConfigManagerInst:GetConfig(323).parameters) then
+		return false
+	end
+
+	return true
+
+end
+
+function GetActivity_WorkerGameEquipCanAddRateByDrawingId(equipDrawingId)
+
+	local workerGameRate = Activity_WorkerGameProxy.inst:GetMakingActivityRateByEquipDrawingId(equipDrawingId)
+	return workerGameRate > 0
+
+end
+
+function GetActivity_WorkerGameEquipMakeIntegralByDrawingId(equipDrawingId)
+	return Activity_WorkerGameProxy.inst:GetEquipMakeIntegralByDrawingId(equipDrawingId)
+end
+
+function GetActivity_WorkerGameCoinCount()
+	return Activity_WorkerGameProxy.inst.coin
+end
+
+function GetActivity_WorkerGameString(strType)
+	return Activity_WorkerGameProxy.inst:GetActivityStr(strType)
+end
+
+function HaveTimeLimitActivitySelfScore()
+	
+	return Activity_WorkerGameProxy.inst.scorePoint_self > 0 or GoldenCityDataProxy.inst.selfScore > 0 or Activity_ScoreAwardGameProxy.inst.scorePoint_self > 0
+	
+end
+
+function GetTriggerIsTrig(id)
+	local dataList = GuideTriggerConfigManager:GetGroupFirst()
+	local groupId = -1
+	for i = 1, #dataList do
+		if (tonumber(dataList[i].trigger_type) == 2) then
+			if (tonumber(dataList[i].trigger_value) == id) then
+				groupId = dataList[i].group_id
+				break
+			end
+		end
+	end
+	if(groupId == -1)then
+		return true
+	else
+		return GuideTriggerDataProxy.inst:CheckIsTrigger(groupId)
+	end
+end
+
+
+function GetLuxuryBuff(subType)
+	return LuxuryConfigManager:GetLuxuryBuff(subType)
+end
+
+function GetRefugeDataFunc()
+	local data = CS.DirectPurchaseData()
+	local getData = RefugeTowerDataProxy.inst.refugeData
+	if(getData ~= nil)then
+		data.iconAtlas = getData.atlas_icon
+		data.icon = getData.icon
+	end
+
+	return data
+end
+
+function GetShopkeeperCanMoveToCounter()
+
+	if ShopkeeperHandler.inst.shopKeeper ~= nil then
+		return ShopkeeperHandler.inst.shopKeeper.isCanMoveToCounter
+	else
+		return false
+	end
+
+end
+
+function GetShopkeeperExist()
+
+	return ShopkeeperHandler.inst.shopKeeper ~= nil
+
+end
+
+function GetShopkeeperIsMoving()
+
+	if ShopkeeperHandler.inst.shopKeeper ~= nil then
+		return ShopkeeperHandler.inst.shopKeeper:isMoving()
+	else
+		return false
+	end
+
+end
+
+function GetRuinsBattleData()
+	local data = CS.TriggerData()
+
+	data.triggerType = 0--boss Id
+	data.triggerCondition = 0--总数量
+	data.triggerVal = 0--剩余数量
+	data.position = ""--波数|总波数
+
+	if(RuinsDataProxy.inst.curRuinsCfg ~= nil)then
+		data.triggerType = RuinsDataProxy.inst.curRuinsCfg.boss_id
+	end
+
+	data.triggerCondition = RuinsDataProxy.inst.sumEnemyCount
+	data.triggerVal = RuinsDataProxy.inst.enemyRemainCount
+
+	data.position = RuinsDataProxy.inst.startWave .. "/" .. RuinsConfigManager:GetAllWave(RuinsDataProxy.inst.curId) .. "/" .. RuinsDataProxy.inst.enemyWaveId .. "/" .. RuinsDataProxy.inst.endRemainCount
+
+	return data
+end
+
+function GetActivity_GoldenCityFlag()
+
+	return GoldenCityDataProxy.inst.flag
+
+end
+
+function GetActivity_GoldenCityCanRewardCount()
+
+	return GoldenCityDataProxy.inst:GetScoreReallyCanRewardCount()
+
+end
+
+function GetActivity_GoldenCityCurScoreLv()
+
+	return GoldenCityDataProxy.inst:GetCurScorePointLv()
+
+end
+
+--心跳回调
+function GlobalHeartbeatEvent(msg)
+
+	local data = CS.UnityEngine.JsonUtility.FromJson(msg,typeof(CS.Response_Heartbeat))
+
+	if data.newUnionOperatingActivityEvent == 1 then --巧匠大赛
+
+		EventDispatcherinst:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_DataCheck)
+		EventDispatcherinst:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_CheckReward)
+	end
+	if data.ver5 == 1 then --夺宝奇兵
+		EventDispatcherinst:dispatchEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_DataCheck)
+		EventDispatcherinst:dispatchEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_RewardCheck)
+
+	end
+	if data.ver6 == 1 then --夺宝奇兵 积分改动
+		EventDispatcherinst:dispatchEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_DataCheck)
+	end
+	
+	--if data.ver7 == 1 then 
+		--EventDispatcherinst:dispatchEvent(GameEvent.ActivityPointEvent.Request_ActivityPoint_CheckData)
+	--end
+	--if data.ver8 == 1 then 
+		--EventDispatcherinst:dispatchEvent(GameEvent.ActivityPointEvent.Request_PointActivity_CheckExchange)
+	--end
+	--if data.ver9 == 1 then 
+		--EventDispatcherinst:dispatchEvent(GameEvent.ActivityPointEvent.Request_PointActivity_CheckExchange2)
+	--end
+	--if data.ver10 == 1 then 
+		--EventDispatcherinst:dispatchEvent(GameEvent.ActivityPointEvent.Request_Pay_PointActivityPurchase)
+	--end
+
+
+end

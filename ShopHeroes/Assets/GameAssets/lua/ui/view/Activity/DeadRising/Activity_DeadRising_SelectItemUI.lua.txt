@@ -1,0 +1,212 @@
+
+-- Activity_DeadRising_SelectItemUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+local luaClass_Activity_DeadRising_ItemFightItem = require("ui/view/Activity/DeadRising/Activity_DeadRising_ItemFightItem")
+
+local CS_type_BtnList = typeof(CS.BtnList)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+
+local CS_ItemBagProxyInst = CS.ItemBagProxy.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+
+Activity_DeadRising_SelectItemUI = class(ViewBase)
+
+function Activity_DeadRising_SelectItemUI:ctor()
+	self.viewID = Constants.ViewName.Activity_DeadRising_SelectItemUI
+	Activity_DeadRising_SelectItemUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+end
+------------------------------------------------
+
+
+function Activity_DeadRising_SelectItemUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.btn_close = contentPane:GetButton("btn_close")
+	self.icon_fight = contentPane:GetGUIIcon("icon_fight")
+	self.tx_itemFight = contentPane:GetText("tx_itemFight")
+	
+	self.itemFightItems = {}
+	local objList_itemFight = contentPane:GetObjByName("objList_itemFight"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList_itemFight.Count - 1 do
+
+	local itemFightItem = luaClass_Activity_DeadRising_ItemFightItem.new()
+	itemFightItem:Init(objList_itemFight[i],function (id)
+		self:itemFightItemClickHandler(id)	
+	end)
+	self.itemFightItems[#self.itemFightItems + 1] = itemFightItem
+
+	end
+
+
+	self.superList = contentPane:GetObjByName("superList"):GetComponent(CS_type_superList)
+
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+
+function Activity_DeadRising_SelectItemUI:onInit()
+
+	self:initComp()
+
+	self.listItemCount = 0
+	self.allItems = {}
+
+	self.btn_close:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+
+	self.superList.itemRenderer = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+	self.superList.itemUpdateInfo = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+end
+
+function Activity_DeadRising_SelectItemUI:setSuperListData()
+
+	local types = get_csharp_array(CS.System.Int32,4)
+	types[0] = 20--CS.ItemType.ExploreTimeItem
+	types[1] = 22--CS.ItemType.ExploreAttBonus
+	types[2] = 24--CS.ItemType.ExploreExpBonusItem
+	types[3] = 21--CS.ItemType.ExploreAddYieldItem
+	self.allItems = CS_ItemBagProxyInst:GetItemsByTypes(types,false)
+	
+	--TODO 迫击炮 战争玫瑰
+	
+	self:SetListItemTotalCount(self.allItems.Count);
+
+end
+
+function Activity_DeadRising_SelectItemUI:Refresh()
+
+	self:setItemTeamData()
+	self:setSuperListData()
+
+end
+
+function Activity_DeadRising_SelectItemUI:superListItemRenderer(index,item)
+
+	local btnList = item.transform:GetComponent(CS_type_BtnList).buttonList
+
+	for i = 0, 3 - 1 do
+
+		local itemIndex = index * 3 + i
+
+		if 	itemIndex < self.listItemCount then
+
+			btnList[i].gameObject:SetActive(true)
+			btnList[i].gameObject:GetComponent(CS_type_LuaListItem):SetData(self.allItems[itemIndex])
+
+		else
+
+			btnList[i].gameObject:SetActive(false)
+
+		end
+
+	end
+
+end
+
+function Activity_DeadRising_SelectItemUI:SetListItemTotalCount(count)
+
+	self.listItemCount = count
+	if self.listItemCount < 0 then
+		self.listItemCount = 0
+	end
+
+	local count1 = math.floor(self.listItemCount / 3);
+	if self.listItemCount % 3 > 0 then
+		count1 = count1 + 1;
+	end
+
+	self.superList.totalItemCount = count1;
+
+end
+
+function Activity_DeadRising_SelectItemUI:itemFightItemClickHandler(itemId)
+	
+	if itemId ~= -1 then --下架
+		EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_AddOrDelItem, itemId, 1)
+	end
+	
+end
+
+function Activity_DeadRising_SelectItemUI:setItemTeamData()
+	
+	self.tx_itemFight.text = tostring(math.ceil(Activity_DeadRisingDataProxy.inst.fight_self_hero * Activity_DeadRisingDataProxy.inst.fightPoint_self_items / 100))
+
+	for i = 1, #self.itemFightItems do
+
+		if i <= #Activity_DeadRisingDataProxy.inst.itemFightDatas then
+			self.itemFightItems[i]:SetData(Activity_DeadRisingDataProxy.inst.itemFightDatas[i])
+		else
+			self.itemFightItems[i]:Clear()
+		end
+
+	end
+	
+	
+end
+
+function Activity_DeadRising_SelectItemUI:onShowed()
+
+	self:setItemTeamData()
+	self:setSuperListData()
+
+end
+
+function Activity_DeadRising_SelectItemUI:onHide()
+
+end
+
+
+function Activity_DeadRising_SelectItemUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function Activity_DeadRising_SelectItemUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("commonBagUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+
+
+

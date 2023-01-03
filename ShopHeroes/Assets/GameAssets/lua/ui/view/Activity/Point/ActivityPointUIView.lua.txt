@@ -1,0 +1,406 @@
+--ActivityPointUIView
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_type_ToggleGroupMarget = typeof(CS.ToggleGroupMarget)
+local CS_type_ItemSubType = typeof(CS.ItemSubType)
+local CS_type_Toggle = typeof(CS.UnityEngine.UI.Toggle)
+local csLanguageManagerInst = CS.LanguageManager.inst
+local CS_TimeUtils = CS.TimeUtils
+
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+
+local Vector2 = CS.UnityEngine.Vector2
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+local luaClass_ActivityPointTask = require("ui/view/Activity/Point/ActivityPoint_Task")
+local luaClass_ActivityPointGift = require("ui/view/Activity/Point/ActivityPoint_Gift")
+local luaClass_ActivityPointExchangeMall = require("ui/view/Activity/Point/ActivityPoint_ExchangeMall")
+local luaClass_ActivityPointActivityMall = require("ui/view/Activity/Point/ActivityPoint_ActivityMall")
+
+ActivityPointType = --0 悬赏目标  1 佣兵礼包  2 兑换商城  3 活动商城
+{
+	task = 0,
+	gift = 1,
+	exchangeMall = 2,
+	activityMall = 3,
+}
+
+ActivityPointResItemId =
+{
+	[0] = 10002,
+	[1] = 10002,
+	[2] = 10014,
+	[3] = 10013,
+}
+
+
+ActivityPointUIView = class(ViewBase)
+
+function ActivityPointUIView:ctor()
+	self.viewID = Constants.ViewName.ActivityPointUIView
+	ActivityPointUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+	--self.topResPanelType = CS.TopPlayerShowType.noRoleAndSettingAndEnergy
+end
+------------------------------------------------
+
+
+function ActivityPointUIView:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.topBigIcon = contentPane:GetGUIIcon("topBigIcon")
+	self.timeText = contentPane:GetText("remainTime")
+	self.resIcon = contentPane:GetGUIIcon("resIcon")
+	self.resBtn = contentPane:GetButton("resIcon")
+	self.resNum = contentPane:GetText("resNum")
+	self.openObj = contentPane:GetObjByName("openObj")
+	self.notOpenText = contentPane:GetText("notOpenText")
+
+	local obj_stateGroup = contentPane:GetObjByName("toggleGroup")
+	self.stateGroup = obj_stateGroup:GetComponent(CS_type_ToggleGroupMarget)
+
+	self.toggles = {}
+	for i = 0, self.stateGroup.togglesBtn.Count - 1 do
+		self.toggles[#self.toggles + 1] = self.stateGroup.togglesBtn[i]:GetComponent(CS_type_Toggle)
+	end
+
+	self.redPoints = {}
+	local objs_redPoint = obj_stateGroup:GetComponent(CS_type_ObjList).objList
+	for i = 0, objs_redPoint.Count - 1 do
+		self.redPoints[i] = objs_redPoint[i]
+	end
+
+	self.toggleLinkObjs = contentPane:GetObjByName("middle"):GetComponent(CS_type_ObjList).objList
+
+	--悬赏目标
+	self.ctrl_task = luaClass_ActivityPointTask.new()
+	self.ctrl_task:Init(self.toggleLinkObjs[ActivityPointType.task]:GetComponent(CS_type_LuaBehaviour))
+
+	--佣兵礼包
+	self.ctrl_gift = luaClass_ActivityPointGift.new()
+	self.ctrl_gift:Init(self.toggleLinkObjs[ActivityPointType.gift]:GetComponent(CS_type_LuaBehaviour))
+
+	--兑换商城
+	self.ctrl_exchangeMall = luaClass_ActivityPointExchangeMall.new()
+	self.ctrl_exchangeMall:Init(self.toggleLinkObjs[ActivityPointType.exchangeMall]:GetComponent(CS_type_LuaBehaviour))
+
+	--活动商城
+	self.ctrl_activityMall = luaClass_ActivityPointActivityMall.new()
+	self.ctrl_activityMall:Init(self.toggleLinkObjs[ActivityPointType.activityMall]:GetComponent(CS_type_LuaBehaviour))
+
+end
+
+function ActivityPointUIView:onInit()
+
+	self:initComp()
+
+	self.realIndex = ActivityPointType.task
+	self.activityPointCtrl = false
+
+	self.closeBtn.onClick:AddListener(function ()
+			self:hide()
+		end)
+	
+	self.resBtn.onClick:AddListener(function ()
+			if(self.rewardData == nil) then return end
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+			local func = funcGeneric(CS.CommonRewardData, CS.UnityEngine.Transform)
+			func(csEventControllerInst, csGameEventType.CommonEvent.COMMONTIPS_SETINFO, self.rewardData, self.resBtn.transform)
+	end)
+
+	self.stateGroup.OnSelectedIndexValueChange = function (index)
+		self:onSelectedIndexValueChange(index)
+	end
+
+	self.timerId = 0
+	self.needScrollToTop = false
+	self.rewardData = nil
+
+end
+
+function ActivityPointUIView:getShowToggles()
+
+	local ignoreTypes = {}
+
+	-- 判断开没开活动商城兑换
+	if(not ActivityPointDataProxy.inst:GetActivityFlagByType(ActivityPointType.activityMall))then
+		ignoreTypes[#ignoreTypes + 1] = ActivityPointType.activityMall
+	end
+
+	local showToggles = {}
+	for i = 1, #self.toggles do
+
+		local toggle = self.toggles[i]
+		local itemSubType = toggle:GetComponent(CS_type_ItemSubType)
+
+		if itemSubType ~= nil then
+
+			local isIgnore = false
+
+			for k = 1, #ignoreTypes do
+				if ignoreTypes[k] == itemSubType.subType then
+					toggle.gameObject:SetActive(false)
+					isIgnore = true
+					break
+				end
+			end
+
+			if not isIgnore then
+				toggle.gameObject:SetActive(true)
+				showToggles[#showToggles + 1] = toggle
+			end
+
+		end
+	end
+
+	local toggleArray = get_csharp_array(CS_type_Toggle,#showToggles)
+	for i = 1, #showToggles do
+		toggleArray[i - 1] = showToggles[i]
+	end
+
+	return toggleArray
+
+end
+
+function ActivityPointUIView:ShowByActivityPointType(activityPointType,needScrollToTop)
+	self.needScrollToTop = needScrollToTop
+	if(ActivityPointDataProxy.inst:GetActivityStr(5) ~= "" and ActivityPointDataProxy.inst:GetActivityStr(5) ~= "-暂无-")then
+		--self.topBigIcon.iconImage.enabled = true
+		self.topBigIcon:SetSpriteURL(ActivityPointDataProxy.inst:GetActivityStr(5))
+	else
+		--self.topBigIcon.iconImage.enabled = false
+		self.topBigIcon:SetSpriteURL("huodong_banner1")
+	end
+
+	self.stateGroup:ClearTogglesBtn()
+
+	self.stateGroup.togglesBtn:AddRange(self:getShowToggles())
+
+	if activityPointType then
+
+		local hasContentType = false
+
+		for i = 0, self.stateGroup.togglesBtn.Count - 1 do
+
+			local toggle = self.stateGroup.togglesBtn[i]
+			local itemSubType = toggle:GetComponent(CS_type_ItemSubType)
+
+			if itemSubType ~= nil and itemSubType.subType == activityPointType then
+
+				self.stateGroup:OnEnableMethod(i)
+				hasContentType = true
+
+				break
+
+			end
+
+		end
+
+		if not hasContentType then
+			self.stateGroup:OnEnableMethod()
+		end
+
+	else
+		self.stateGroup:OnEnableMethod()
+	end
+
+end
+
+function ActivityPointUIView:updateTopShow()
+
+	local resItem = CS.ItemconfigManager.inst:GetConfig(ActivityPointResItemId[self.realIndex])
+	if(resItem ~= nil)then
+		self.resIcon.iconImage.enabled = true
+		self.resIcon:SetSprite(resItem.atlas,resItem.icon)
+		if(ActivityPointResItemId[self.realIndex] == 10002)then
+			self.rewardData = CS.CommonRewardData(resItem.id,CS.UserDataProxy.inst.playerData.gem,0,resItem.type)
+			self.resNum.text = CS.AbbreviationUtility.AbbreviateNumber(CS.UserDataProxy.inst.playerData.gem,2)
+		else
+			local itemBagData = CS.ItemBagProxy.inst:GetItem(resItem.id)
+			if(itemBagData ~= nil)then
+				self.rewardData = CS.CommonRewardData(resItem.id,math.ceil(itemBagData.count),0,resItem.type)
+				self.resNum.text = tostring(math.ceil(itemBagData.count))
+			else
+				self.rewardData = nil
+				self.resNum.text = ""
+			end
+		end
+	else
+		self.resIcon.iconImage.enabled = false
+		self.rewardData = nil
+		self.resNum.text = ""
+	end
+
+
+	if(ActivityPointDataProxy.inst:GetActivityFlagByType(self.realIndex))then
+		self.openObj:SetActive(true)
+		self.notOpenText.enabled = false
+
+		self:setRemainTimer()
+	else
+		self.openObj:SetActive(false)
+		self.notOpenText.enabled = true
+	end
+
+end
+
+function ActivityPointUIView:setRemainTimer()
+
+	self:clearTimer()
+
+	local remainTime = ActivityPointDataProxy.inst:GetActivityRemainTimeByType(self.realIndex)
+
+	if(remainTime <= 0)then
+		self.timeText.text = csLanguageManagerInst:GetValueByKey("已结束")
+	else
+		self.timeText.text = CS_TimeUtils.timeSpanStrip(remainTime,true)
+		remainTime = remainTime + CS_GameTimerInst.serverNow
+	end
+
+	self.timerId = CS_GameTimerInst:AddTimer(1,function()
+
+			local _remainTime = remainTime - CS_GameTimerInst.serverNow
+			if(self.timeText == nil) then return end
+			if(_remainTime <= 0)then
+				self:clearTimer()
+				self.timeText.text = csLanguageManagerInst:GetValueByKey("已结束")
+			else
+				self.timeText.text = CS_TimeUtils.timeSpanStrip(_remainTime,true)
+			end
+
+		end)
+
+end
+
+function ActivityPointUIView:clearTimer()
+
+	if self.timerId ~= 0 then
+
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+
+	end
+
+end
+
+function ActivityPointUIView:updateRedPoints()
+
+	self.redPoints[ActivityPointType.task]:SetActive(ActivityPointDataProxy.inst:GetTaskListState())
+	self.redPoints[ActivityPointType.gift]:SetActive(false)
+	self.redPoints[ActivityPointType.exchangeMall]:SetActive(false)
+	self.redPoints[ActivityPointType.activityMall]:SetActive(false)
+
+	self.redPoints[self.realIndex]:SetActive(false)
+
+end
+
+function ActivityPointUIView:onHide()
+
+	if self.activityPointCtrl then
+		self.activityPointCtrl:Clear()
+		self.activityPointCtrl = false
+	end
+
+	self:clearTimer()
+
+end
+
+function ActivityPointUIView:onSelectedIndexValueChange(index)
+
+	self.realIndex = index
+	local itemSubType = self.stateGroup.togglesBtn[index]:GetComponent(CS_type_ItemSubType)
+
+	if itemSubType ~= nil then
+		self.realIndex = itemSubType.subType
+	end
+
+	for i = 0, self.toggleLinkObjs.Count - 1 do
+		self.toggleLinkObjs[i]:SetActive(false)
+	end
+
+	self.toggleLinkObjs[self.realIndex]:SetActive(true)
+
+	if self.activityPointCtrl then
+		self.activityPointCtrl:Clear()
+	end
+
+	if self.realIndex == ActivityPointType.task then
+		self:setData_task(self.needScrollToTop)
+	elseif self.realIndex == ActivityPointType.gift then
+		self:setData_gift(self.needScrollToTop)
+	elseif self.realIndex == ActivityPointType.exchangeMall then
+		self:setData_exchangeMall(self.needScrollToTop)
+	elseif self.realIndex == ActivityPointType.activityMall then
+		self:setData_activityMall(self.needScrollToTop)
+	end
+	self.needScrollToTop = false
+
+	self:updateTopShow()
+	self:updateRedPoints()
+
+end
+
+function ActivityPointUIView:Refresh(index)
+
+	if (self.realIndex == index and self.activityPointCtrl) then
+		self.activityPointCtrl:RefreshUIData(false)
+	end
+
+	self:updateTopShow()
+	self:updateRedPoints()
+	self:ShowByActivityPointType(self.realIndex,false)
+
+end
+
+function ActivityPointUIView:RefreshAll()
+
+	self:Refresh(self.realIndex) -- 刷新当前页面
+
+end
+
+--悬赏目标
+function ActivityPointUIView:setData_task(needScrollToTop)
+
+	self.activityPointCtrl = self.ctrl_task
+	self.ctrl_task:RefreshUIData(needScrollToTop)
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--佣兵礼包
+function ActivityPointUIView:setData_gift(needScrollToTop)
+
+	self.activityPointCtrl = self.ctrl_gift
+	self.ctrl_gift:RefreshUIData(needScrollToTop)
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--兑换商城
+function ActivityPointUIView:setData_exchangeMall(needScrollToTop)
+
+	self.activityPointCtrl = self.ctrl_exchangeMall
+	self.ctrl_exchangeMall:RefreshUIData(needScrollToTop)
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--活动商城
+function ActivityPointUIView:setData_activityMall(needScrollToTop)
+
+	self.activityPointCtrl = self.ctrl_activityMall
+	self.ctrl_activityMall:RefreshUIData(needScrollToTop)
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

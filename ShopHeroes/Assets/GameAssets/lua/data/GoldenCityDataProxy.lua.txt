@@ -1,0 +1,654 @@
+--GoldenCityDataProxy
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local csGUIHelper = CS.GUIHelper
+
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_itemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_ItemType = CS.ItemType
+
+GoldenCityDataProxy = class(BaseDataProxy)
+
+GoldenCityDataProxy.inst = GoldenCityDataProxy:new()
+
+function GoldenCityDataProxy:Init()
+	self:initData()
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_OperatingActivity2_DataCheck_Cmd,
+		function(resp)
+			print("Response_OperatingActivity2_DataCheck_Cmd success", resp)
+			self:GetActivityCheckData(resp)
+		end,
+		function(code)
+			print("Response_OperatingActivity2_DataCheck_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取黄金城数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_OperatingActivity2_UnionRankList_Cmd,
+		function(resp)
+			print("Response_OperatingActivity2_UnionRankList_Cmd success", resp)
+			self:GetGoldenCityRankData(resp)
+		end,
+		function(code)
+			print("Response_OperatingActivity2_UnionRankList_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取黄金城排行数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_OperatingActivity2_DailyReward_Cmd,
+		function(resp)
+			print("Response_OperatingActivity2_DailyReward_Cmd success", resp)
+			self:GetGoldenCityDailyRewardData(resp)
+		end,
+		function(code)
+			print("Response_OperatingActivity2_DailyReward_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取黄金城每日领奖数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_OperatingActivity2_CheckReward_Cmd,
+		function(resp)
+			print("Response_OperatingActivity2_CheckReward_Cmd success", resp)
+			self:GetGoldenCityRewardCheckData(resp)
+		end,
+		function(code)
+			print("Response_OperatingActivity2_CheckReward_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取黄金城领奖列表数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_OperatingActivity2_Reward_Cmd,
+		function(resp)
+			print("Response_OperatingActivity2_Reward_Cmd success", resp)
+			self:GetGoldenCityRewardData(resp)
+		end,
+		function(code)
+			print("Response_OperatingActivity2_Reward_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取黄金城领奖列表领奖数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_OperatingActivity2_ExploreStart_Cmd,
+		function(resp)
+			print("Response_OperatingActivity2_ExploreStart_Cmd success", resp)
+			self:GetGoldenCityExploreStartData(resp)
+		end,
+		function(code)
+			print("Response_OperatingActivity2_ExploreStart_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取黄金城领奖列表领奖数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_OperatingActivity2_ActivityPointChange_Cmd,
+		function(resp)
+			print("Response_OperatingActivity2_ActivityPointChange_Cmd success", resp)
+			self:GetGoldenCityPointChangeData(resp)
+		end,
+		function(code)
+			print("Response_OperatingActivity2_ActivityPointChange_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取黄金城领奖列表领奖数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_OperatingActivity2_RewardChange_Cmd,
+		function(resp)
+			print("Response_OperatingActivity2_RewardChange_Cmd success", resp)
+			self:GetGoldenCityRewardChangeData(resp)
+		end,
+		function(code)
+			print("Response_OperatingActivity2_RewardChange_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取黄金城领奖列表领奖数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_OperatingActivity2_ExploreImmediately_Cmd,
+		function(resp)
+			print("Response_OperatingActivity2_ExploreImmediately_Cmd success", resp)
+			self:GetGoldenCityExploreImmediatelyData(resp)
+		end,
+		function(code)
+			print("Response_OperatingActivity2_ExploreImmediately_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取黄金城领奖列表领奖数据失败!")
+		end
+	)
+
+	--self:test()
+end
+
+function GoldenCityDataProxy:test()
+	self.flag = true
+
+	local str1 = MsgType.OneOperatingActivityStringData:New()
+	str1.type = 1
+	str1.CN = "万圣节活动测试"
+	str1.EN = "万圣节活动测试"
+	str1.TW = "万圣节活动测试"
+	local str2 = MsgType.OneOperatingActivityStringData:New()
+	str2.type = 2
+	str2.CN = "万圣节活动具体内容测试"
+	str2.EN = "万圣节活动具体内容测试"
+	str2.TW = "万圣节活动具体内容测试"
+	local str3 = MsgType.OneOperatingActivityStringData:New()
+	str3.type = 4
+	str3.CN = "wanshengjie_nangua"
+	str3.EN = "wanshengjie_nangua"
+	str3.TW = "wanshengjie_nangua"
+	local str4 = MsgType.OneOperatingActivityStringData:New()
+	str4.type = 5
+	str4.CN = "wanshengjie_banner"
+	str4.EN = "wanshengjie_banner"
+	str4.TW = "wanshengjie_banner"
+
+	self.stringList[1] = str1
+	self.stringList[2] = str2
+	self.stringList[3] = str3
+	self.stringList[4] = str4
+
+	self.bossExploreIsAllOver = false
+	self.bossExploreId = 13
+	self.bossExploreCfg = GoldenCityConfigManager:GetConfig(self.bossExploreId)
+	self.bossExploreProcess = 1
+
+	self.dailyFlag = true
+	self.unionScore = 1260
+end
+
+function GoldenCityDataProxy:initData()
+	self.stringList = {} -- 活动名称 信息 图标 banner 根据类型区分
+	self.scoreRewardList = {} -- 奖励列表
+	self.scoreCanRewardCount = 0 -- 可领取奖励的数量
+
+	self.unionScore = 0 -- 公会积分(总积分)
+	self.selfScore = 0 -- 个人积分
+	self.flag = false -- 活动是否开启
+	self.dailyFlag = false -- 每日领奖是否领取
+
+	self.endTime = 0 -- 活动结束时间
+	self.endtime_serverEndtime = 0 --结束时间_服务器时间
+
+	self.bossExploreIsAllOver = false -- boss副本是否全部打完
+	self.bossExploreCfg = nil -- 当前boss副本config
+	self.bossExploreProcess = 0 -- 当前boss副本进度
+	self.bossExploreId = 0 -- 当前boss副本的id
+	self.lastExploreProcess = -1 -- 上一次副本进度
+
+	self.endTimer = 0
+
+	self.isShowGoldenCityUI = false
+	self.cachePointChangeData = nil
+end
+
+function GoldenCityDataProxy:GetGoldenCityExploreImmediatelyData(respData)
+	local data = MsgType.Response_OperatingActivity2_ExploreImmediately:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	local slotData = CS.ExploreDataProxy.inst:GetMakeSlot(data.exploreSlot.slotId)
+	if(slotData == nil)then
+		CS.ExploreDataProxy.inst:AddSlotData(data.exploreSlot)
+	else
+		slotData:setData(data.exploreSlot)
+	end
+
+	if(slotData ~= nil and slotData.exploreState ~= 1) then
+		CS.PlatformManager.inst:RemoveOneNotificationWithID("Explore_" .. slotData.exploreId)
+	end
+
+	CS.GUIManager.BackMainView()
+	EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreEnd,data.exploreSlot.slotId)
+end
+
+function GoldenCityDataProxy:GetGoldenCityRewardChangeData(respData)
+	local data = MsgType.Response_OperatingActivity2_RewardChange:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self:setScoreRewardData(data.rewardItem)
+
+	EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_ScoreReward)
+	EventDispatcher:dispatchEvent(
+		GameEvent.GoldenCityEvent.RefreshRedPoint_Activity_GoldenCity_ScoreCanReward,
+		self:GetScoreReallyCanRewardCount() > 0
+	)
+end
+
+function GoldenCityDataProxy:GetGoldenCityPointChangeData(respData)
+	local data = MsgType.Response_OperatingActivity2_ActivityPointChange:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	local scorePointChangeVal = data.userActivityPoint - self.selfScore
+
+	self.unionScore = data.activityPoint
+	self.selfScore = data.userActivityPoint
+
+	self.cachePointChangeData = scorePointChangeVal
+end
+
+function GoldenCityDataProxy:GetGoldenCityExploreStartData(respData)
+	local data = MsgType.Response_OperatingActivity2_ExploreStart:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	local tempData = CS.ExploreDataProxy.inst:GetMakeSlot(data.exploreSlot.slotId)
+	if(tempData ~= nil)then
+		tempData:setData(data.exploreSlot)
+
+		if(tempData.exploreState == 1) then
+			local title = CS.LanguageManager.inst:GetValueByKey("生存几何")
+			local body = ""
+			local instanceIdCfg = CS.ExploreInstanceConfigManager.inst:GetConfig(tempData.exploreId)
+			if (instanceIdCfg ~= nil) then
+				body = CS.LanguageManager.inst:GetValueByKey("您的英雄小队在{0}已完成探索，快来收取战利品！", CS.LanguageManager.inst:GetValueByKey(instanceIdCfg.instance_name))
+			end
+			CS.PlatformManager.inst:AddLocalNotice(title, "", body, 1, tempData.exploringEndTime, "Explore_" .. tempData.exploreId)
+		end
+	end
+
+	for i = 1, #data.heroInfo do
+		CS.RoleDataProxy.inst:AddHeroData(data.heroInfo[i])
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.HideUI_GoldenCityPrepare)
+	EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_MainToggle,0)
+end
+
+function GoldenCityDataProxy:GetGoldenCityRewardData(respData)
+	local data = MsgType.Response_OperatingActivity2_Reward:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self:setScoreRewardData(data.rewardItem)
+
+	local cfg = CS.ItemconfigManager.inst:GetConfig(data.reward.itemId)
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.queueItem)
+	if (cfg ~= nil) then
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", 0, data.reward.itemId, data.reward.count)
+
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	else
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", data.reward.itemId, 0, data.reward.count)
+
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_ScoreReward)
+	EventDispatcher:dispatchEvent(
+		GameEvent.GoldenCityEvent.RefreshRedPoint_Activity_GoldenCity_ScoreCanReward,
+		self:GetScoreReallyCanRewardCount() > 0
+	) -- 红点根据真实可领取走
+	EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState, self.flag)
+end
+
+function GoldenCityDataProxy:GetGoldenCityRewardCheckData(respData)
+	local data = MsgType.Response_OperatingActivity2_CheckReward:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	for i = 1, #data.rewardList do
+		local groupData = data.rewardList[i]
+		self:setScoreRewardData(groupData)
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_ScoreReward)
+	EventDispatcher:dispatchEvent(
+		GameEvent.GoldenCityEvent.RefreshRedPoint_Activity_GoldenCity_ScoreCanReward,
+		self:GetScoreReallyCanRewardCount() > 0
+	)
+end
+
+function GoldenCityDataProxy:GetGoldenCityDailyRewardData(respData)
+	local data = MsgType.Response_OperatingActivity2_DailyReward:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.dailyFlag = data.checkFlag == 1
+
+	local cfg = CS.ItemconfigManager.inst:GetConfig(data.item.itemId)
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.queueItem)
+	if (cfg ~= nil) then
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", 0, data.item.itemId, data.item.count)
+
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	else
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", data.item.itemId, 0, data.item.count)
+
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_MainToggle,0)
+end
+
+function GoldenCityDataProxy:GetGoldenCityRankData(respData)
+	local data = MsgType.Response_OperatingActivity2_UnionRankList:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	EventDispatcher:dispatchEvent(
+		GameEvent.GoldenCityEvent.Refresh_GoldenCity_MessRank,
+		data.rankList,data.userRank
+	)
+end
+
+function GoldenCityDataProxy:GetActivityCheckData(respData)
+	local data = MsgType.Response_OperatingActivity2_DataCheck:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.unionScore = data.activityPoint
+	self.selfScore = data.userActivityPoint
+	self.flag = data.flag == 1
+	self.dailyFlag = data.checkFlag == 1
+	self.version = data.version
+
+	self.stringList = data.stringList
+
+	self.endTime = data.endTime
+	self.endtime_serverEndtime = self.endTime + CS_GameTimerInst.serverNow
+
+	self.bossExploreIsAllOver = data.bossId == 99999
+	self.bossExploreCfg = GoldenCityConfigManager:GetConfig(data.bossId)
+	if(self.lastExploreProcess == -1)then
+		self.lastExploreProcess = data.process
+	else
+		self.lastExploreProcess = self.bossExploreProcess
+	end
+	self.bossExploreProcess = data.process
+	self.bossExploreId = data.bossId
+
+	if self.flag then
+		self:setEndtimeTimer()
+	else
+		self:clearEndTimeTimer()
+	end
+
+	if CS_UserDataProxyInst.playerData.level >= CS_WorldParConfigManagerInst:GetConfig(8405).parameters then --等级足够
+		if self.flag then --活动开启
+			local storyNpcCfg = StoryNpcConfigManager:GetConfig(5, -1)
+
+			if
+				storyNpcCfg ~= nil and
+				CS_PlayerPrefs.GetString(
+					CS_AccountDataProxyInst.account ..
+					"_GoldenCity_" .. tostring(self.version) .. "_" .. tostring(storyNpcCfg.story_id),
+					"-1"
+				) == "-1"
+				then
+				EventDispatcher:dispatchEvent(
+					GameEvent.EventSystem.AddEvent,
+					GameEvent.StoryRoleEvent.AddStoryRole,
+					{
+						storyType = 5,
+						parame = -1,
+						callback = function()
+							CS_PlayerPrefs.SetString(
+								CS_AccountDataProxyInst.account ..
+								"_GoldenCity_" .. tostring(self.version) .. "_" .. tostring(storyNpcCfg.story_id),
+								"1"
+							)
+							EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityMain)
+							CS.GoOperationManager.inst.isDoing = false
+							EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState, self.flag)
+							CS.FGUI.inst:SetAllUIInteractable(true)
+							CS.FGUI.inst:SetAllUIAlpha(1)
+							EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+							EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+						end
+					},
+					ExecuteType.queueup,
+					kGameState.Shop
+				)
+			else
+				EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState, self.flag)
+			end
+		else
+			EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState, self.flag)
+		end
+	end
+
+
+	--EventDispatcher:dispatchEvent(
+	--GameEvent.GoldenCityEvent.RefreshRedPoint_Activity_GoldenCity_ScoreCanReward,
+	--self.scoreCanRewardCount > 0
+	--)
+
+end
+
+function GoldenCityDataProxy:setEndtimeTimer()
+
+	self:clearEndTimeTimer()
+
+	if (self.endtime_serverEndtime < CS_GameTimerInst.serverNow) then
+		return
+	end
+
+	local remainTime = self.endtime_serverEndtime - CS_GameTimerInst.serverNow
+	self.endTimer = CS_GameTimerInst:AddTimer(remainTime,1,function()
+			self:endtimeTimerMethod()
+		end,CS.GameTimerType.byServerTime)
+end
+
+function GoldenCityDataProxy:clearEndTimeTimer()
+	if self.endTimer ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.endTimer)
+		self.endTimer = 0
+	end
+end
+
+function GoldenCityDataProxy:endtimeTimerMethod()
+
+	local remainTime = self.endtime_serverEndtime - CS_GameTimerInst.serverNow
+
+	if remainTime > 0 then
+		self.endTimer = CS_GameTimerInst:AddTimer(remainTime,1,function()
+				self:endtimeTimerMethod()
+			end,CS.GameTimerType.byServerTime)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_DataCheck)
+	end
+
+end
+
+function GoldenCityDataProxy:GetActivityStr(type)
+	local str = nil
+
+	for i = 1, #self.stringList do
+		if self.stringList[i].type == type then
+			local data = self.stringList[i]
+
+			if CS_LanguageManagerInst.curType == CS.LanguageType.SIMPLIFIED_CHINESE then
+				str = data.CN
+			elseif CS_LanguageManagerInst.curType == CS.LanguageType.TRADITIONAL_CHINESE then
+				str = data.TW
+			elseif CS_LanguageManagerInst.curType == CS.LanguageType.ENGLISH then
+				str = data.EN
+			end
+
+			break
+		end
+	end
+
+	return (str == nil or str == "") and CS_LanguageManagerInst:GetValueByKey("-暂无-") or str
+end
+
+function GoldenCityDataProxy:GetCurScorePointLv()
+	local lv = 1
+
+	local num = #self.scoreRewardList
+
+	for i = num, 1, -1 do
+		local data = self.scoreRewardList[i]
+		if tonumber(self.unionScore) >= tonumber(data.needPoint) then
+			lv = i
+			break
+		end
+	end
+
+	return tonumber(lv)
+end
+
+function GoldenCityDataProxy:setScoreRewardData(data)
+	local state1 = false
+	local state2 = false
+
+	if self.scoreRewardList[tonumber(data.groupId)] ~= nil then
+		state1 = self.scoreRewardList[tonumber(data.groupId)].rewardList[1].state or false
+		state2 = self.scoreRewardList[tonumber(data.groupId)].rewardList[2].state or false
+	end
+
+	self.scoreRewardList[tonumber(data.groupId)] = data
+
+	if state1 then
+		if
+			state1 == MsgType.EOperatingActivityRewardState.None and
+			data.rewardList[1].state == MsgType.EOperatingActivityRewardState.CanReward
+			then
+			self.scoreCanRewardCount = self.scoreCanRewardCount + 1
+		elseif
+			state1 == MsgType.EOperatingActivityRewardState.CanReward and
+			data.rewardList[1].state == MsgType.EOperatingActivityRewardState.Rewarded
+			then
+			self.scoreCanRewardCount = self.scoreCanRewardCount - 1
+		end
+	elseif data.rewardList[1].state == MsgType.EOperatingActivityRewardState.CanReward then
+		self.scoreCanRewardCount = self.scoreCanRewardCount + 1
+	end
+
+	if state2 then
+		if
+			state2 == MsgType.EOperatingActivityRewardState.None and
+			data.rewardList[2].state == MsgType.EOperatingActivityRewardState.CanReward
+			then
+			self.scoreCanRewardCount = self.scoreCanRewardCount + 1
+		elseif
+			state2 == MsgType.EOperatingActivityRewardState.CanReward and
+			data.rewardList[2].state == MsgType.EOperatingActivityRewardState.Rewarded
+			then
+			self.scoreCanRewardCount = self.scoreCanRewardCount - 1
+		end
+	elseif data.rewardList[2].state == MsgType.EOperatingActivityRewardState.CanReward then
+		self.scoreCanRewardCount = self.scoreCanRewardCount + 1
+	end
+end
+
+--获取当前实际可领取的奖励数目(个人积分，公会积分都满足)
+function GoldenCityDataProxy:GetScoreReallyCanRewardCount()
+	local scoreReallyCanRewardCount = 0
+
+	local num = #self.scoreRewardList
+
+	for i = num, 1, -1 do
+		local data = self.scoreRewardList[i]
+
+		local selfScoreReach = tonumber(self.selfScore) >= data.userNeedPoint
+		local unionScoreReach = tonumber(self.unionScore) >= data.needPoint
+
+		for k = 1, #data.rewardList do
+			if data.rewardList[k].state == MsgType.EOperatingActivityRewardState.CanReward and selfScoreReach and unionScoreReach then -- 可领取状态并且个人以及公会积分都满足
+				if(data.rewardList[k].vipFlag ~= 1 or (data.rewardList[k].vipFlag == 1 and CS.K_Vip_State.__CastFrom(CS.UserDataProxy.inst.playerData.vipState) == CS.K_Vip_State.Vip))then -- 非vip 或者vip奖励且玩家是vip的情况
+					scoreReallyCanRewardCount = scoreReallyCanRewardCount + 1
+				end
+			end
+		end
+	end
+
+	return scoreReallyCanRewardCount
+end
+
+function GoldenCityDataProxy:GetCurSelfScorePointLv()
+	local lv = 1
+
+	local num = #self.scoreRewardList
+
+	for i = num, 1, -1 do
+		local data = self.scoreRewardList[i]
+		if tonumber(self.selfScore) >= tonumber(data.userNeedPoint) then
+			lv = i
+			break
+		end
+	end
+
+	return tonumber(lv)
+end
+
+--查看当前积分等级达到奖励列表中是否包含对应宠物id的奖励
+function GoldenCityDataProxy:GetScoreRewardIndexByPetId(petId)
+
+	local lv = -1
+
+	local num = #self.scoreRewardList
+
+	for i = num, 1, -1 do
+
+		local data = self.scoreRewardList[i]
+
+		local selfScoreReach = tonumber(self.selfScore) >= data.userNeedPoint
+
+		for k = 1, #data.rewardList do
+
+			local itemCfg = CS_itemConfigManagerInst:GetConfig(data.rewardList[k].item.itemId)
+
+			if itemCfg ~= nil and CS_ItemType.__CastFrom(itemCfg.type) == CS_ItemType.PetSkin and itemCfg.effect == petId then --找到了该宠物的数据
+
+				--如果活动开启 直接返回
+				if self.flag then
+
+					lv = i
+
+				else
+
+					--如果活动未开启 目前积分可领取 返回
+					if data.rewardList[k].state == MsgType.EOperatingActivityRewardState.CanReward and selfScoreReach then
+						lv = i
+					end
+
+				end
+
+				break
+
+			end
+
+		end
+	end
+
+	return tonumber(lv)
+
+end
+
+function GoldenCityDataProxy:Clear()
+end
+
+function GoldenCityDataProxy:GetData()
+end

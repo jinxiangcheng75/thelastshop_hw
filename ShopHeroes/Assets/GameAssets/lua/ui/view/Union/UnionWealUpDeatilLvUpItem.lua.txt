@@ -1,0 +1,76 @@
+---------------------------------------------------------------------
+
+local Vector3 = CS.UnityEngine.Vector3
+
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local csGameTimerInst = CS.GameTimer.inst
+local EventDispatcher = require("event/EventDispatcher")
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_UnionTechnologyConfigManagerInst = CS.UnionTechnologyConfigManager.inst
+
+--UnoinWealUpDeatilLvUpItem
+
+
+local selfBtn
+local icon
+local specialIconObj
+local shichang_lvObj
+local shichang_lanObj
+local lvTx
+
+local cfg
+----
+
+function InitComp()
+
+	selfBtn = self.transform:GetComponent("Button")
+	icon = self.transform:Find("icon"):GetComponent(CS_type_GUIIcon)
+	specialIconObj = self.transform:Find("specialIcon").gameObject
+	shichang_lvObj = self.transform:Find("shichang_lv").gameObject
+	shichang_lanObj = self.transform:Find("shichang_lan").gameObject
+	lvTx = self.transform:Find("lvBg/lvTx"):GetComponent("Text")
+
+	selfBtn:ButtonClickTween(function ()
+			onSelfBtnClick()
+		end)
+
+end
+
+function SetData(UnionTechnologyConfigId)
+
+	cfg = CS_UnionTechnologyConfigManagerInst:GetConfig(UnionTechnologyConfigId)
+	icon:SetSprite(cfg.atlas,cfg.icon)
+
+
+	specialIconObj:SetActive(false)
+	shichang_lvObj:SetActive(false)
+	shichang_lanObj:SetActive(false)
+
+	if cfg.big_type == 16 then --市场请求
+
+		shichang_lanObj:SetActive(true)
+
+	elseif cfg.big_type == 17 then --市场报价
+
+		shichang_lvObj:SetActive(true)
+
+	elseif cfg.big_type == 18 or cfg.big_type == 19 or cfg.big_type == 20 then --资源类
+
+		specialIconObj:SetActive(true)
+
+	end
+
+	lvTx.text = tostring(cfg.technology_level)
+
+end
+
+function onSelfBtnClick()
+	
+	--todo 小tips
+	EventDispatcher:dispatchEvent(GameEvent.UnionEvent.ShowTips_UnionWealUpDataItemInfo,self.transform,cfg)
+	
+end

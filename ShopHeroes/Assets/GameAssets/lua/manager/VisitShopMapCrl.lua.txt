@@ -1,0 +1,252 @@
+require("data/VisitShopData/UserIndoorDataProxy")
+
+local csUnityUtils = CS.UnityUtils
+
+local roomFrameProfabs
+local roomRoot
+local cameraStartPos
+local visitMapEntityObj
+local shopkeeperDir = 0
+local shopkeeperpos
+function start()
+	local profabObj = self:GetObjByName("RoomFrameProfab")
+	roomFrameProfabs = profabObj:GetComponent("RoomFrameProfabs")
+	if roomFrameProfabs ~= nil then
+		print("找到RoomFrameProfab 对象")
+	end
+	roomRoot = self:GetObjByName("mapgrid")
+	cameraStartPos = self:GetObjByName("CameraStarPos")
+	visitMapEntityObj = self:GetObjByName("VisitMapEntity")
+
+	initMap()
+	creatShopkeeper()
+end
+
+function getindoorSize(level)
+	local mapcfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(level)
+	local size = {}
+	size.xMin = mapcfg.cell_minx
+	size.yMin = mapcfg.cell_miny
+	size.xMax = mapcfg.cell_maxx
+	size.yMax = mapcfg.cell_maxy
+	return size
+end
+
+--创建店主
+function creatShopkeeper()
+	local mapdata = UserIndoorDataProxy.inst:GetData()
+
+	local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+	local func = funcGeneric(CS.DressUpSystem)
+	local headIconTf = roomRoot.transform
+	func(
+		CS.CharacterManager.inst,
+		CS.CharacterManager.inst:GetPeopleShapeNudeSpinePath(mapdata.userData.gender),
+		CS.SpineUtils.RoleDressToUintList(mapdata.userData.userDress),
+		CS.EGender.__CastFrom(mapdata.userData.gender),
+		1.4,
+		true,
+		function(system)
+			headGraphicSystem = system
+			system.transform:SetParent(headIconTf)
+			system.transform.localScale = CS.UnityEngine.Vector3.one * 0.14
+			system.transform.localPosition =
+				CS.MapUtils.CellPosToWorldPos(
+				CS.MapUtils.IndoorCellposToMapCellPos(CS.UnityEngine.Vector3Int(shopkeeperpos.x, shopkeeperpos.y, 0))
+			)
+			system:Play("idle_1", true, 1, 0, nil)
+			if (shopkeeperDir == 1) then
+				system:SetDirection(CS.RoleDirectionType.Left)
+			else
+				system:SetDirection(CS.RoleDirectionType.Right)
+			end
+			system:SetSortingAndOrderLayer(
+				"map_Actor",
+				CS.MapUtils.GetTileMapOrder(system.transform.position.y, system.transform.position.x, 1, 1)
+			)
+		end
+	)
+end
+
+function initMap()
+	--
+	local mapdata = UserIndoorDataProxy.inst:GetData()
+
+	local size = getindoorSize(mapdata.shopData.shopLevel)
+	--柱子
+	--左下
+	NewGo = CS.UnityEngine.GameObject.Instantiate(roomFrameProfabs:GetGameProfab("左柱子"), roomRoot.transform)
+	NewGo.transform.position =
+		CS.MapUtils.CellPosToWorldPos(
+		CS.MapUtils.IndoorCellposToMapCellPos(CS.UnityEngine.Vector3Int(size.xMin, size.yMax + 1, 0))
+	)
+
+	--左上
+	NewGo = CS.UnityEngine.GameObject.Instantiate(roomFrameProfabs:GetGameProfab("中间柱"), roomRoot.transform)
+	NewGo.transform.position =
+		CS.MapUtils.CellPosToWorldPos(
+		CS.MapUtils.IndoorCellposToMapCellPos(CS.UnityEngine.Vector3Int(size.xMax + 1, size.yMax + 1, 0))
+	)
+
+	--右下
+	NewGo = CS.UnityEngine.GameObject.Instantiate(roomFrameProfabs:GetGameProfab("前柱"), roomRoot.transform)
+	NewGo.transform.position =
+		CS.MapUtils.CellPosToWorldPos(
+		CS.MapUtils.IndoorCellposToMapCellPos(CS.UnityEngine.Vector3Int(size.xMin, size.yMin, 0))
+	)
+
+	local _renderer = NewGo:GetComponent("SpriteRenderer")
+	if (_renderer ~= nil) then
+		_renderer.sortingOrder =
+			CS.MapUtils.GetTileMapOrder(NewGo.transform.position.y - 0.5, NewGo.transform.position.x - 0.5, 1, 1)
+	end
+	--右上
+	NewGo = CS.UnityEngine.GameObject.Instantiate(roomFrameProfabs:GetGameProfab("右柱子"), roomRoot.transform)
+	NewGo.transform.position =
+		CS.MapUtils.CellPosToWorldPos(
+		CS.MapUtils.IndoorCellposToMapCellPos(CS.UnityEngine.Vector3Int(size.xMax + 1, size.yMin, 0))
+	)
+
+	--右墙基
+	local index = 0
+	for x = size.xMin, size.xMax - 1, 2 do
+		NewGo = CS.UnityEngine.GameObject.Instantiate(roomFrameProfabs:GetGameProfab("右墙基"), roomRoot.transform)
+		NewGo.transform.position =
+			CS.MapUtils.CellPosToWorldPos(CS.MapUtils.IndoorCellposToMapCellPos(CS.UnityEngine.Vector3Int(x, size.yMin, 0)))
+
+		local renderEx = NewGo:GetComponent("SpriteEx")
+		if csUnityUtils.EqualsNull(renderEx) == false then
+			local spriteurl = "tjx_0" .. (index % 3 + 1)
+			CS.ManagerBinder.inst.Asset:GetSpriteAsync(
+				spriteurl,
+				function(gsprite)
+					renderEx.mGSprite = gsprite
+				end
+			)
+		end
+		local renderer = NewGo:GetComponent("SpriteRenderer")
+		if csUnityUtils.EqualsNull(renderer) == false then
+			renderer.sortingOrder =
+				CS.MapUtils.GetTileMapOrder(NewGo.transform.position.y - 0.5, NewGo.transform.position.x - 0.5, 1, 1)
+		end
+		index = index + 1
+	end
+	--左墙基
+	index = 0
+	for y = size.yMin, size.yMax - 1, 2 do
+		if y < 20 or y > 24 then
+			NewGo = CS.UnityEngine.GameObject.Instantiate(roomFrameProfabs:GetGameProfab("左墙基"), roomRoot.transform)
+			NewGo.transform.position =
+				CS.MapUtils.CellPosToWorldPos(CS.MapUtils.IndoorCellposToMapCellPos(CS.UnityEngine.Vector3Int(0, y, 0)))
+
+			local renderEx = NewGo:GetComponent("SpriteEx")
+			if csUnityUtils.EqualsNull(renderEx) == false then
+				local spriteurl = "tjx_0" .. (index % 3 + 1)
+				CS.ManagerBinder.inst.Asset:GetSpriteAsync(
+					spriteurl,
+					function(gsprite)
+						renderEx.mGSprite = gsprite
+					end
+				)
+			end
+			local renderer = NewGo:GetComponent("SpriteRenderer")
+			if csUnityUtils.EqualsNull(renderer) == false then
+				renderer.sortingOrder =
+					CS.MapUtils.GetTileMapOrder(NewGo.transform.position.y - 0.5, NewGo.transform.position.x - 0.5, 1, 1)
+			end
+			index = index + 1
+		end
+	end
+
+	--车库
+	local newGo = CS.UnityEngine.GameObject.Instantiate(roomFrameProfabs:GetGameProfab("车库"), roomRoot.transform)
+	newGo.transform.localPosition =
+		CS.MapUtils.CellPosToWorldPos(
+		CS.MapUtils.IndoorCellposToMapCellPos(CS.UnityEngine.Vector3Int(size.xMin, size.yMax + 1, 0))
+	)
+
+	--门口
+	local newGo = CS.UnityEngine.GameObject.Instantiate(roomFrameProfabs:GetGameProfab("门口"), roomRoot.transform)
+	newGo.transform.localPosition =
+		CS.MapUtils.CellPosToWorldPos(CS.MapUtils.IndoorCellposToMapCellPos(CS.StaticConstants.indoorGatePoint))
+
+	--
+
+	--地板
+	local floors = mapdata.floorData
+	local floorCount = #(floors.floorList)
+	for i = 1, floorCount do
+		local data = floors.floorList[i]
+		local floorGo = CS.UnityEngine.GameObject.Instantiate(roomFrameProfabs:GetGameProfab("地板"), roomRoot.transform)
+		floorGo:SetActive(true)
+		local _floor = floorGo:GetComponent("Floor")
+		_floor.id = data.furnitureId
+		_floor:setpos(data.x, data.y)
+		_floor:create()
+	end
+	--墙面
+	local walls = mapdata.wallData
+	local wallCount = #(walls.wallList)
+	for i = 1, wallCount do
+		local wall = walls.wallList[i]
+		local wallprofab = nil
+		if wall.x == size.xMax + 1 then
+			wallprofab = roomFrameProfabs:GetGameProfab("右墙")
+		else
+			wallprofab = roomFrameProfabs:GetGameProfab("左墙")
+		end
+		local newGo = CS.UnityEngine.GameObject.Instantiate(wallprofab, roomRoot.transform)
+		newGo:SetActive(true)
+		local wallbase = newGo:GetComponent("WallBase")
+		wallbase.id = wall.furnitureId
+		wallbase.index = wall.index
+		wallbase:SetCellPosInt(CS.UnityEngine.Vector3Int(wall.x, wall.y, 0))
+		wallbase:create()
+	end
+
+	--家具
+	local furnitures = mapdata.furnitureList
+	local furniturecount = #furnitures
+	for i = 1, furniturecount do
+		local furniture = furnitures[i]
+		if furniture.state ~=3 then
+		local furniturecfg = CS.FurnitureConfigManager.inst:getConfig(furniture.furnitureId)
+		if csUnityUtils.EqualsNull(furniturecfg) == false then
+			local counterGo = CS.UnityEngine.GameObject.Instantiate(visitMapEntityObj, roomRoot.transform)
+			counterGo:SetActive(true)
+			local f = counterGo:GetComponent("VisitShopEntity")
+			f.mapsize.xMin = size.xMin
+			f.mapsize.yMin = size.yMin
+			f.mapsize.xMax = size.xMax
+			f.mapsize.yMax = size.yMax
+			f.uid = furniture.furnitureUid
+			f.id = furniture.furnitureId
+			f.dir = furniture.rotate
+			f.fLV = furniture.level
+			f.equipList = furniture.equipList
+			f:setType(furniturecfg.type_1)
+
+			if (furniturecfg.type_1 == 4) then
+				if (furniture.rotate == 0) then
+					furniture.y = size.yMax
+				else
+					furniture.x = size.xMax
+				end
+			elseif (furniturecfg.type_1 == 6) then
+				shopkeeperDir = furniture.rotate
+				shopkeeperpos = CS.UnityEngine.Vector2(furniture.x + 1, furniture.y + 1)
+			elseif furniturecfg.type_1 == 11 then
+				for i = 1, #(mapdata.petList) do
+					if furniture.furnitureUid == mapdata.petList[i].furnitureUid then
+						f.petInfo = mapdata.petList[i]
+					end
+				end
+			end
+			f:setpos(furniture.x, furniture.y)
+
+			f:create()
+		end
+		end
+	end
+	CS.D2DragCamera.inst:setCameraPositionAndSaveLastPos(cameraStartPos.transform.position)
+end

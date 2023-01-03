@@ -1,0 +1,176 @@
+--RefugeUseItemUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local CS_type_luaList = typeof(CS.LuaListItem)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local csGameTimerInst = CS.GameTimer.inst
+
+
+RefugeUseItemUIView = class(ViewBase)
+
+function RefugeUseItemUIView:ctor()
+	self.viewID = Constants.ViewName.RefugeUseItemUIView
+	RefugeUseItemUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function RefugeUseItemUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.scrollView = contentPane:GetObjByName("itemList"):GetComponent(CS_type_superList)
+	self.emptyText = contentPane:GetText("emptyText")
+	self.bgBtn = contentPane:GetButton("bg")
+
+	self.uiAnimator = contentPane.uiAnimator
+end
+
+function RefugeUseItemUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.bgBtn.onClick:AddListener(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.scrollView.itemRenderer = function(index, item)
+		self:ListItemRenderer(index, item)
+	end
+
+	self.fromType = 1
+	self.allItems = {}
+end
+
+function RefugeUseItemUIView:DoShowAnimation()
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+end
+
+function RefugeUseItemUIView:DoHideAnimation()
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("commonBagUI_hide")
+
+	csGameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end
+	)
+end
+
+function RefugeUseItemUIView:ListItemRenderer(index, item)
+	local itemScript = item
+	for i = 0, 2 do
+		local itemIndex = index * 3 + i
+		local smallObj = itemScript.buttonList[i].gameObject
+		if (itemIndex >= self.listItemCount) then
+			smallObj:SetActive(false)
+		else
+			if (itemIndex < self.listItemCount) then
+				smallObj:SetActive(true)
+				local smallItem = smallObj:GetComponent("SelectBagItem")
+				smallItem:setExploreItemData(self.allItems[itemIndex],function (itemId)
+						self:OnItemClick(itemId)
+					end)
+			else
+				smallObj:SetActive(false)
+			end
+		end
+	end
+end
+
+function RefugeUseItemUIView:OnItemClick(itemId)
+	self:hide()
+	if(self.fromType == 1)then
+		EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.ShowUI_RefugePrepareUIAddItem,itemId)
+	elseif self.fromType == 2 then
+		EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_AddItemCom,itemId)
+	else
+
+	end
+end
+
+function RefugeUseItemUIView:SetListItemTotalCount(count)
+	self.listItemCount = count
+	if (self.listItemCount < 0) then
+		self.listItemCount = 0
+	end
+
+	local count1 = math.floor(self.listItemCount / 3)
+	if (self.listItemCount % 3 > 0) then
+		count1 = count1 + 1
+	end
+	self.scrollView.totalItemCount = count1
+end
+
+function RefugeUseItemUIView:onHide()
+	--print("RefugeUseItemUIView onHide")
+end
+
+function  RefugeUseItemUIView:onShowed()
+	--print("RefugeUseItemUIView onShowed")
+end
+
+function RefugeUseItemUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function RefugeUseItemUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RefugeUseItemUIView:closeBtnClick()
+	self:hide()
+end
+
+function RefugeUseItemUIView:SetUIData(fromType)
+	self.fromType = fromType
+
+	self.allItems = {}
+
+	if(fromType == 1)then
+		local types = get_csharp_array(CS.ItemType,3)
+		types[0] = CS.ItemType.ExploreTimeItem
+		types[1] = CS.ItemType.ExploreAttBonus
+		types[2] = CS.ItemType.ExploreExpBonusItem
+		self.allItems = CS.ItemBagProxy.inst:GetItemsByTypes(types, true)
+	elseif fromType == 2 then
+		local types = get_csharp_array(CS.ItemType,4)
+		types[0] = CS.ItemType.ExploreTimeItem
+		types[1] = CS.ItemType.ExploreAttBonus
+		types[2] = CS.ItemType.ExploreExpBonusItem
+		types[3] = CS.ItemType.ExploreAddYieldItem
+		self.allItems = CS.ItemBagProxy.inst:GetItemsByTypes(types, true)
+	end
+	
+	if(self.allItems.Count > 0)then
+		self.emptyText.enabled = false
+		self:SetListItemTotalCount(self.allItems.Count)
+	else
+		self.emptyText.enabled = true
+	end
+end
+------------------------------------------------

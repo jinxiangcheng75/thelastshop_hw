@@ -1,0 +1,693 @@
+local luaClass_Activity_WorkerGameBtn = require("ui/view/MainUI/Activity_WorkerGameBtn")
+local luaClass_Activity_GoldenCityBtn = require("ui/view/MainUI/Activity_GoldenCityBtn")
+local luaClass_Activity_ScoreAwardBtn = require("ui/view/MainUI/Activity_ScoreAwardBtn")
+local luaClass_Activity_DeadRisingBtn = require("ui/view/MainUI/Activity_DeadRisingBtn")
+--local luaClass_Activity_WorkerGameCoinBtn = require("ui/view/MainUI/Activity_WorkerGameCoinBtn")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+local CS_LotteryDataProxyInst = CS.LotteryDataProxy.inst
+local CS_SevenDayGoalDataProxyInst = CS.SevenDayGoalDataProxy.inst
+local CS_MoneyBoxDataProxyInst = CS.MoneyBoxDataProxy.inst
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_UIUnLockConfigMrgInst = CS.UIUnLockConfigMrg.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+--MainUI_dlc 实际逻辑在lua侧
+
+local MainUI_dlc = class()
+
+function MainUI_dlc:ctor()
+
+	self.isInitComp = false
+
+end
+
+function MainUI_dlc:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaBehaviour)
+
+	self.RefugeRedPoint = self.contentPane:GetObjByName("refugeRedPoint")
+	self.redPoint_welfare = self.contentPane:GetObjByName("redPoint_welfare")
+	self.redPoint_mall = self.contentPane:GetObjByName("redPoint_mall")
+
+	local userLv = CS.UserDataProxy.inst.playerData.level
+	local rankMinLv = 999
+	local rankMaxLv = 999
+	if(CS.WorldParConfigManager.inst:GetConfig(341) ~= nil)then
+		rankMinLv = CS.WorldParConfigManager.inst:GetConfig(341).parameters
+	end
+	if(CS.WorldParConfigManager.inst:GetConfig(342) ~= nil)then
+		rankMaxLv = CS.WorldParConfigManager.inst:GetConfig(342).parameters
+	end
+	self.rankBtn = self.contentPane:GetButton("btn_totalRank")
+	self.rankBtn.gameObject:SetActive(userLv >= rankMinLv and userLv < rankMaxLv)
+
+	self.btn_sevenGift = self.contentPane:GetButton("btn_sevenGift")
+	self.giftSevenRedPoint = self.contentPane:GetObjByName("giftSevenRedPoint")
+	--local userLv = CS.UserDataProxy.inst.playerData.level
+	local unlockLv = 999
+
+	if(CS.WorldParConfigManager.inst:GetConfig(364) ~= nil)then
+		unlockLv = CS.WorldParConfigManager.inst:GetConfig(364).parameters
+	end
+	self.btn_sevenGift.gameObject:SetActive(userLv >= unlockLv and GiftSevenDataProxy.inst.day ~= 9999)
+
+	--self.btn_chat = self.contentPane:GetButton("btn_chat")
+
+	unlockLv = 999
+	self.btn_activity_point = self.contentPane:GetButton("btn_activity_point")
+	if(CS.WorldParConfigManager.inst:GetConfig(8501) ~= nil)then
+		unlockLv = CS.WorldParConfigManager.inst:GetConfig(8501).parameters
+	end
+	self.btn_activity_point.gameObject:SetActive(userLv >= unlockLv) -- 判断等级
+
+	self.isInitComp = true
+
+end
+
+function MainUI_dlc:init(obj)
+
+	self:initComp(obj)
+	self:addListeners()
+
+	self.activity_workerGameBtn = luaClass_Activity_WorkerGameBtn.new() --巧匠大赛按钮
+	self.activity_workerGameBtn:init(self.contentPane:GetObjByName("btn_activity_workerGame"))
+
+	--self.activity_workerGameCoinBtn = luaClass_Activity_WorkerGameCoinBtn.new()
+	--self.activity_workerGameCoinBtn:init(self.contentPane:GetObjByName("btn_activity_workerGameCoin"))
+
+	local storyNpcCfg = StoryNpcConfigManager:GetConfig(3, -1)
+
+	if
+		storyNpcCfg ~= nil and
+		CS_PlayerPrefs.GetString(
+			CS_AccountDataProxyInst.account ..
+			"_StoryNpc_ActivityWorkerGame_" ..
+			tostring(Activity_WorkerGameProxy.inst.version) .. "_" .. tostring(storyNpcCfg.story_id),
+			"-1"
+		) == "-1"
+		then
+		self:checkActivity_WorkerGameBtn(false)
+	else
+		--先调用一下
+		self:checkActivity_WorkerGameBtn(Activity_WorkerGameProxy.inst.flag)
+	end
+
+	self:initGoldenCity()
+
+	self:initScoreAward()
+	
+	self:initDeadRising()
+
+	self.rankBtn:ButtonClickTween(
+		function ()
+			EventDispatcher:dispatchEvent(GameEvent.RankEvent.Open_RankUIByBtn,0)
+			--EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.ShowUI_Activity_DeadRising_MainUI)
+		end
+	)
+
+	self.btn_sevenGift:ButtonClickTween(
+		function ()
+			EventDispatcher:dispatchEvent(GameEvent.GiftSevenEvent.OpenUI_GiftSeven)
+		end
+	)
+
+	--self.btn_chat:ButtonClickTween(
+	--function ()
+	--self:onBtn_chatClick()
+	--end
+	--)
+
+	self.btn_activity_point:ButtonClickTween(
+		function ()
+			EventDispatcher:dispatchEvent(GameEvent.ActivityPointEvent.OpenUI_ActivityPoint_MainUI,0,false)
+		end
+	)
+
+
+
+	self:refreshRedPoints()
+
+end
+
+function MainUI_dlc:initGoldenCity()
+	self.activity_goldenCityBtn = luaClass_Activity_GoldenCityBtn.new() --黄金城按钮
+	self.activity_goldenCityBtn:init(self.contentPane:GetObjByName("btn_activity_goldenCity"))
+
+	local storyNpcCfg = StoryNpcConfigManager:GetConfig(5, -1)
+
+	if
+		storyNpcCfg ~= nil and
+		CS_PlayerPrefs.GetString(
+			CS_AccountDataProxyInst.account ..
+			"_GoldenCity_" ..
+			tostring(GoldenCityDataProxy.inst.version) .. "_" .. tostring(storyNpcCfg.story_id),
+			"-1"
+		) == "-1"
+		then
+
+		self:checkActivity_GoldenCityBtn(false)
+	else
+		--先调用一下
+		self:checkActivity_GoldenCityBtn(GoldenCityDataProxy.inst.flag)
+	end
+end
+
+function MainUI_dlc:initScoreAward()
+
+	self.activity_scoreAwardBtn = luaClass_Activity_ScoreAwardBtn.new() --积分大奖赛
+	self.activity_scoreAwardBtn:init(self.contentPane:GetObjByName("btn_activity_scoreAward"))
+
+	local storyNpcCfg = StoryNpcConfigManager:GetConfig(6, -1)
+	
+	if storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(
+		CS_AccountDataProxyInst.account ..
+		"_StoryNpc_ActivityScoreAwardGame_" ..
+		tostring(Activity_ScoreAwardGameProxy.inst.version) .. "_" .. tostring(storyNpcCfg.story_id),
+		"-1"
+	) == "-1" then
+		
+		self:checkActivity_ScoreAwardBtn(false)
+		
+	else
+		
+		self:checkActivity_ScoreAwardBtn(Activity_ScoreAwardGameProxy.inst.flag)
+		
+	end
+	
+end
+
+function MainUI_dlc:initDeadRising()
+	
+	--self.activity_deadRisingBtn = luaClass_Activity_DeadRisingBtn.new() --丧尸围城
+	--self.activity_deadRisingBtn:init(self.contentPane:GetObjByName("btn_activity_deadRising"))
+	
+end
+
+function MainUI_dlc:addListeners()
+
+	EventDispatcher:addEvent(
+		GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,
+		self,
+		self.checkActivity_WorkerGameBtn
+	)
+	EventDispatcher:addEvent(
+		GameEvent.Activity_WorkerGameEvent.RefreshRedPoint_Activity_WorkerGame_ScoreCanReward,
+		self,
+		self.refreshActiveWokerGameRedPoint
+	)
+	EventDispatcher:addEvent(
+		GameEvent.RefugeEvent.Refresh_RefugeRedPoint,
+		self,
+		self.refreshRefugeRedPoint
+	)
+	EventDispatcher:addEvent(
+		GameEvent.RankEvent.Refresh_MainRankBtnActive,
+		self,
+		self.refreshRankBtnActive
+	)
+	EventDispatcher:addEvent(
+		GameEvent.MainUIEvent.mainUI_refreshRedPoints,
+		self,
+		self.refreshRedPoints
+	)
+	EventDispatcher:addEvent(
+		GameEvent.GiftSevenEvent.RefreshUI_GiftSevenRedPoint,
+		self,
+		self.refreshGiftSevenRedPoint
+	)
+	EventDispatcher:addEvent(
+		GameEvent.GiftSevenEvent.RefreshUI_GiftSevenBtn,
+		self,
+		self.refreshGiftSevenBtnActive
+	)
+	EventDispatcher:addEvent(
+		GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState,
+		self,
+		self.checkActivity_GoldenCityBtn
+	)
+	EventDispatcher:addEvent(
+		GameEvent.GoldenCityEvent.RefreshRedPoint_Activity_GoldenCity_ScoreCanReward,
+		self,
+		self.refreshActiveGoldenCityRedPoint
+	)
+	EventDispatcher:addEvent(
+		GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_Btn,
+		self,
+		self.refreshActivityPointBtnActive
+	)
+	EventDispatcher:addEvent(
+		GameEvent.Activity_ScoreAwardGameEvent.RefrshActivity_ScoreAwardGameState,
+		self,
+		self.checkActivity_ScoreAwardBtn
+	)
+	EventDispatcher:addEvent(
+		GameEvent.Activity_ScoreAwardGameEvent.RefreshRedPoint_Activity_ScoreAwardGame_ScoreCanReward,
+		self,
+		self.refreshScoreAwardGameRedPoint
+	)
+	EventDispatcher:addEvent(
+		GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_RedPoint,
+		self,
+		self.refreshActivityPointRedPoint
+	)
+
+end
+
+function MainUI_dlc:removeListeners()
+
+	EventDispatcher:removeEvent(
+		GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,
+		self,
+		self.checkActivity_WorkerGameBtn
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.Activity_WorkerGameEvent.RefreshRedPoint_Activity_WorkerGame_ScoreCanReward,
+		self,
+		self.refreshActiveWokerGameRedPoint
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.RefugeEvent.Refresh_RefugeRedPoint,
+		self,
+		self.refreshRefugeRedPoint
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.RankEvent.Refresh_MainRankBtnActive,
+		self,
+		self.refreshRankBtnActive
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.MainUIEvent.mainUI_refreshRedPoints,
+		self,
+		self.refreshRedPoints
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.GiftSevenEvent.RefreshUI_GiftSevenRedPoint,
+		self,
+		self.refreshGiftSevenRedPoint
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.GiftSevenEvent.RefreshUI_GiftSevenBtn,
+		self,
+		self.refreshGiftSevenBtnActive
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState,
+		self,
+		self.checkActivity_GoldenCityBtn
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.GoldenCityEvent.RefreshRedPoint_Activity_GoldenCity_ScoreCanReward,
+		self,
+		self.refreshActiveGoldenCityRedPoint
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_Btn,
+		self,
+		self.refreshActivityPointBtnActive
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.Activity_ScoreAwardGameEvent.RefrshActivity_ScoreAwardGameState,
+		self,
+		self.checkActivity_ScoreAwardBtn
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.Activity_ScoreAwardGameEvent.RefreshRedPoint_Activity_ScoreAwardGame_ScoreCanReward,
+		self,
+		self.refreshScoreAwardGameRedPoint
+	)
+	EventDispatcher:removeEvent(
+		GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_RedPoint,
+		self,
+		self.refreshActivityPointRedPoint
+	)
+
+
+end
+
+function MainUI_dlc:refreshGiftSevenBtnActive()
+	self.btn_sevenGift = self.contentPane:GetButton("btn_sevenGift")
+	if(self.btn_sevenGift ~= nil)then
+		local userLv = CS.UserDataProxy.inst.playerData.level
+		local unlockLv = 999
+
+		if(CS.WorldParConfigManager.inst:GetConfig(364) ~= nil)then
+			unlockLv = CS.WorldParConfigManager.inst:GetConfig(364).parameters
+		end
+		self.btn_sevenGift.gameObject:SetActive(userLv >= unlockLv and GiftSevenDataProxy.inst.day ~= 9999)
+	end
+end
+
+function MainUI_dlc:refreshRankBtnActive()
+	self.rankBtn = self.contentPane:GetButton("btn_totalRank")
+	if(self.rankBtn ~= nil)then
+		local userLv = CS.UserDataProxy.inst.playerData.level
+		local rankMinLv = 999
+		local rankMaxLv = 999
+		if(CS.WorldParConfigManager.inst:GetConfig(341) ~= nil)then
+			rankMinLv = CS.WorldParConfigManager.inst:GetConfig(341).parameters
+		end
+		if(CS.WorldParConfigManager.inst:GetConfig(342) ~= nil)then
+			rankMaxLv = CS.WorldParConfigManager.inst:GetConfig(342).parameters
+		end
+		self.rankBtn.gameObject:SetActive(userLv >= rankMinLv and userLv < rankMaxLv)
+	end
+end
+
+function MainUI_dlc:refreshActivityPointBtnActive()
+	self.btn_activity_point = self.contentPane:GetButton("btn_activity_point")
+	if(self.btn_activity_point ~= nil)then
+		local userLv = CS.UserDataProxy.inst.playerData.level
+		local unlockLv = 999
+		if(CS.WorldParConfigManager.inst:GetConfig(8501) ~= nil)then
+			unlockLv = CS.WorldParConfigManager.inst:GetConfig(8501).parameters
+		end
+		self.btn_activity_point.gameObject:SetActive(userLv >= unlockLv)
+	end
+end
+
+function MainUI_dlc:checkActivity_WorkerGameBtn(flag)
+
+	if CS_UserDataProxyInst.playerData.level < CS_WorldParConfigManagerInst:GetConfig(323).parameters then
+		if self.activity_workerGameBtn ~= nil then
+			self.activity_workerGameBtn:check(false)
+		end
+		--if self.activity_workerGameCoinBtn ~= nil then
+		--self.activity_workerGameCoinBtn:check(false)
+		--end
+		return
+	end
+
+	if self.activity_workerGameBtn ~= nil then
+		self.activity_workerGameBtn:check(flag)
+	end
+
+	--if self.activity_workerGameCoinBtn ~= nil then
+	--self.activity_workerGameCoinBtn:check(flag)
+	--end
+
+end
+
+function MainUI_dlc:refreshActiveWokerGameRedPoint(flag)
+
+	if self.activity_workerGameBtn ~= nil then
+		self.activity_workerGameBtn:refreshRedPoint(flag)
+	end
+
+end
+
+function MainUI_dlc:checkActivity_GoldenCityBtn(flag)
+
+	if CS_UserDataProxyInst.playerData.level < CS_WorldParConfigManagerInst:GetConfig(8405).parameters then
+		if self.activity_goldenCityBtn ~= nil then
+			self.activity_goldenCityBtn:check(false)
+		end
+		return
+	end
+
+	if self.activity_goldenCityBtn ~= nil then
+		self.activity_goldenCityBtn:check(flag)
+	end
+end
+
+function MainUI_dlc:refreshActiveGoldenCityRedPoint(flag)
+
+	if self.activity_goldenCityBtn ~= nil then
+		self.activity_goldenCityBtn:refreshRedPoint(flag)
+	end
+
+end
+
+function MainUI_dlc:checkActivity_ScoreAwardBtn(flag)
+
+	local level = 10
+	local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(8511)
+	if worldParCfg ~= nil then
+		level = worldParCfg.parameters
+	end
+	
+	if CS_UserDataProxyInst.playerData.level < level then
+		if self.activity_scoreAwardBtn ~= nil then
+			self.activity_scoreAwardBtn:check(false)
+		end
+		return
+	end
+	
+	if self.activity_scoreAwardBtn ~= nil then
+		self.activity_scoreAwardBtn:check(flag)
+	end
+
+end
+
+function MainUI_dlc:refreshScoreAwardGameRedPoint()
+
+	if self.activity_scoreAwardBtn ~= nil then
+		self.activity_scoreAwardBtn:refreshRedPoint()
+	end
+
+end
+
+function MainUI_dlc:getWelfareRedPointFlag()
+
+
+	if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_dailySign") then
+
+		if CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_dailySign") then
+			--每日签到红点
+			if DailySignDataProxy.inst.isShowDailySignRedPoint then return true end
+		end
+
+	else
+
+		local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(136) --136 每日签到
+		if worldParCfg ~= nil and worldParCfg.parameters <= CS_UserDataProxyInst.playerData.level then
+			--每日签到红点
+			if DailySignDataProxy.inst.isShowDailySignRedPoint then return true end
+		end
+
+	end
+
+	if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_sevenDay") then
+
+		if CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_sevenDay") then
+			--七日红点
+			if CS_SevenDayGoalDataProxyInst.isShowRedPoint and CS_UserDataProxyInst.playerData.level >= CS_WorldParConfigManagerInst:GetConfig(135).parameters then return true end
+		end
+
+	else
+
+		local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(135) --135 七日
+		if worldParCfg ~= nil and worldParCfg.parameters <= CS_UserDataProxyInst.playerData.level then
+			--七日红点
+			if CS_SevenDayGoalDataProxyInst.isShowRedPoint and CS_UserDataProxyInst.playerData.level >= CS_WorldParConfigManagerInst:GetConfig(135).parameters then return true end
+		end
+
+	end
+
+	if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_moneyBox") then
+
+		if CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_moneyBox") then
+			--储蓄罐红点
+			if CS_MoneyBoxDataProxyInst.NeedShowRedPoint then return true end
+		end
+
+	else
+
+		local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(138) --138 储蓄罐
+		if worldParCfg ~= nil and worldParCfg.parameters <= CS_UserDataProxyInst.playerData.level then
+			--储蓄罐红点
+			if CS_MoneyBoxDataProxyInst.NeedShowRedPoint then return true end
+		end
+
+	end
+
+	if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_lottery") then
+
+		if CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_lottery") then
+			--转盘红点
+			if CS_LotteryDataProxyInst.hasSingleRedPoint --[[or CS_LotteryDataProxyInst.hasRefreshRedPoint]] then return true end
+		end
+
+	else
+
+		local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(100) --100 转盘
+		if worldParCfg ~= nil and worldParCfg.parameters <= CS_UserDataProxyInst.playerData.level then
+			--转盘红点
+			if CS_LotteryDataProxyInst.hasSingleRedPoint --[[or CS_LotteryDataProxyInst.hasRefreshRedPoint]] then return true end
+		end
+
+	end
+
+	if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_levelGrowth") then
+
+		if CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_levelGrowth") then
+			--成长礼包红点
+			if MallDataProxy.inst:GetFirstGrowthReward() > 0 then return true end
+		end
+
+	else
+
+		local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(340) --340 成长礼包
+		if worldParCfg ~= nil and worldParCfg.parameters <= CS_UserDataProxyInst.playerData.level then
+			--成长礼包红点
+			if MallDataProxy.inst:GetFirstGrowthReward() > 0 then return true end
+		end
+
+	end
+
+	return false
+
+end
+
+function MainUI_dlc:getMallRedPointFlag()
+
+	--目前只有每日礼包有红点
+	local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(149)
+	if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+		return false
+	end
+
+	return DailyRewardDataProxy.inst:HasReward()
+
+end
+
+function MainUI_dlc:refreshRedPoints()
+
+	if not self.isInitComp then
+		return
+	end
+
+	self.redPoint_welfare:SetActive(self:getWelfareRedPointFlag())
+	self.redPoint_mall:SetActive(self:getMallRedPointFlag())
+
+	self:refreshActiveGoldenCityRedPoint(GoldenCityDataProxy.inst:GetScoreReallyCanRewardCount() > 0)
+
+	self:refreshScoreAwardGameRedPoint(false);
+	
+	self:refreshActivityPointRedPoint()
+
+end
+
+function MainUI_dlc:refreshGiftSevenRedPoint()
+	self.giftSevenRedPoint = self.contentPane:GetObjByName("giftSevenRedPoint")
+	if self.giftSevenRedPoint ~= nil then
+		self.giftSevenRedPoint:SetActive(
+			GiftSevenDataProxy.inst.isRecharge and not GiftSevenDataProxy.inst.isReward
+		)
+	end
+end
+
+function MainUI_dlc:refreshRefugeRedPoint()
+	self.RefugeRedPoint = self.contentPane:GetObjByName("refugeRedPoint")
+	if self.RefugeRedPoint ~= nil then
+		self.RefugeRedPoint:SetActive(
+			RefugeTowerDataProxy.inst.haveNotGetAward
+		)
+	end
+end
+
+function MainUI_dlc:refreshActivityPointRedPoint()
+	self.activityPointRedPoint = self.contentPane:GetObjByName("activityPointRedPoint")
+	if self.activityPointRedPoint ~= nil then
+		self.activityPointRedPoint:SetActive(
+			ActivityPointDataProxy.inst:GetTaskListState()
+		)
+	end
+end
+
+--function MainUI_dlc:onBtn_chatClick()
+
+--if (CS_UserDataProxyInst.playerData.level < CS_WorldParConfigManagerInst:GetConfig(137).parameters) then
+--EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("店主达到{0}级可解锁，可以通过售卖装备升级",tostring(math.ceil(CS_WorldParConfigManagerInst:GetConfig(137).parameters))),"FFD907")
+--return
+--end
+
+--EventDispatcher:dispatchEvent(GameEvent.ChatEvent.OpenChatView)
+
+--end
+
+function MainUI_dlc:clear()
+
+	self.isInitComp = false
+	self:removeListeners()
+
+	if self.activity_workerGameBtn ~= nil then
+		self.activity_workerGameBtn:clearTimer()
+		self.activity_workerGameBtn = nil
+	end
+
+	if self.activity_goldenCityBtn ~= nil then
+		self.activity_goldenCityBtn:clearTimer()
+		self.activity_goldenCityBtn = nil
+	end
+
+	--if self.activity_workerGameCoinBtn ~= nil then
+	--self.activity_workerGameCoinBtn:clearTimer()
+	--self.activity_workerGameCoinBtn = nil
+	--end
+
+	if self.activity_scoreAwardBtn ~= nil then
+		self.activity_scoreAwardBtn:clearTimer()
+		self.activity_scoreAwardBtn = nil
+	end
+
+
+end
+
+
+
+
+-----------LuaBehaviour---------------------------------------------------------------------------------------------------------------------------------------
+
+local mainUI_dlc
+
+function awake()
+
+	mainUI_dlc = MainUI_dlc.new()
+	mainUI_dlc:init(self.gameObject)
+
+end
+
+function onEnable()
+
+	if mainUI_dlc.RefugeRedPoint ~= nil then
+		mainUI_dlc.RefugeRedPoint:SetActive(
+			RefugeTowerDataProxy.inst.haveNotGetAward
+		)
+	end
+
+	if mainUI_dlc.giftSevenRedPoint ~= nil then
+		mainUI_dlc.giftSevenRedPoint:SetActive(
+			GiftSevenDataProxy.inst.isRecharge and not GiftSevenDataProxy.inst.isReward
+		)
+	end
+
+
+
+end
+
+--function update()
+
+--if CS.UnityEngine.Input.GetKeyDown(CS.UnityEngine.KeyCode.C) then
+--EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,Activity_WorkerGameProxy.inst.flag)
+--end
+
+--end
+
+function ondestroy()
+
+	if mainUI_dlc ~= nil then
+		mainUI_dlc:clear()
+		mainUI_dlc = nil
+	end
+
+end

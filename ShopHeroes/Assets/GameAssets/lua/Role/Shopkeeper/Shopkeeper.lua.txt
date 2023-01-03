@@ -1,0 +1,517 @@
+
+require("utils/XLuaUtils")
+require("Role/IndoorRole")
+local luaClass_StateMachine =  require("utils/StateMachine")
+local luaClass_ShopkeeperOnCounterRoundState =  require("Role/Shopkeeper/State/ShopkeeperOnCounterRoundState")
+local luaClass_ShopkeeperOnGuideState =  require("Role/Shopkeeper/State/ShopkeeperOnGuideState")
+local luaClass_ShopkeeperRambleState =  require("Role/Shopkeeper/State/ShopkeeperRambleState")
+local luaClass_ShopkeeperToCounterState =  require("Role/Shopkeeper/State/ShopkeeperToCounterState")
+
+
+local CS_IndoorRoleActionConfigManagerInst = CS.IndoorRoleActionConfigManager.inst
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local Vector3 = CS.UnityEngine.Vector3
+local Vector3Int = CS.UnityEngine.Vector3Int
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_MapUtils = CS.MapUtils
+local CS_StaticConstants = CS.StaticConstants
+local CS_Random = CS.UnityEngine.Random
+
+MachineShopkeeperState =
+{
+	none = -1,
+	onCounterRound = 0,--在柜台旁
+	ramble = 1,--闲逛
+	toCounter = 2,--去柜台（可能去不了）
+	inGuide = 3,--在引导其间(无任何操作)
+}
+
+ShopkeeperRambleType =
+{
+
+	none = 0,
+
+	shopkeeper_ramble_1 = CS_StaticConstants.shopkeeperWeightBase + 1,
+	shopkeeper_ramble_2 = CS_StaticConstants.shopkeeperWeightBase + 2,
+	shopkeeper_ramble_3 = CS_StaticConstants.shopkeeperWeightBase + 3,
+	shopkeeper_ramble_4 = CS_StaticConstants.shopkeeperWeightBase + 4,
+	shopkeeper_ramble_5 = CS_StaticConstants.shopkeeperWeightBase + 5,
+
+}
+
+
+local Shopkeeper = class(IndoorRole)
+
+function Shopkeeper:Init(gameObj)
+
+	self.roundCounterShopperNum = 0 --在柜台旁边的顾客数量
+	self.isShowingAcheivement = false --是否在展示成就气泡
+	self.onMoveEndCompleteHandler = nil --移动结束回调
+	self.rambleType = ShopkeeperRambleType.none
+
+	------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	self.gameObject = gameObj
+	self.transform = self.gameObject.transform
+	self:init(self.transform,self.gameObject:GetComponent(typeof(CS.RoleMoveByAStar)),self.gameObject:GetComponent(typeof(CS.CharacterAttacher)))
+	self.gameObject.name = "Shopkeeper"
+
+	local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+	local func = funcGeneric(CS.DressUpSystem)
+	func(
+		CS_CharacterManagerInst,
+		CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(CS_UserDataProxyInst.playerData.gender)),
+		CS_SpineUtils.RoleDressToUintList(CS_UserDataProxyInst.playerData.userDress),
+		CS.EGender.__CastFrom(CS_UserDataProxyInst.playerData.gender),
+		0.14,
+		true,
+		function(system)
+			self.character = system
+			local go = self.character.gameObject
+			go.transform:SetParent(self.attacher.actorParent)
+			go.transform.localPosition = Vector3.zero;
+			self:UpdateSortingOrder()
+			local idleAnimationName = CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.character.gender, CS.kIndoorRoleActionType.normal_standby);
+			self.character:Play(idleAnimationName, true);
+			self.character:SetDirection(CS.RoleDirectionType.Left);
+		end
+	)
+
+	self.machine = luaClass_StateMachine.new()
+
+	local shopkeeperOnCounterRoundState = luaClass_ShopkeeperOnCounterRoundState.new()
+	shopkeeperOnCounterRoundState:init(self)
+	local shopkeeperOnGuideState = luaClass_ShopkeeperOnGuideState.new()
+	shopkeeperOnGuideState:init(self)
+	local shopkeeperRambleState = luaClass_ShopkeeperRambleState.new()
+	shopkeeperRambleState:init(self)
+	local shopkeeperToCounterState = luaClass_ShopkeeperToCounterState.new()
+	shopkeeperToCounterState:init(self)
+
+	self.machine:Init({shopkeeperOnCounterRoundState,shopkeeperOnGuideState,shopkeeperRambleState,shopkeeperToCounterState})
+
+	self.isCanMoveToCounter = true --是否可以移动到柜台
+
+end
+
+function Shopkeeper:SetRoundCounterShopperNum(num)
+
+	self.roundCounterShopperNum = num
+	if self.roundCounterShopperNum < 0 then
+		self.roundCounterShopperNum = 0
+	end
+
+	if self.machine ~= nil then
+
+		local state = self:GetCurState();
+		if state == MachineShopkeeperState.inGuide then
+			return
+		end
+
+		if self.roundCounterShopperNum > 0 then
+			self.machine:SetState(MachineShopkeeperState.onCounterRound)
+		else
+			if state ~= MachineShopkeeperState.ramble then
+				self.machine:SetState(MachineShopkeeperState.ramble)
+			end
+		end
+
+
+	end
+
+end
+
+function Shopkeeper:GetRoundCounterShopperNum()
+	return self.roundCounterShopperNum
+end
+
+function Shopkeeper:Update()
+	if (self.machine ~= nil) then
+		self.machine:OnUpdate();
+	end
+end
+
+
+function Shopkeeper:GetCurState()
+
+	if self.machine ~= nil then
+		return self.machine:GetCurState()
+	end
+
+	return MachineShopkeeperState.none
+
+end
+
+function Shopkeeper:SetState(state,info)
+
+	if self.machine ~= nil then
+
+		self.machine:SetState(state,info)
+
+	end
+
+end
+
+--更新装扮
+function Shopkeeper:ChangeClothing()
+
+	CS_CharacterManagerInst:ReSetCharacter(self.character,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(CS_UserDataProxyInst.playerData.gender)),CS_SpineUtils.RoleDressToUintList(CS_UserDataProxyInst.playerData.userDress),CS.EGender.__CastFrom(CS_UserDataProxyInst.playerData.gender))
+
+end
+
+
+--移动到对应家具
+function Shopkeeper:MoveToFurniture(furnitureUid)
+
+	if furnitureUid == -1 then
+		return false
+	end
+
+	local result,furniture = CS.IndoorMap.inst:GetFurnituresByUid(furnitureUid)
+	
+	if result then
+	
+		local posList = furniture:GetFreePos()
+		local ranPosList = get_csharp_list(Vector3Int)
+		
+		for i = 0, posList.Count - 1 do
+			ranPosList:Insert(CS_Random.Range(0, ranPosList.Count + 1),posList[i])
+		end
+		
+		for i = 0, ranPosList.Count - 1 do
+
+			local endPos = ranPosList[i]
+			local movepath = CS.IndoorMap.inst:FindPath(self.currCellPos,endPos)
+
+			if movepath.Count > 0 then
+				self:move(movepath)
+				return true
+			end
+
+		end
+			
+	end
+
+	return false
+
+end
+
+function Shopkeeper:MoveToPet(petUid)
+
+	if petUid == -1 then
+		return false
+	end
+
+	if CS.IndoorRoleSystem.inst == nil then
+		return false
+	end
+
+	local pet = CS.IndoorRoleSystem.inst:GetPetByUid(petUid);
+
+	if pet == nil then
+		return false
+	end
+
+	local endPos = pet:GetFreePos()
+
+	local movepath = CS.IndoorMap.inst:FindPath(self.currCellPos,endPos)
+
+	if movepath.Count > 0 and endPos ~= Vector3Int(0,0,0) then
+		self:move(movepath)
+		return true
+	end
+
+	return false
+
+end
+
+--随机移动一个位置
+function Shopkeeper:MoveToRandomPos()
+
+	local pos = CS.IndoorMap.inst:GetFreeGridPos();
+	local endPos = CS.MapUtils.IndoorCellposToMapCellPos(pos);
+
+	if endPos ~= Vector3Int(0,0,0) then
+
+		local movepath = CS.IndoorMap.inst:FindPath(self.currCellPos, endPos);
+
+		if movepath.Count > 0 then
+			self:move(movepath)
+			return true
+		else
+			return false
+		end
+
+	else
+		return false
+	end
+
+end
+
+--移动到柜台
+function Shopkeeper:moveToCounter()
+
+	local endPos = CS.IndoorMap.inst:GetCounterOperationPos();
+
+	if endPos ~= Vector3Int(99999,99999,99999) then
+
+		local movepath = CS.IndoorMap.inst:FindPath(self.currCellPos, endPos);
+
+		if movepath.Count > 0 then
+			self:move(movepath)
+			return true
+		else
+			return false
+		end
+
+	else
+		return false
+	end
+
+end
+
+--面向柜台
+function Shopkeeper:FaceToCounter()
+
+	if CS_UserDataProxyInst == nil or self.character == nil then
+		return
+	end
+
+	local counterdata = CS_UserDataProxyInst:GetCounter();
+
+	if counterdata ~= nil then
+
+		if counterdata.dir == 0 then
+			self.character:SetDirection(CS.RoleDirectionType.Right);
+		else
+			self.character:SetDirection(CS.RoleDirectionType.Left);
+		end
+
+	end
+
+end
+
+--面向家具
+function Shopkeeper:FaceToFurniture(fUid)
+
+
+	if self.character ~= nil then
+
+		local result,f = CS.IndoorMap.inst:GetFurnituresByUid(fUid)
+
+		if result then
+			self.character:SetDirection(self:getDir(self.currCellPos,f.cellpos))
+		end
+
+	end
+
+end
+
+
+--面向宠物
+function Shopkeeper:FaceToPet(petUid)
+
+	if self.character ~= nil then
+
+		if CS.IndoorRoleSystem.inst ~= nil then
+
+			local pet = CS.IndoorRoleSystem.inst:GetPetByUid(petUid);
+
+			if pet ~= nil then
+				self.character:SetDirection(self:getDir(self.currCellPos,pet.currCellPos))
+			end
+
+		end
+
+	end
+
+end
+
+--是否在柜台附近
+function Shopkeeper:CheckIsRoundCounter()
+
+	local endPos = CS.IndoorMap.inst:GetCounterOperationPos();
+
+	if endPos ~= Vector3Int(99999,99999,99999) then
+
+		if CS.Helper.V3_Distance(self.currCellPos,endPos) < 0.1 then
+			return true
+		else
+			return false
+		end
+	else
+		return false
+	end
+
+end
+
+--店铺格局发生了变化
+function Shopkeeper:OnDesignChanged()
+
+	local curState = self:GetCurState()
+
+	if curState == MachineShopkeeperState.ramble or curState == MachineShopkeeperState.inGuide then
+		--闲逛或者在引导中 不做处理
+		return
+	else
+
+		if self:CheckIsRoundCounter() then
+
+			self:FaceToCounter()
+			if curState ~= MachineShopkeeperState.onCounterRound then
+				self:SetState(MachineShopkeeperState.onCounterRound)
+			end
+
+		else
+
+			self:SetState(MachineShopkeeperState.toCounter);
+
+		end
+
+	end
+
+end
+
+--面向顾客
+function Shopkeeper:FaceToShopper(shopperPosition)
+
+	if self:isMoving() then
+		return
+	end
+
+	local direction = self:getDir(CS.IndoorMap.inst.gameMapGrid:WorldToCell(self.transform.position), CS.IndoorMap.inst.gameMapGrid:WorldToCell(shopperPosition) + Vector3Int(0,0,1)) -- +1 Y偏移
+
+	if self.character ~= nil then
+		self.character:SetDirection(direction)
+	end
+
+end
+
+--展示成就气泡
+function Shopkeeper:ShowAcheivementBubble()
+
+	if not CS.AcheivementDataProxy.inst.NeedRedPoint and (GemMonthCardDataProxy.inst.remainCount <= 0 or GemMonthCardDataProxy.inst.flag ~= 0) then
+		return
+	end
+
+	self.isShowingAcheivement = true;
+
+	CS.AtlasAssetHandler.inst:GetAtlasSprite("main_atlas","zhuejiemian_qipao2",function (gsprite)
+
+			self:SetSpBgIcon(gsprite.sprite)
+			gsprite:release()
+
+		end)
+
+	local atlas = "main_atlas"
+	local iconName = "zhuejiemian_iconchenjiu"
+
+	if GemMonthCardDataProxy.inst.remainCount > 0 and GemMonthCardDataProxy.inst.flag == 0 then --金条月卡领取满足
+
+		atlas = "mallItem_atlas"
+		iconName = "shangcheng_yuekajintiao"
+		
+	end
+
+	CS.AtlasAssetHandler.inst:GetAtlasSprite(atlas,iconName,function (gsprite)
+
+			self:ShowSpPop(gsprite.sprite,1,false,false,CS.UnityEngine.Color.white,false,1)
+
+		end)
+
+	self:SetBubbleClickHandler(function ()
+
+			CS_EventControllerInst:TriggerEvent(CS_GameEventType.AcheivementEvent.SHOWUI_ACHEIVEMENTUI)
+
+		end)
+
+end
+
+--隐藏成就气泡
+function Shopkeeper:HideAcheivementBubble()
+
+	if self.isShowingAcheivement then
+		self.isShowingAcheivement = false
+		self:HidePopup()
+	end
+
+end
+
+function Shopkeeper:onMoveEndComplete()
+
+	Shopkeeper.super.onMoveEndComplete(self)
+
+	if self.onMoveEndCompleteHandler ~= nil then
+		self.onMoveEndCompleteHandler()
+	end
+
+end
+
+function Shopkeeper:Talk(msg,talkComplete)
+
+	if self.isShowingAcheivement then
+
+		if talkComplete == nil then
+			talkComplete = function()
+				self:ShowAcheivementBubble()
+			end
+		else
+			talkComplete = talkComplete + function()
+				self:ShowAcheivementBubble()
+			end
+		end
+
+	end
+
+	Shopkeeper.super.Talk(self,msg,talkComplete)
+
+end
+
+function Shopkeeper:checkCurPosIsObstacle()
+
+	local gridFlag = CS.IndoorMap.inst:GetIndoorGridFlags(self.currCellPos.x - CS_StaticConstants.IndoorOffsetX,self.currCellPos.y - CS_StaticConstants.IndoorOffsetY)
+
+	if gridFlag == 0 then
+
+		--设置一下Flag
+		CS.IndoorMap.inst:SetGridFlags(true,self.currCellPos.x - CS_StaticConstants.IndoorOffsetX,self.currCellPos.y - CS_StaticConstants.IndoorOffsetY,1415926,1415926)
+		return false
+
+	end
+
+	if gridFlag ~= 1415926 and CS.kTileGroupType.__CastFrom(gridFlag) ~= CS.kTileGroupType.Counter then
+		return true
+	else
+		return false
+	end
+
+end
+
+function Shopkeeper:RefreshCurCellPos()
+
+	if self:checkCurPosIsObstacle() then
+
+		local newPos = CS.IndoorMap.inst:_FindFreeCell(CS_MapUtils.MapCellPosToIndoorCellpos(self.currCellPos),1,1,true)
+		self:SetCellPos(CS_MapUtils.IndoorCellposToMapCellPos(newPos));
+		self:UpdateSortingOrder()
+		CS.IndoorMap.inst:SetGridFlags(true, newPos.x, newPos.y, 1415926, 1415926);
+
+	end
+
+	if not self:CheckIsRoundCounter() then
+
+		self:OnDesignChanged()
+	else
+
+		self:FaceToCounter()
+
+	end
+
+end
+
+return Shopkeeper

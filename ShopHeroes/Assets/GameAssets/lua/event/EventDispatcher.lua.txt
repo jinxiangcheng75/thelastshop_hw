@@ -1,0 +1,125 @@
+--EventDispatcher.lua
+
+local EventDispatcher = {}
+EventDispatcher.__index = EventDispatcher
+
+function EventDispatcher:new()
+	local o = o or {}
+	setmetatable(o, self)
+	self.__index = self
+	self.a = 1
+	self.m_listeners = {}
+	return o
+end
+
+EventDispatcher.inst = EventDispatcher:new()
+
+function EventDispatcher:addEvent(name, target, listener)
+	print("addEvent:" .. name)
+	-- 先看看事件是否存在
+	local index = 1
+	print(self.m_listeners[name])
+	if self.m_listeners[name] == nil then
+		self.m_listeners[name] = {}
+	else
+		local existIndex = self:getEventIndex(name, listener)
+		if existIndex ~= -1 then
+			return
+		end
+		index = tonumber(#self.m_listeners[name]) + 1
+	end
+	--cclog("EventDispatcher:addEvent %s,index = %d",name,index)
+	self.m_listeners[name][index] = {[1] = listener, [2] = target}
+end
+
+function EventDispatcher:removeEvent(name, listener)
+	print("removeEvent:" .. name)
+	if self.m_listeners[name] == nil then
+		return
+	end
+	local existIndex = self:getEventIndex(name, listener)
+	if existIndex == -1 then
+		return
+	end
+	table.remove(self.m_listeners[name], existIndex)
+end
+
+function EventDispatcher:dispatchEvent(name, ...)
+	print("dispatchEvent:" .. name, ...)
+	if self.m_listeners[name] == nil then
+		return
+	end
+	print(self.m_listeners[name])
+	for k, v in pairs(self.m_listeners[name]) do
+		v[1](v[2], ...)
+	end
+end
+
+function EventDispatcher:dispatchEventP0(name)
+	print("dispatchEvent:" .. name)
+	if self.m_listeners[name] == nil then
+		return
+	end
+	print(self.m_listeners[name])
+	for k, v in pairs(self.m_listeners[name]) do
+		v[1](v[2])
+	end
+end
+
+function EventDispatcher:dispatchEventP1(name, P1)
+	print("dispatchEvent:" .. name, P1)
+	if self.m_listeners[name] == nil then
+		return
+	end
+	print(self.m_listeners[name])
+	for k, v in pairs(self.m_listeners[name]) do
+		v[1](v[2], P1)
+	end
+end
+
+function EventDispatcher:dispatchEventP2(name, P1, P2)
+	print("dispatchEvent:" .. name, P1, P2)
+	if self.m_listeners[name] == nil then
+		return
+	end
+	print(self.m_listeners[name])
+	for k, v in pairs(self.m_listeners[name]) do
+		v[1](v[2], P1, P2)
+	end
+end
+
+function EventDispatcher:dispatchEventP3(name, P1, P2, P3)
+	print("dispatchEvent:" .. name, P1, P2, P3)
+	if self.m_listeners[name] == nil then
+		return
+	end
+	print(self.m_listeners[name])
+	for k, v in pairs(self.m_listeners[name]) do
+		v[1](v[2], P1, P2, P3)
+	end
+end
+
+function EventDispatcher:dispatchEventP4(name, P1, P2, P3, P4)
+	print("dispatchEvent:" .. name, P1, P2, P3, P4)
+	if self.m_listeners[name] == nil then
+		return
+	end
+	print(self.m_listeners[name])
+	for k, v in pairs(self.m_listeners[name]) do
+		v[1](v[2], P1, P2, P3, P4)
+	end
+end
+
+function EventDispatcher:getEventIndex(name, listener)
+	if self.m_listeners[name] == nil then
+		return -1
+	end
+	for i = 1, #self.m_listeners[name] do
+		if self.m_listeners[name][i][1] == listener then
+			return i
+		end
+	end
+	return -1
+end
+
+return EventDispatcher.inst

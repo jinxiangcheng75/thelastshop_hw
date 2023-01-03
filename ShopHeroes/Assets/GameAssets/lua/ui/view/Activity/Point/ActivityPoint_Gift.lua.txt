@@ -1,0 +1,71 @@
+--ActivityPoint_Gift
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_TimeUtils = CS.TimeUtils
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local ActivityPoint_Gift = class(luaClass_Welfare_CtrlBase)
+
+function ActivityPoint_Gift:initComp(luaBehaviour)
+
+	local contentPane = luaBehaviour
+
+	self.superList = contentPane.gameObject:GetComponent(CS_type_superList)
+	self.noGiftObj = contentPane:GetObjByName("noGiftObj")
+
+end
+
+function ActivityPoint_Gift:Init(luaBehaviour)
+
+	self:initComp(luaBehaviour)
+
+	self.taskList = nil
+
+	self.superList.itemRenderer = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+	self.superList.itemUpdateInfo = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+end
+
+function ActivityPoint_Gift:superListItemRenderer(index,item)
+
+	item:SetData(self.giftList[index + 1])
+
+end
+
+
+function ActivityPoint_Gift:RefreshUIData(needScrollToTop)
+
+	self.giftList = ActivityPointDataProxy.inst.giftList
+
+	self.superList.totalItemCount = #self.giftList
+
+	self.noGiftObj:SetActive(#self.giftList == 0)
+
+	if(needScrollToTop)then
+		self.superList:ScrollToTop()
+	end
+end
+
+function ActivityPoint_Gift:Clear()
+	
+	--self.superList:clear()
+	
+end
+
+return ActivityPoint_Gift

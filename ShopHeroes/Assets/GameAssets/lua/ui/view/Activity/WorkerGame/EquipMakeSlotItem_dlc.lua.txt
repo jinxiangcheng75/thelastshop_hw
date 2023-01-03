@@ -1,0 +1,83 @@
+--EquipMakeSlotItem
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_UnityUtils = CS.UnityUtils
+
+local CS_EquipDataProxyInst = CS.EquipDataProxy.inst
+
+local obj_workerGameBg
+local img_workerGameCoolBg
+
+local img_coolBg
+
+local timerId
+
+function InitComp()
+
+	obj_workerGameBg = self:GetObjByName("obj_workerGameBg")
+	img_workerGameCoolBg = self:GetObjByName("img_workerGameCoolBg"):GetComponent("Image")
+	img_coolBg = self:GetObjByName("img_CoolBg"):GetComponent("Image")
+
+end
+
+function SetData(slotId)
+
+	--活动未开启
+	if Activity_WorkerGameProxy.inst.flag == 0 then
+		obj_workerGameBg:SetActive(false)
+		img_coolBg.gameObject:SetActive(true)
+		clear()
+		return
+	end
+	
+	local data = Activity_WorkerGameProxy.inst:getMakeSlotData(slotId)
+
+	if data == nil or data.makingState == 0 then --空闲不管
+		obj_workerGameBg:SetActive(false)
+		clear()
+		return
+	end
+
+	if data.activityFlag == 1 then --如果是巧匠大赛可以加积分的 显示他
+
+		obj_workerGameBg:SetActive(true)
+		img_coolBg.gameObject:SetActive(false)
+
+		if data.makingState == 2 then --可领取
+
+			clear()
+
+			img_workerGameCoolBg.fillAmount = 1
+
+		elseif data.makingState == 1 then --制作中
+
+			clear()
+			
+			timerId = CS_GameTimerInst:AddTimerFrame(3,0,function()
+					img_workerGameCoolBg.fillAmount = img_coolBg.fillAmount
+				end)
+
+		end
+
+	else --否则隐藏
+		img_coolBg.gameObject:SetActive(true)
+		clear()
+		obj_workerGameBg:SetActive(false)
+	end
+
+end
+
+function clear()
+
+	if timerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(timerId)
+		timerId = 0
+	end
+
+end
+
+function onDestroy()
+
+	clear()
+
+end

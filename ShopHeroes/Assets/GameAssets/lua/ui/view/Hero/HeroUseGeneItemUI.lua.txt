@@ -1,0 +1,352 @@
+
+
+--HeroUseGeneItemUI
+
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_SpriteList = typeof(CS.SpriteList)
+local CS_type_GraphicDressUpSystem = typeof(CS.GraphicDressUpSystem)
+local CS_type_OverrideButton = typeof(CS.OverrideButton)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_StaticConstants = CS.StaticConstants
+local CS_GUIHelper = CS.GUIHelper
+
+local CS_RoleDataProxyInst = CS.RoleDataProxy.inst
+local CS_ItemBagProxyInst = CS.ItemBagProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+
+local CS_itemConfigManagerInst = CS.ItemconfigManager.inst
+
+HeroUseGeneItemUI = class(ViewBase)
+
+function HeroUseGeneItemUI:ctor()
+	self.viewID = Constants.ViewName.HeroUseGeneItemUI
+	HeroUseGeneItemUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = false
+	--self.topResPanelType = CS.TopPlayerShowType.noSetting
+end
+------------------------------------------------
+
+
+function HeroUseGeneItemUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.btn_mask = contentPane:GetButton("btn_mask")
+	self.btn_close = contentPane:GetButton("btn_close")
+	self.headGraphicDressParent = contentPane:GetObjByName("headGraphicDressParent"):GetComponent("RectTransform")
+	self.icon_intelligence = contentPane:GetGUIIcon("icon_intelligence")
+	self.tx_heroName = contentPane:GetText("tx_heroName")
+	self.icon_heroBg = contentPane:GetGUIIcon("icon_heroBg")
+	self.icon_professionBg = contentPane:GetGUIIcon("icon_professionBg")
+	self.icon_profession = contentPane:GetGUIIcon("icon_profession")
+
+	local objList_stars = contentPane:GetObjByName("objList_stars"):GetComponent(CS_type_ObjList).objList
+	self.starIcons = {}
+	for i = 0, objList_stars.Count - 1 do
+		self.starIcons[#self.starIcons + 1] =  objList_stars[i]:GetComponent(CS_type_GUIIcon)
+	end
+
+	self.tx_propertyName = contentPane:GetText("tx_propertyName")
+	self.img_property = contentPane:GetImage("img_property")
+	self.property_spriteList = self.img_property.gameObject:GetComponent(CS_type_SpriteList).spriteList
+	self.tx_curVal = contentPane:GetText("tx_curVal")
+	self.tx_nextVal = contentPane:GetText("tx_nextVal")
+	self.btn_del = contentPane:GetObjByName("btn_del"):GetComponent(CS_type_OverrideButton)
+	self.btn_add = contentPane:GetObjByName("btn_add"):GetComponent(CS_type_OverrideButton)
+	self.curSliderFill = contentPane:GetObjByName("curSliderFill"):GetComponent("RectTransform")
+	self.fillTween = contentPane:GetObjByName("fillTween"):GetComponent("RectTransform")
+	self.fillTweenImg = contentPane:GetImage("fillTween")
+	self.slider_use = contentPane:GetObjByName("slider_use"):GetComponent("Slider")
+	self.tx_sliderChg = contentPane:GetText("tx_sliderChg")
+	self.tx_tips = contentPane:GetText("tx_tips")
+	self.icon_geneItem1 = contentPane:GetGUIIcon("icon_geneItem1")
+	self.icon_geneItem2 = contentPane:GetGUIIcon("icon_geneItem2")
+	self.tx_geneItemName = contentPane:GetText("tx_geneItemName")
+	self.tx_geneItemNum = contentPane:GetText("tx_geneItemNum")
+	self.btn_apply = contentPane:GetButton("btn_apply")
+	self.obj_prompt = contentPane:GetObjByName("obj_prompt")
+	self.tx_prompt = contentPane:GetText("tx_prompt")
+
+
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+
+function HeroUseGeneItemUI:onInit()
+
+	self:initComp()
+	self.headGraphicDress = nil
+	self.heroData = nil
+	self.itemData = nil
+	self.propertyNames = {"生命值","防御值","攻击值"}
+	self.clickCount = 0
+	self.isMax = false
+
+	self.btn_mask.onClick:AddListener(
+		function ()
+			self:hide()
+		end)
+
+	self.btn_close:ButtonClickTween(function ()
+			self:hide()
+		end)
+
+	self.btn_add:ButtonClickTween(function ()
+			self:onAddBtnClick()
+		end)
+
+	self.btn_add:SetClickCallback(function ()
+			self:onAddBtnClick()
+		end)
+
+	self.btn_del:ButtonClickTween(function ()
+			self:onDelBtnClick()
+		end)
+
+	self.btn_del:SetClickCallback(function ()
+			self:onDelBtnClick()
+		end)
+
+	self.slider_use.onValueChanged:AddListener(function (value)
+			self:onSliderValueChanged(value)
+		end)
+
+	self.btn_apply:ButtonClickTween(function ()
+			self:onApplyBtnClick()
+		end)
+
+end
+
+function HeroUseGeneItemUI:setStarShow()
+
+	for i = 1, #self.starIcons do
+
+		if i - 1 < self.heroData.config.hero_grade then
+
+			self.starIcons[i].gameObject:SetActive(true)
+			self.starIcons[i]:SetSprite(CS_StaticConstants.roleAtlasName, "yingxiong_xingcheng");
+
+		else
+
+			if i - 1 < self.heroData.transferNumLimit then
+
+				self.starIcons[i].gameObject:SetActive(true)
+				self.starIcons[i]:SetSprite(CS_StaticConstants.roleAtlasName, "yingxiong_xingcheng1");
+
+			else
+				self.starIcons[i].gameObject:SetActive(false)
+			end
+
+		end
+
+	end
+
+end
+
+function HeroUseGeneItemUI:SetData(heroUid,propertyType)
+
+	self.heroData = CS_RoleDataProxyInst:GetHeroDataByUid(heroUid)
+
+	if self.heroData == nil then
+
+		CS.Logger.error("未找到对应uid的英雄数据   uid : "..heroUid)
+		self:hide()
+		return
+
+	end
+
+	self.itemData = CS_ItemBagProxyInst:GetItemsByType(CS.ItemType.HeroPropertyUp,propertyType)
+
+	if self.itemData == nil or CS.ItemType.__CastFrom(self.itemData.itemConfig.type) ~= CS.ItemType.HeroPropertyUp then
+
+		CS.Logger.error("未找到对应id的item数据 或 对应的itemConfig type 不为 英雄强化基因药水   kRolePropertyType : "..propertyType)
+		self:hide()
+		return
+
+	end
+
+	local rarity = CS_RoleDataProxyInst:ReturnRarityByAptitude(self.heroData.intelligence);
+
+	self.icon_heroBg:SetSprite(CS_StaticConstants.roleAtlasName,CS_StaticConstants.roleHeroBgIconName[rarity - 1])
+	self.icon_intelligence:SetSprite(CS_StaticConstants.roleAtlasName,CS_StaticConstants.roleIntelligenceIconStr[rarity - 1])
+
+	self:setStarShow()
+
+	self.icon_professionBg:SetSprite(CS_StaticConstants.roleAtlasName,CS_StaticConstants.heroTypeBgIconName[self.heroData.config.type - 1])
+	self.icon_profession:SetSprite(self.heroData.config.atlas,self.heroData.config.ocp_icon)
+	self.tx_heroName.text = CS_LanguageManagerInst:GetValueByKey(self.heroData.nickName);
+	self.tx_heroName.color = CS_GUIHelper.GetColorByColorHex(CS_StaticConstants.roleIntelligenceColor[rarity])
+
+	self.tx_propertyName.text = CS_LanguageManagerInst:GetValueByKey(self.propertyNames[self.itemData.itemConfig.effect])
+	self.img_property.sprite = self.property_spriteList[self.itemData.itemConfig.effect - 1]
+
+	self.tx_curVal.text = tostring(self.heroData:GetProperty(self.itemData.itemConfig.effect,true))
+	self.tx_nextVal.text = tostring(self.heroData:GetProperty(self.itemData.itemConfig.effect,true))
+
+	self.slider_use.maxValue = self.heroData.config.gene_num
+	self.slider_use.value = self.heroData:GetGeneItemNum(self.itemData.itemConfig.effect)
+	self.curSliderFill.anchorMax = Vector2(self.slider_use.value / self.slider_use.maxValue,1)
+
+	self.tx_sliderChg.text = self.heroData:GetGeneItemNum(self.itemData.itemConfig.effect).."(+"..self.clickCount..")<color=#c49da6>/"..self.heroData.config.gene_num.."</color>"
+	self.tx_geneItemNum.text = "x"..math.ceil(self.itemData.count).."<color=#c49da6>(-"..self.clickCount..")</color>"
+
+	self.tx_tips.text = CS_LanguageManagerInst:GetValueByKey("{0}星可强化{1}次",tostring(self.heroData.config.hero_grade),tostring(self.heroData.config.gene_num))
+
+	self.icon_geneItem1:SetSprite(self.itemData.itemConfig.atlas,self.itemData.itemConfig.icon)
+	self.icon_geneItem2:SetSprite(self.itemData.itemConfig.atlas,self.itemData.itemConfig.icon)
+	self.tx_geneItemName.text = CS_LanguageManagerInst:GetValueByKey(self.itemData.itemConfig.name)
+
+	self.isMax = self.heroData.config.gene_num == self.heroData:GetGeneItemNum(self.itemData.itemConfig.effect)
+
+	if self.isMax or self.itemData.count <= 0 then
+
+		self.btn_apply.gameObject:SetActive(false)
+		self.obj_prompt:SetActive(true)
+		self.tx_prompt.text = CS_LanguageManagerInst:GetValueByKey(self.isMax and "已达上限" or "基因不足")
+
+	else
+
+		self.btn_apply.gameObject:SetActive(true)
+		self.obj_prompt:SetActive(false)
+		self:onAddBtnClick()
+
+
+	end
+
+	self:setModel()
+
+end
+
+function HeroUseGeneItemUI:setModel()
+
+	if self.headGraphicDress == nil then
+		
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+
+		func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(self.heroData.gender)),self.heroData:GetHeadDressIds(),CS.EGender.__CastFrom(self.heroData.gender),1.4,true,function (system)
+				self.headGraphicDress = system
+				system.transform:SetParent(self.headGraphicDressParent);
+				system.transform.localScale = Vector3.one;
+				system.transform.localPosition = Vector3.zero;
+				self.headGraphicDress:SetDirection(CS.RoleDirectionType.Left)
+			end)
+		
+	else
+		
+		CS_CharacterManagerInst:ReSetCharacter(self.headGraphicDress,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(self.heroData.gender)),self.heroData:GetHeadDressIds(),CS.EGender.__CastFrom(self.heroData.gender))
+		self.headGraphicDress:SetDirection(CS.RoleDirectionType.Left)
+		
+	end
+	
+
+end
+
+function HeroUseGeneItemUI:onSliderValueChanged(value)
+
+	self.tx_sliderChg.text = self.heroData:GetGeneItemNum(self.itemData.itemConfig.effect).."(+"..self.clickCount..")<color=#c49da6>/"..self.heroData.config.gene_num.."</color>"
+	self.fillTween.anchorMax = Vector2(self.slider_use.value / self.slider_use.maxValue, 1);
+
+	self.tx_geneItemNum.text = "x"..math.ceil(self.itemData.count).."<color=#c49da6>(-"..self.clickCount..")</color>"
+
+	self.tx_nextVal.text = tostring(self.heroData:GetProperty(self.itemData.itemConfig.effect,true) + self.clickCount * self.itemData.itemConfig.effect_val)
+
+end
+
+function HeroUseGeneItemUI:onDelBtnClick()
+
+	if self.slider_use.value > self.heroData:GetGeneItemNum(self.itemData.itemConfig.effect) + 1 then
+		self:changeGeneItemCount(false)
+	end
+
+end
+
+function HeroUseGeneItemUI:onAddBtnClick()
+
+	if self.slider_use.value ~= self.slider_use.maxValue and not self.isMax then
+
+		if self.clickCount < self.itemData.count then
+			self:changeGeneItemCount(true)
+		end
+
+	end
+
+end
+
+function HeroUseGeneItemUI:changeGeneItemCount(isAdd)
+
+	local changeCount = isAdd and 1 or -1
+	self.clickCount = self.clickCount + changeCount
+	self.slider_use.value = self.slider_use.value + changeCount
+
+end
+
+function HeroUseGeneItemUI:onApplyBtnClick()
+
+	if self.heroData.currentState == 2 then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("英雄探索期间不能使用基因药水"),"FF2828")
+	else
+		EventDispatcher:dispatchEvent(GameEvent.HeroEvent.Request_UseGeneItem,self.itemData.itemConfig.id,self.heroData.uid,self.clickCount)
+	end
+
+end
+
+function HeroUseGeneItemUI:onShowed()
+
+	self.fillTweenImg:DOFade(0.4,0.8):From(0):SetLoops(-1,CS.DG.Tweening.LoopType.Yoyo);
+
+end
+
+function HeroUseGeneItemUI:onHide()
+
+	self.heroData = nil
+	self.itemData = nil
+	self.clickCount = 0
+	self.isMax = false
+
+	CS.DG.Tweening.DOTween.Kill(self.fillTweenImg)
+
+end
+
+function HeroUseGeneItemUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+
+end
+
+function HeroUseGeneItemUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end)
+
+end
+
+------------------------------------------------

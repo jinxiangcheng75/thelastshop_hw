@@ -1,0 +1,119 @@
+local noWearObj
+local wearObj
+local lockObj
+local equipBtn
+local icon
+local classText
+local abrasionIcon
+local abrasionText
+local qualityBg
+local qualityIcon
+local allIcons
+local superNormalObj
+
+local roleData
+local _heroUId
+local _fieldId
+local _equipId
+local _equip
+local _curDicList
+local _itemState
+
+local EventDispatcher = require("event/EventDispatcher")
+
+function InitComp()
+	noWearObj = self:GetObjByName("noWearObj")
+	wearObj = self:GetObjByName("wearObj")
+	lockObj = self:GetObjByName("lockObj")
+	equipBtn = self:GetObjByName("equipBtn"):GetComponent("Button")
+	icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	classText = self:GetObjByName("classText"):GetComponent("Text")
+	abrasionIcon = self:GetObjByName("abrasionIcon"):GetComponent("GUIIcon")
+	abrasionText = self:GetObjByName("abrasionText"):GetComponent("Text")
+	qualityBg = self:GetObjByName("qualityBg"):GetComponent("RectTransform")
+	qualityIcon = self:GetObjByName("equipBtn"):GetComponent("GUIIcon")
+	allIcons = self:GetObjByName("allIcons"):GetComponent("ObjList").objList
+	superNormalObj = self:GetObjByName("superNormalImage")
+
+	equipBtn.onClick:AddListener(
+		function ()
+			setEquipBtnEvent()
+		end
+	)
+end
+
+function setEquipBtnEvent()
+	if(_itemState == 1)then
+		EventDispatcher:dispatchEvent(GameEvent.RankEvent.ShowUI_LookOtherUserRoleEquip,_equip,_heroUId)
+	end
+end
+
+function setEquip(itemState,heroId,fieldId,equipIds,equip)
+	_itemState = itemState
+	if(itemState == 1)then
+		setWearEquipData(equip,heroId,fieldId,equipIds)
+	elseif itemState == 2 then
+		setNotWearEquipData(equipIds,heroId,fieldId)
+	else
+		setLockData()
+	end
+end
+
+function setWearEquipData(equip,heroId,fieldId,equipIds)
+	_heroUId = heroId
+	_fieldId = fieldId
+	_equipId = equip.equipId
+	_equip = equip
+	_curDicList = equipIds
+	wearObj:SetActive(true)
+	noWearObj:SetActive(false)
+	lockObj:SetActive(false)
+	local tempItem = CS.EquipConfigManager.inst:GetEquipDrawingsCfgByEquipId(equip.equipId)
+	classText.text = tostring(tempItem.level)
+	local equipCfg = CS.EquipConfigManager.inst:GetEquipQualityConfig(equip.equipId)
+	qualityIcon:SetSprite(CS.StaticConstants.roleAtlasName, "yingxiong_xiangqzbk")
+	CS.GUIHelper.showQualiyIcon(qualityBg, equipCfg.quality)
+	local qcolor = ""
+	if(equipCfg.quality > 1)then
+		qcolor = CS.StaticConstants.qualityColor[equipCfg.quality - 1]
+	end
+	icon:SetSprite(tempItem.atlas, tempItem.icon, qcolor)
+	local abProb = CS.RoleDataProxy.inst:GetEquipDamagerVal(equipCfg.quality) / 100
+	local damagePercent = CS.FurnitureBuffMgr.inst:GetBuffValByType(CS.FurnitureBuffType.equip_damageRaceDown)
+	abProb = abProb - abProb * damagePercent
+	abrasionText.text = abProb .. "%"
+	
+	superNormalObj:SetActive(equipCfg.quality > CS.StaticConstants.SuperEquipBaseQuality)
+end
+
+function setNotWearEquipData(equipIds,heroId,fieldId)
+	_curDicList = equipIds
+	_heroUId = heroId
+	_fieldId = fieldId
+	wearObj:SetActive(false)
+	noWearObj:SetActive(true)
+	lockObj:SetActive(false)
+	qualityIcon:SetSprite(CS.StaticConstants.roleAtlasName, "yingxiong_xiangqzbk1")
+	for i = 0, allIcons.Count - 1 do
+		local index = i
+		local curItem = allIcons[index]:GetComponent("GUIIcon")
+		if (index < equipIds.Count)then
+			local tempData = CS.EquipConfigManager.inst:GetEquipTypeByID(equipIds[index])
+			curItem.gameObject:SetActive(true)
+			curItem:SetSprite(tempData.Atlas, tempData.icon)
+		else
+			curItem.gameObject:SetActive(false)
+		end
+	end
+end
+
+function setLockData()
+	wearObj:SetActive(false)
+	noWearObj:SetActive(false)
+	lockObj:SetActive(true)
+	qualityIcon:SetSprite(CS.StaticConstants.roleAtlasName, CS.StaticConstants.roleEquipQualityIconName[CS.StaticConstants.roleEquipQualityIconName.Length - 1])
+end
+
+function SetData(_data)
+	setEquip(_data.itemState,_data.heroId,_data.fieldId,_data.equipIds,_data.equip)
+end

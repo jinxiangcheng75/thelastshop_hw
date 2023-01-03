@@ -1,0 +1,71 @@
+-- GiftSevenSystem
+
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("utils/XLuaUtils")
+
+require("ui/view/PayGift/GiftSevenUIView")
+
+local EventDispatcher= require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+GiftSevenSystem = class(BaseSystem)
+GiftSevenSystem.super = BaseSystem
+
+function GiftSevenSystem:ctor()
+	
+end
+
+function GiftSevenSystem:OnInit()
+
+end
+
+function GiftSevenSystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.GiftSevenEvent.OpenUI_GiftSeven,self,self.openGiftSevenUI)
+	EventDispatcher:addEvent(GameEvent.GiftSevenEvent.HideUI_GiftSeven,self,self.hideGiftSevenUI)
+	EventDispatcher:addEvent(GameEvent.GiftSevenEvent.RefreshUI_GiftSeven,self,self.refreshGiftSevenUI)
+	EventDispatcher:addEvent(GameEvent.GiftSevenEvent.Request_AmountReward,self,self.requestAmountReward)
+
+end
+
+function GiftSevenSystem:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.GiftSevenEvent.OpenUI_GiftSeven,self.openGiftSevenUI)
+	EventDispatcher:removeEvent(GameEvent.GiftSevenEvent.HideUI_GiftSeven,self.hideGiftSevenUI)
+	EventDispatcher:removeEvent(GameEvent.GiftSevenEvent.RefreshUI_GiftSeven,self.refreshGiftSevenUI)
+	EventDispatcher:removeEvent(GameEvent.GiftSevenEvent.Request_AmountReward,self.requestAmountReward)
+
+end
+
+function GiftSevenSystem:requestAmountReward()
+	local rep = MsgType.Request_Pay_AmountReward:New()
+	rep:Send()
+end
+
+function GiftSevenSystem:refreshGiftSevenUI()
+	local giftSevenUI = GUIManager.inst:GetWindow(Constants.ViewName.GiftSevenUIView, false)
+	if 	giftSevenUI ~= nil and giftSevenUI.isShowing == true then
+		giftSevenUI:RefreshUIData()
+	end
+end
+
+function GiftSevenSystem:hideGiftSevenUI()
+	GUIManager.inst:HideView(Constants.ViewName.GiftSevenUIView)
+end
+
+function GiftSevenSystem:openGiftSevenUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GiftSevenUIView,
+		function(view)
+			
+		end
+	)
+end
+
+
+----------------------------------------------------------------------

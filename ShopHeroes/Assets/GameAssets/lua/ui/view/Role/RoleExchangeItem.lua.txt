@@ -1,0 +1,251 @@
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+local levelText
+local roleTrans
+local bgIcon
+local typeIcon
+local typeText
+local intelligenceIcon
+local intelligenceText
+local costObj
+local costText
+local recruitedText
+local btmRecruitedObj
+local recruitBtn
+local notUnlockText
+local slider
+local canRecruitText
+local typeBgIcon
+local priceRect
+local intellBgIcon
+local fengexianIcon
+
+local lastLevelBg
+local lastLevelText
+--local redPoint
+
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csStaticConstants = CS.StaticConstants
+local csGUIHelper = CS.GUIHelper
+local csEHeroExchangeState = CS.EHeroExchangeState
+local csAbbreviationUtility = CS.AbbreviationUtility
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csRoleDataProxyInst = CS.RoleDataProxy.inst
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+local Vector3 = CS.UnityEngine.Vector3
+local csColor = CS.UnityEngine.Color
+
+local data
+local graphicDressUp = nil
+
+function InitComp()
+	levelText = self:GetObjByName("levelText"):GetComponent("Text")
+	roleTrans = self:GetObjByName("rolePos").transform
+	bgIcon = self:GetObjByName("bgIcon"):GetComponent("GUIIcon")
+	typeIcon = self:GetObjByName("typeIcon"):GetComponent("GUIIcon")
+	typeText = self:GetObjByName("typeText"):GetComponent("Text")
+	intelligenceIcon = self:GetObjByName("intelligenceIcon"):GetComponent("GUIIcon")
+	intelligenceText = self:GetObjByName("intelligenceText"):GetComponent("Text")
+	costObj = self:GetObjByName("costObj")
+	costText = self:GetObjByName("costText"):GetComponent("Text")
+	recruitedText = self:GetObjByName("recruitedText"):GetComponent("Text")
+	btmRecruitedObj = self:GetObjByName("btmRecruitedObj")
+	recruitBtn = self:GetObjByName("recruitBtn"):GetComponent("Button")
+	notUnlockText = self:GetObjByName("notUnlockText"):GetComponent("Text")
+	slider = self:GetObjByName("Slider"):GetComponent("Slider")
+	canRecruitText = self:GetObjByName("canRecruitText"):GetComponent("Text")
+	typeBgIcon = self:GetObjByName("typeBgIcon"):GetComponent("GUIIcon")
+	priceRect = self:GetObjByName("costObj"):GetComponent("RectTransform")
+	intellBgIcon = self:GetObjByName("iconMask"):GetComponent("GUIIcon")
+	fengexianIcon = self:GetObjByName("fengexianIcon"):GetComponent("GUIIcon")
+
+	lastLevelBg = self:GetObjByName("lastLevelBg")
+	lastLevelText = self:GetObjByName("lastLevelText"):GetComponent("Text")
+	--redPoint = self:GetObjByName("redPoint"):GetComponent("Image")
+
+	recruitBtn:ButtonClickTween(
+		function ()
+			if(data.state == csEHeroExchangeState.Unlock)then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+				func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, csLanguageManagerInst:GetValueByKey("已兑换英雄"),csGUIHelper.GetColorByColorHex("FF2828"))
+				return
+			end
+			if(data.state == csEHeroExchangeState.Lock)then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+				if(csUserDataProxyInst.playerData.level >= data.unlockLevel)then
+					func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, csLanguageManagerInst:GetValueByKey("需先招募已解锁英雄"),csGUIHelper.GetColorByColorHex("FF2828"))
+				else
+					func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, csLanguageManagerInst:GetValueByKey("需店主达到{0}级",tostring(data.unlockLevel)),csGUIHelper.GetColorByColorHex("FF2828"))
+				end
+				return
+			end
+			if(data.state == csEHeroExchangeState.Idle)then
+				if(csUserDataProxyInst.playerData.level < data.unlockLevel)then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+					func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, csLanguageManagerInst:GetValueByKey("需店主达到{0}级",tostring(data.unlockLevel)),csGUIHelper.GetColorByColorHex("FF2828"))
+					return
+				end
+			end
+
+			if(csUserDataProxyInst.playerData.level < data.unlockLevel) then return end
+
+			if(csUserDataProxyInst.playerData.gold < data.unlockCost)then
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+				func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, csLanguageManagerInst:GetValueByKey("新币不足"),csGUIHelper.GetColorByColorHex("FF2828"))
+				return
+			end
+
+			if(csRoleDataProxyInst.FieldNumAbtractHeroNum <= 0)then
+				--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				--local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+				--func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, csLanguageManagerInst:GetValueByKey("英雄槽位已满请先解锁槽位"),csGUIHelper.GetColorByColorHex("FF2828"))
+				local cfg = CS.FieldConfigManager.inst:GetFieldConfig(1, csRoleDataProxyInst.heroFieldCount + 1)
+				if(cfg == nil)then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+					func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, csLanguageManagerInst:GetValueByKey("无空闲槽位"),csGUIHelper.GetColorByColorHex("FF2828"))
+				else
+					csRoleDataProxyInst.slotComType = 2
+					csRoleDataProxyInst.exchangeHeroId = data.id
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+					local func = funcGeneric(CS.System.Int32)
+
+					EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTipsAgainAffirmUI,csLanguageManagerInst:GetValueByKey("英雄栏位不足"),csLanguageManagerInst:GetValueByKey("是否前往扩充您的英雄栏位？"),function ()
+							func(csEventControllerInst, csGameEventType.RoleEvent.BUYSLOT_SHOWUI,csRoleDataProxyInst.heroFieldCount,TipsAgainAffirmUIType.allBtn)
+						end);
+
+				end
+				return
+			end
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.System.Int32)
+			func(csEventControllerInst, csGameEventType.RoleEvent.REQUEST_HEROEXCHANGE, data.id)
+
+		end
+	)
+end
+
+function SetData(_data)
+	--if(csRoleDataProxyInst.heroExchangeList == nil or csRoleDataProxyInst.heroExchangeList.Count <= 0)then return end
+	data = _data
+	self.gameObject.name = tostring(data.id)
+	if(data == nil) then return  end
+	--levelText.text = tostring(index)
+
+	levelText.text = tostring(data.unlockLevel)
+	-- bgIcon
+	typeIcon:SetSprite(data.cfg.atlas,data.cfg.ocp_icon)
+	typeBgIcon:SetSprite(CS.StaticConstants.roleAtlasName, CS.StaticConstants.heroTypeBgIconName[data.cfg.type - 1])
+	typeText.text = csLanguageManagerInst:GetValueByKey(data.cfg.name)
+	intelligenceIcon:SetSprite(csStaticConstants.roleAtlasName,csStaticConstants.roleIntelligenceIconStr[data.rarity - 1])
+	intelligenceText.text = tostring(data.intelligence)
+	intelligenceText.color = csGUIHelper.GetColorByColorHex(csStaticConstants.roleIntelligenceColor[data.rarity])
+	intellBgIcon:SetSprite(CS.StaticConstants.roleAtlasName,CS.StaticConstants.roleHeroBgIconName[data.rarity - 1])
+
+	setStateData()
+	setSliderData()
+	setHeroHeadIcon()
+end
+
+function setStateData()
+	--costObj:SetActive(data.state ~= csEHeroExchangeState.Unlock)
+	--recruitedText.enabled = data.state == csEHeroExchangeState.Unlock
+	btmRecruitedObj:SetActive(data.state == csEHeroExchangeState.Unlock)
+	--recruitBtn.gameObject:SetActive(data.state == csEHeroExchangeState.Idle and csUserDataProxyInst.playerData.level >= data.unlockLevel)
+	notUnlockText.gameObject:SetActive(data.state == csEHeroExchangeState.Lock or (data.state == csEHeroExchangeState.Idle and csUserDataProxyInst.playerData.level < data.unlockLevel))
+	--redPoint.enabled = data.state == csEHeroExchangeState.Idle and csUserDataProxyInst.playerData.gold >= data.unlockCost
+	costText.color = csUserDataProxyInst.playerData.gold >= data.unlockCost and csColor.white or csColor.red
+
+	canRecruitText.enabled = (data.state == csEHeroExchangeState.Idle and csUserDataProxyInst.playerData.level >= data.unlockLevel)
+	if((data.state == csEHeroExchangeState.Idle and csUserDataProxyInst.playerData.level >= data.unlockLevel))then
+		fengexianIcon:SetSprite(CS.StaticConstants.roleAtlasName,"shoudao_baixian")
+		local iconName = ""
+		if(CS.FGUI.inst.isLandscape)then
+			iconName = "yingxiong_zhaomudik1h"
+		else
+			iconName = "yingxiong_zhaomudik1"
+		end
+		bgIcon:SetSprite(CS.StaticConstants.roleAtlasName,iconName)
+	else
+		local iconName = ""
+		if(CS.FGUI.inst.isLandscape)then
+			iconName = "yingxiong_zhaomudikh"
+		else
+			iconName = "yingxiong_zhaomudik"
+		end
+		fengexianIcon:SetSprite(CS.StaticConstants.roleAtlasName,"zhizuo_dicengxian")
+		bgIcon:SetSprite(CS.StaticConstants.roleAtlasName,iconName)
+	end
+	csGUIHelper.SetUIGray(recruitBtn.transform, data.state == csEHeroExchangeState.Unlock)
+	--print("当前的槽位数量是",csRoleDataProxyInst.heroFieldCount,"当前的英雄列表数量是",csRoleDataProxyInst.HeroList.Count)
+
+	if(data.unlockCost > 0)then
+		costText.text = csAbbreviationUtility.AbbreviateNumber(data.unlockCost,2)
+	else
+		costText.text = csLanguageManagerInst:GetValueByKey("免费")
+	end
+
+	if(data.state == csEHeroExchangeState.Lock)then
+		if(csUserDataProxyInst.playerData.level >= data.unlockLevel)then
+			notUnlockText.text = csLanguageManagerInst:GetValueByKey("需先招募已解锁英雄")
+		else
+			notUnlockText.text = csLanguageManagerInst:GetValueByKey("需店主达到{0}级",tostring(data.unlockLevel))
+		end
+	elseif(data.state == csEHeroExchangeState.Idle)then
+		if(csUserDataProxyInst.playerData.level < data.unlockLevel)then
+			notUnlockText.text = csLanguageManagerInst:GetValueByKey("需店主达到{0}级",tostring(data.unlockLevel))
+		end
+	end
+end
+
+function setSliderData()
+	if(data.id <= --[[csRoleDataProxyInst.heroExchangeList.Count]]1) then
+		slider.gameObject:SetActive(false)
+		lastLevelBg:SetActive(false)
+	else
+		lastLevelBg:SetActive(true)
+		slider.gameObject:SetActive(true)
+		local lastData = csRoleDataProxyInst:GetExchangeDataById(data.id - 1)
+		if(lastData == nil)then
+			print("当前的数据是空的")
+			return
+		end
+		lastLevelText.text = tostring(lastData.unlockLevel)
+		slider.maxValue = data.unlockLevel - lastData.unlockLevel -- 3 10   7   5
+		slider.value = csUserDataProxyInst.playerData.level - lastData.unlockLevel
+	end
+end
+
+function setHeroHeadIcon()
+	if(csRoleDataProxyInst.heroGraphicDressDic:ContainsKey(data.id))then
+		if(graphicDressUp ~= nil)then
+			graphicDressUp.transform:SetParent(CS.FGUI.inst.heroGraphicCacheParent);
+			graphicDressUp.transform.localPosition = Vector3.zero;
+		end
+		graphicDressUp = csRoleDataProxyInst.heroGraphicDressDic[data.id]
+		if(graphicDressUp ~= nil)then
+			graphicDressUp.transform:SetParent(roleTrans);
+			graphicDressUp.transform.localScale = Vector3.one;
+			graphicDressUp.transform.localPosition = Vector3.zero;
+			graphicDressUp:SetDirection(CS.RoleDirectionType.Right);
+		end
+	else
+		if(graphicDressUp ~= nil)then
+			graphicDressUp.transform:SetParent(CS.FGUI.inst.heroGraphicCacheParent);
+			graphicDressUp.transform.localPosition = Vector3.zero;
+		end
+	end
+end
+
+function ClearData()
+	graphicDressUp = nil
+end

@@ -1,0 +1,56 @@
+
+local EventDispatcher = require("event/EventDispatcher")
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+--SettingPanel_dlc
+
+local toggle_EcoMode
+local btn_clearBlockUserIds
+
+function awake()
+
+	toggle_EcoMode = self:GetObjByName("toggle_EcoMode"):GetComponent("Toggle")
+
+	if toggle_EcoMode ~= nil then
+
+		toggle_EcoMode.onValueChanged:AddListener(function (isOn)
+
+				local number = 0
+				if isOn then
+					number = 1
+				else
+					number = 0
+				end
+				
+				CS.UnityEngine.PlayerPrefs.SetInt("EcoMode",number)
+				CS.UnityEngine.Application.targetFrameRate = isOn and 35 or 60;
+
+			end)
+
+	end
+	
+	btn_clearBlockUserIds = self:GetButton("btn_clearBlockUserIds")
+	
+	if btn_clearBlockUserIds ~= nil then
+		
+		btn_clearBlockUserIds.onClick:AddListener(function ()
+				
+				ChatDataProxy.inst:ClearBlockUserIds()
+				EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("已成功清空聊天屏蔽列表。"),"FF2828")
+				
+		end)
+		
+	end
+	
+
+end
+
+function onEnable()
+
+	if toggle_EcoMode ~= nil then
+		local number = CS.UnityEngine.PlayerPrefs.GetInt("EcoMode", 0)
+		toggle_EcoMode.isOn = number == 1
+		CS.UnityEngine.Application.targetFrameRate = (number == 1) and 35 or 60;
+	end
+
+end

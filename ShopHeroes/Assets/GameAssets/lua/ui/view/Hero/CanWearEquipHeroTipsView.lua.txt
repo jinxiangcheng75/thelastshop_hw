@@ -1,0 +1,165 @@
+--CanWearEquipHeroTipsView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_SpriteList = typeof(CS.SpriteList)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local csLanguageManagerInst = CS.LanguageManager.inst
+
+CanWearEquipHeroTipsView = class(ViewBase)
+
+function CanWearEquipHeroTipsView:ctor()
+	self.viewID = Constants.ViewName.CanWearEquipHeroTipsView
+	CanWearEquipHeroTipsView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = false
+	self.topResPanelType = CS.TopPlayerShowType.ignore
+end
+------------------------------------------------
+-- width + 42 height + 100
+
+function CanWearEquipHeroTipsView:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.maskBg = contentPane:GetButton("maskBg")
+	self.tipImageBg = contentPane:GetObjByName("tipImageBg"):GetComponent("RectTransform")
+	self.type1_objList = contentPane:GetObjByName("type1_objList"):GetComponent("ObjList").objList
+	self.type2_objList = contentPane:GetObjByName("type2_objList"):GetComponent("ObjList").objList
+	self.type3_objList = contentPane:GetObjByName("type3_objList"):GetComponent("ObjList").objList
+	self.type1Rect = contentPane:GetObjByName("type1_objList"):GetComponent("RectTransform")
+	self.type2Rect = contentPane:GetObjByName("type2_objList"):GetComponent("RectTransform")
+	self.type3Rect = contentPane:GetObjByName("type3_objList"):GetComponent("RectTransform")
+	self.allRect = contentPane:GetObjByName("allRect"):GetComponent("RectTransform")
+	self.allProfessionText = contentPane:GetObjByName("allProfessionText")
+
+	self.width = contentPane:GetObjByName("type1_objList"):GetComponent("RectTransform").rect.width
+	self.height = self.type1_objList[0]:GetComponent("RectTransform").rect.height
+
+end
+
+
+function CanWearEquipHeroTipsView:onInit()
+
+	self:initComp()
+	self.maskBg.onClick:AddListener(
+		function ()
+			self:hide()
+		end)
+
+end
+
+function CanWearEquipHeroTipsView:SetData(trans, equip_subType)
+
+	local cfgs = CS.HeroProfessionConfigManager.inst:GetCanWearHeroProfessionsByEquipSubType(equip_subType)
+	local type1List = {}
+	local type2List = {}
+	local type3List = {}
+
+	for i = 0, cfgs.Count - 1 do
+		local index = i
+
+		if(cfgs[index].hero_grade == 1 or cfgs[index].hero_grade == 2)then
+			if(cfgs[index].type == 1)then
+				type1List[#type1List + 1] = cfgs[index]
+			elseif cfgs[index].type == 2 then
+				type2List[#type2List + 1] = cfgs[index]
+			elseif cfgs[index].type == 3 then
+				type3List[#type3List + 1] = cfgs[index]
+			end
+		end
+	end
+
+
+	local rowCount = 0
+	local allCount = 0
+	rowCount = math.max(#type1List,#type2List,#type3List)
+	local columnCount = 0
+	if(#type1List > 0)then columnCount = columnCount + 1 end
+	if(#type2List > 0)then columnCount = columnCount + 1 end
+	if(#type3List > 0)then columnCount = columnCount + 1 end
+	allCount = #type1List + #type2List + #type3List
+
+	self.type1Rect.gameObject:SetActive(#type1List > 0)
+	self.type2Rect.gameObject:SetActive(#type2List > 0)
+	self.type3Rect.gameObject:SetActive(#type3List > 0)
+
+	if(allCount < 12)then
+		self.tipImageBg.sizeDelta = Vector2(self.width * columnCount + 42,self.height * rowCount + 120)
+		self.allProfessionText:SetActive(false)
+		self.allRect.gameObject:SetActive(true)
+	else
+		self.tipImageBg.sizeDelta = Vector2(290,210)
+		self.allProfessionText:SetActive(true)
+		self.allRect.gameObject:SetActive(false)
+	end
+
+	local anchorePos = CS.GUIHelper.GetFGuiCameraUIPointByWorldPos(trans.position)
+	self.tipImageBg.anchoredPosition = Vector2(anchorePos.x,anchorePos.y + self.tipImageBg.sizeDelta.y / 2 + 80)
+
+	for i = 0, self.type1_objList.Count - 1 do
+		local curItem = self.type1_objList[i]
+		if(i < #type1List)then
+			curItem:SetActive(true)
+			curItem:GetComponent("GUIIcon"):SetSprite(type1List[i + 1].atlas,type1List[i + 1].ocp_icon)
+			curItem.transform:GetChild(0):GetComponent("Text").text = csLanguageManagerInst:GetValueByKey(type1List[i + 1].name)
+		else
+			curItem:SetActive(false)
+		end
+	end
+
+	for i = 0, self.type2_objList.Count - 1 do
+		local curItem = self.type2_objList[i]
+		if(i < #type2List)then
+			curItem:SetActive(true)
+			curItem:GetComponent("GUIIcon"):SetSprite(type2List[i + 1].atlas,type2List[i + 1].ocp_icon)
+			curItem.transform:GetChild(0):GetComponent("Text").text = csLanguageManagerInst:GetValueByKey(type2List[i + 1].name)
+		else
+			curItem:SetActive(false)
+		end
+	end
+
+	for i = 0, self.type3_objList.Count - 1 do
+		local curItem = self.type3_objList[i]
+		if(i < #type3List)then
+			curItem:SetActive(true)
+			curItem:GetComponent("GUIIcon"):SetSprite(type3List[i + 1].atlas,type3List[i + 1].ocp_icon)
+			curItem.transform:GetChild(0):GetComponent("Text").text = csLanguageManagerInst:GetValueByKey(type3List[i + 1].name)
+		else
+			curItem:SetActive(false)
+		end
+	end
+	CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.type1Rect)
+	CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.type2Rect)
+	CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.type3Rect)
+	CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.allRect)
+
+	self.tipImageBg.gameObject:SetActive(true)
+
+
+end
+
+function CanWearEquipHeroTipsView:onShowed()
+
+
+
+end
+
+function CanWearEquipHeroTipsView:onHide()
+
+	self.tipImageBg.gameObject:SetActive(false)
+
+end
+------------------------------------------------

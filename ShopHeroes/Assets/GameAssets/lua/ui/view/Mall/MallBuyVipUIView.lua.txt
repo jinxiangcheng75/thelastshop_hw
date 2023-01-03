@@ -1,0 +1,118 @@
+--MallBuyVipUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/MallDataProxy")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csGameTimerInst = CS.GameTimer.inst
+local csTimeUtils = CS.TimeUtils
+
+local data
+
+MallBuyVipUIView = class(ViewBase)
+
+function MallBuyVipUIView:ctor()
+	self.viewID = Constants.ViewName.MallBuyVipUIView
+	MallBuyVipUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function MallBuyVipUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.bgBtn = contentPane:GetButton("bg")
+	self.priceText = contentPane:GetText("priceText")
+	self.vipIcon = contentPane:GetGUIIcon("vipIcon")
+	self.vipBigTitle = contentPane:GetText("vipBigTitle")
+	self.vipSmallTitle = contentPane:GetText("vipSmallTitle")
+	self.infoBtn = contentPane:GetButton("infoBtn")
+	self.icon1 = contentPane:GetGUIIcon("icon1")
+	self.icon2 = contentPane:GetGUIIcon("icon2")
+	self.icon3 = contentPane:GetGUIIcon("icon3")
+	self.icon4 = contentPane:GetGUIIcon("icon4")
+end
+
+function MallBuyVipUIView:onInit()
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function()
+			self:closeBtnClick()
+		end
+	)
+
+	self.bgBtn:ButtonClickTween(
+		function()
+			self:closeBtnClick()
+		end
+	)
+
+	self.infoBtn:ButtonClickTween(
+		function()
+			EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_BuyVipUI, 0)
+		end
+	)
+end
+
+function MallBuyVipUIView:onHide()
+	--print("MallBuyVipUIView onHide")
+end
+
+function MallBuyVipUIView:onShowed()
+	--print("MallBuyVipUIView onShowed")
+	self:SetUIData()
+end
+
+function MallBuyVipUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function MallBuyVipUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function MallBuyVipUIView:closeBtnClick()
+	self:hide()
+end
+
+function MallBuyVipUIView:SetUIData()
+	local vipData = MallDataProxy.inst.vipData
+	local vipPayData = MallDataProxy.inst.vipPayData
+
+	if (vipPayData.pic1 ~= "-1" and vipPayData.pic2 ~= "-1") then
+		self.vipIcon:SetSprite(vipPayData.pic1, vipPayData.pic2)
+	end
+
+	if (vipPayData.atlasIcon ~= "-1") then
+		if (vipPayData.icon1 ~= "-1") then
+			self.icon1:SetSprite(vipPayData.atlasIcon, vipPayData.icon1)
+		end
+		if (vipPayData.icon2 ~= "-1") then
+			self.icon2:SetSprite(vipPayData.atlasIcon, vipPayData.icon2)
+		end
+		if (vipPayData.icon3 ~= "-1") then
+			self.icon3:SetSprite(vipPayData.atlasIcon, vipPayData.icon3)
+		end
+		if (vipPayData.icon4 ~= "-1") then
+			self.icon4:SetSprite(vipPayData.atlasIcon, vipPayData.icon4)
+		end
+	end
+
+	self.vipBigTitle.text = cs_LanguageManagerInst:GetValueByKey(vipPayData.name)
+	self.vipSmallTitle.text = cs_LanguageManagerInst:GetValueByKey(vipPayData.tag)
+	-- if(vipData.state ~= 0)then
+	-- 	--self.priceText.text = cs_LanguageManagerInst:GetValueByKey("续费{0}",vipPayData.price)
+	-- else
+	-- 	self.priceText.text = cs_LanguageManagerInst:GetValueByKey(vipPayData.value)
+	-- end
+	self.priceText.text =
+		CS.GamePay.inst:GetProductPrice(vipPayData.payProduct.productId) .. "/" .. cs_LanguageManagerInst:GetValueByKey("月")
+end
+------------------------------------------------

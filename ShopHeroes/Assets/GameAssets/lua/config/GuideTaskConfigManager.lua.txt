@@ -1,0 +1,62 @@
+-- GuideTaskConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+GuideTaskConfigData =
+class(
+	{
+		id,
+		task_group,
+		pre_group_id,
+		task_type,
+		group_name,
+		atlas,
+		icon,
+		des,
+		des_2,
+		condition_id,
+		parameter_num,
+		award_1_type,
+		award_1_id,
+		award_1_num,
+		task_scenes,
+		task_guide_1,
+		task_guide_2,
+		task_guide_3,
+		task_guide_4,
+		task_guide_5,
+		dialog = "",
+	}
+)
+
+GuideTaskConfigManager = class()
+--GuideTaskConfigManager.cfgDict = {}
+local csv_name = "task_novice"
+
+function GuideTaskConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("GuideTaskConfigManager:InitCSVConfig csv:", csv)
+	local cfgs = CSVParser:parseClass(csv, 3, GuideTaskConfigData)
+	GuideTaskConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("GuideTaskConfigManager  错误")
+	end
+end
+
+function GuideTaskConfigManager:processConfigs(cfgs)
+	--print("GuideTaskConfigManager:processConfigs ", cfgs, " len:", #cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		--print("GuideTaskConfigManager c i:", i," c:", c, " idtype:", type(c.id) , "id is",c.id)
+		self.cfgDict[tonumber(c.id)] = c
+	end
+	--print("GuideTaskConfigManager:processConfigs completed")
+end
+
+function GuideTaskConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

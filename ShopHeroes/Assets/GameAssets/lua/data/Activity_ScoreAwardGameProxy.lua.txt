@@ -1,0 +1,921 @@
+
+--Activity_ScoreAwardGameProxy 积分大奖赛
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_ItemType = CS.ItemType
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_itemConfigManagerInst = CS.ItemconfigManager.inst
+
+local CS_GameTimerInst = CS.GameTimer.inst
+
+Activity_ScoreAwardGameProxy = class(BaseDataProxy)
+
+Activity_ScoreAwardGameProxy.inst = Activity_ScoreAwardGameProxy:new()
+
+function Activity_ScoreAwardGameProxy:Init()
+
+	self:init()
+
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_PointActivity2_CheckData_Cmd,
+		function(resp)
+			print("Response_PointActivity2_CheckData success", resp)
+			self:GetScoreAwardGameStateData(resp)
+		end,
+		function(code)
+			print("Response_PointActivity2_CheckData fail --- code", code)
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_PointActivity2_TaskChange_Cmd,
+		function(resp)
+			print("Response_PointActivity2_TaskChange success", resp)
+			self:GetScoreAwardGameTaskChangeData(resp)
+		end,
+		function(code)
+			print("Response_PointActivity2_TaskChange fail --- code", code)
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_PointActivity2_TaskReward_Cmd,
+		function(resp)
+			print("Response_PointActivity2_TaskReward success", resp)
+			self:GetScoreAwardGameTaskRewardData(resp)
+		end,
+		function(code)
+			print("Response_PointActivity2_TaskReward fail --- code", code)
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_PointActivity2_CheckReward_Cmd,
+		function(resp)
+			print("Response_PointActivity2_CheckReward success", resp)
+			self:GetScoreAwardGameTaskScoreRewardListData(resp)
+		end,
+		function(code)
+			print("Response_PointActivity2_CheckReward fail --- code", code)
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_PointActivity2_Reward_Cmd,
+		function(resp)
+			print("Response_PointActivity2_Reward success", resp)
+			self:GetScoreAwardGameTaskScoreRewardData(resp)
+		end,
+		function(code)
+			print("Response_PointActivity2_Reward fail --- code", code)
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_PointActivity2_RewardChange_Cmd,
+		function(resp)
+			print("Response_PointActivity2_RewardChange success", resp)
+			self:GetScoreAwardGameTaskScoreRewardChangeData(resp)
+		end,
+		function(code)
+			print("Response_PointActivity2_RewardChange fail --- code", code)
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_PointActivity2_ActivityPointChange_Cmd,
+		function(resp)
+			print("Response_PointActivity2_ActivityPointChange success", resp)
+			self:GetScoreAwardGamePointChangeData(resp)
+		end,
+		function(code)
+			print("Response_PointActivity2_ActivityPointChange fail --- code", code)
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_PointActivity2_UnionRankList_Cmd,
+		function(resp)
+			print("Response_PointActivity2_UnionRankList success", resp)
+			self:GetScoreAwardGameUnionRankListData(resp)
+		end,
+		function(code)
+			print("Response_PointActivity2_UnionRankList fail --- code", code)
+		end
+	)
+
+
+end
+
+function Activity_ScoreAwardGameProxy:init()
+
+	self.scoreAwardTaskList = {} --内容令状任务列表
+	self.scoreRewardList = {} --积分等级达到奖励列表
+
+	self.scoreCanRewardCount = 0 --积分到达奖励为可领取状态的数量（仅状态）
+
+	self.endtime_serverEndtime = 0 --结束时间_服务器时间
+	self.flag = false --是否开启
+	self.endTimer = 0 --结束时间timer
+
+	self.scorePoint = 0 --活动积分 总积分 公会积分
+	self.scorePoint_self = 0 --活动积分 个人积分
+
+	self.stringList = {} --各个地方显示的语句
+
+	self.version = 0
+
+	--test
+	--self:test()
+
+end
+
+function Activity_ScoreAwardGameProxy:test()
+
+	self.flag = true
+	self.endtime_serverEndtime = CS_GameTimerInst.serverNow + 6000
+
+	local tempTaskList = {}
+	for i = 1, 46 do
+		local curTaskData = MsgType.OnePointActivityTaskInfo:New()
+		curTaskData.id = i
+		curTaskData.type = i
+		curTaskData.param = i
+		curTaskData.process = 0
+		curTaskData.state = 1
+		curTaskData.rewardList = {}
+		local reward1 = MsgType.OneRewardItem:New()
+		reward1.itemType = 2
+		reward1.itemId = 10002
+		reward1.count = 6
+		curTaskData.rewardList[1] = reward1
+		if(i % 5 == 0)then
+			local reward2 = MsgType.OneRewardItem:New()
+			reward2.itemType = 1
+			reward2.itemId = 10001
+			reward2.count = 8668
+			curTaskData.rewardList[2] = reward2
+			curTaskData.state = 2
+			curTaskData.process = i
+		end
+		if(i % 6 == 0)then
+			curTaskData.state = 2
+			curTaskData.process = i
+		end
+		if(i % 10 == 0)then
+			curTaskData.state = 3
+		end
+		tempTaskList[#tempTaskList + 1] = curTaskData
+	end
+
+	local curTaskData = MsgType.OnePointActivityTaskInfo:New()
+	curTaskData.id = 999
+	curTaskData.type = 5
+	curTaskData.param = 999
+	curTaskData.process = 0
+	curTaskData.state = 1
+	curTaskData.rewardList = {}
+	local reward1 = MsgType.OneRewardItem:New()
+	reward1.itemType = 2
+	reward1.itemId = 10002
+	reward1.count = 6
+	curTaskData.rewardList[1] = reward1
+
+	tempTaskList[#tempTaskList + 1] = curTaskData
+
+
+	self:UpdateAllTaskData(tempTaskList,true)
+
+	local str1 = MsgType.OneOperatingActivityStringData:New()
+	str1.type = 1
+	str1.CN = "啊哈"
+	str1.EN = "万圣节活动测试"
+	str1.TW = "万圣节活动测试"
+	local str2 = MsgType.OneOperatingActivityStringData:New()
+	str2.type = 2
+	str2.CN = "啊哈啊哈啊哈啊哈啊哈"
+	str2.EN = "万圣节活动具体内容测试"
+	str2.TW = "万圣节活动具体内容测试"
+	local str3 = MsgType.OneOperatingActivityStringData:New()
+	str3.type = 4
+	str3.CN = "wanshengjie_nangua"
+	str3.EN = "wanshengjie_nangua"
+	str3.TW = "wanshengjie_nangua"
+	local str4 = MsgType.OneOperatingActivityStringData:New()
+	str4.type = 5
+	str4.CN = "wanshengjie_banner"
+	str4.EN = "wanshengjie_banner"
+	str4.TW = "wanshengjie_banner"
+
+	self.stringList[1] = str1
+	self.stringList[2] = str2
+	self.stringList[3] = str3
+	self.stringList[4] = str4
+
+
+end
+
+function Activity_ScoreAwardGameProxy:clearEndTimeTimer()
+	if self.endTimer ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.endTimer)
+		self.endTimer = 0
+	end
+end
+
+function Activity_ScoreAwardGameProxy:setEndtimeTimer()
+
+	self:clearEndTimeTimer()
+
+	if (self.endtime_serverEndtime < CS_GameTimerInst.serverNow) then
+		return
+	end
+
+	local remainTime = self.endtime_serverEndtime - CS_GameTimerInst.serverNow
+	self.endTimer = CS_GameTimerInst:AddTimer(remainTime,1,function()
+			self:endtimeTimerMethod()
+		end,CS.GameTimerType.byServerTime)
+end
+
+function Activity_ScoreAwardGameProxy:endtimeTimerMethod()
+
+	local remainTime = self.endtime_serverEndtime - CS_GameTimerInst.serverNow
+
+	if remainTime > 0 then
+		self.endTimer = CS_GameTimerInst:AddTimer(remainTime,1,function()
+				self:endtimeTimerMethod()
+			end,CS.GameTimerType.byServerTime)
+	else
+		--发送获取内容令状的网络请求
+		EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckData)
+	end
+
+end
+
+function Activity_ScoreAwardGameProxy:GetActivityStr(type)
+	local str = nil
+
+	for i = 1, #self.stringList do
+		if self.stringList[i].type == type then
+			local data = self.stringList[i]
+
+			if CS_LanguageManagerInst.curType == CS.LanguageType.SIMPLIFIED_CHINESE then
+				str = data.CN
+			elseif CS_LanguageManagerInst.curType == CS.LanguageType.TRADITIONAL_CHINESE then
+				str = data.TW
+			elseif CS_LanguageManagerInst.curType == CS.LanguageType.ENGLISH then
+				str = data.EN
+			end
+
+			break
+		end
+	end
+
+	return (str == nil or str == "") and CS_LanguageManagerInst:GetValueByKey("-暂无-") or str
+end
+
+-----内容令状任务
+
+function Activity_ScoreAwardGameProxy:GetScoreAwardGameTaskChangeData(respData)
+
+
+	local data = MsgType.Response_PointActivity2_TaskChange:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	local list = self:GetShowTaskList();
+	local map = {} --本地缓存的 当前的任务列表的完成状态
+
+	for i = 1, #list do
+		if list[i].state ~= MsgType.EPointActivityTaskState.Rewarded then
+			map[list[i].type] = list[i].state
+		end
+	end
+
+	self:UpdateAllTaskData(data.taskList,false) --更新本地缓存的任务数据
+
+	list = self:GetShowTaskList();
+
+	for i = 1, #list do
+
+		--此次完成并且以前未完成过的
+		if list[i].state == MsgType.EPointActivityTaskState.CanReward and (map[list[i].type] == nil or (map[list[i].type] ~= MsgType.EPointActivityTaskState.CanReward) ) then
+
+			EventDispatcher:dispatchEvent(GameEvent.OnSomeOneTaskFinishGameEvent.AddCommonTaskFinishProgressAnimData,{
+					tipsIconUrl = self:GetActivityStr(MsgType.EOperatingActivityStringType.Icon),
+					--taskIcon_atlas = cfg.atlas,
+					--taskIcon_name = cfg.icon,
+					taskContent = CS_LanguageManagerInst:GetValueByKey(list[i].cfg.name,tostring(list[i].limit)), 
+					clickCallback = function()
+						EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_MainPanel, true)
+					end })
+
+		end
+
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_MainPanel)
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshRedPoint_Activity_ScoreAwardGame_ScoreCanReward)
+
+end
+
+function Activity_ScoreAwardGameProxy:GetScoreAwardGameTaskRewardData(respData)
+
+	local data = MsgType.Response_PointActivity2_TaskReward:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	self:UpdateSingleTaskData(data.task)
+
+	if #data.rewardList > 1 then --多个奖励
+
+		local rewardsList = get_csharp_list(CS.CommonRewardData)
+
+		for i = 1, #data.rewardList do
+
+			local item = data.rewardList[i]
+
+			rewardsList:Add(CS.CommonRewardData(item.itemId, item.count, 0, item.itemType))
+
+		end
+
+		local awardItem = CS.Award_AboutCommon()
+		awardItem.type = CS.ReceiveInfoUIType.CommonReward
+		awardItem.allRewardList = rewardsList
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.Award_AboutCommon)
+		func(CS_EventControllerInst, CS_GameEventType.ReceiveEvent.NEWITEM_MSG, awardItem)
+
+	elseif #data.rewardList == 1 then
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.queueItem)
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", 0, data.rewardList[1].itemId, data.rewardList[1].count)
+		func(CS_EventControllerInst, CS_GameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+
+	end
+
+	self.scorePoint = data.activityPoint
+	self.scorePoint_self = data.userActivityPoint
+
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_MainPanel)
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshRedPoint_Activity_ScoreAwardGame_ScoreCanReward)
+
+end
+
+function Activity_ScoreAwardGameProxy:GetScoreAwardGameStateData(respData)
+
+	local data = MsgType.Response_PointActivity2_CheckData:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	self.flag = data.activityFlag == 1
+	self.endtime_serverEndtime = CS_GameTimerInst.serverNow + data.remainTime
+	self.stringList = data.stringList
+	self:UpdateAllTaskData(data.taskList,true)
+	self.version = data.version
+
+
+	if CS_UserDataProxyInst.playerData.level >= CS_WorldParConfigManagerInst:GetConfig(8511).parameters then --等级足够
+		if self.flag then --活动开启
+			
+			self:setEndtimeTimer()
+			
+			local storyNpcCfg = StoryNpcConfigManager:GetConfig(6, -1)
+
+			if
+				storyNpcCfg ~= nil and
+				CS_PlayerPrefs.GetString(
+					CS_AccountDataProxyInst.account ..
+					"_StoryNpc_ActivityScoreAwardGame_" .. tostring(self.version) .. "_" .. tostring(storyNpcCfg.story_id),
+					"-1"
+				) == "-1"
+				then
+				EventDispatcher:dispatchEvent(
+					GameEvent.EventSystem.AddEvent,
+					GameEvent.StoryRoleEvent.AddStoryRole,
+					{
+						storyType = 6,
+						parame = -1,
+						callback = function()
+							CS_PlayerPrefs.SetString(
+								CS_AccountDataProxyInst.account ..
+								"_StoryNpc_ActivityScoreAwardGame_" .. tostring(self.version) .. "_" .. tostring(storyNpcCfg.story_id),
+								"1"
+							)
+							EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_MainPanel, false)
+							CS.GoOperationManager.inst.isDoing = false
+							EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefrshActivity_ScoreAwardGameState, self.flag)
+							CS.FGUI.inst:SetAllUIInteractable(true)
+							CS.FGUI.inst:SetAllUIAlpha(1)
+							EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+							EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+						end
+					},
+					ExecuteType.queueup,
+					kGameState.Shop
+				)
+			else
+				EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefrshActivity_ScoreAwardGameState, self.flag)
+			end
+		else
+			EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefrshActivity_ScoreAwardGameState, self.flag)
+		end
+	end
+
+
+end
+
+
+function Activity_ScoreAwardGameProxy:UpdateSingleTaskData(oneTask)
+	if(oneTask == nil) then return end
+
+	if(self.scoreAwardTaskList[oneTask.type] == nil)then
+		self.scoreAwardTaskList[oneTask.type] = {}
+	end
+
+	if(self.scoreAwardTaskList[oneTask.type] ~= nil)then
+		local groupList = self.scoreAwardTaskList[oneTask.type]
+
+		if(groupList[oneTask.id] ~= nil)then
+			groupList[oneTask.id]:SetData(oneTask)
+		else
+			local data = ScoreAwardGame_TaskData:new()
+			data:SetData(oneTask)
+			groupList[oneTask.id] = data
+		end
+	end
+end
+
+function Activity_ScoreAwardGameProxy:UpdateAllTaskData(taskDataList,needInit)
+
+	if needInit then
+		self.scoreAwardTaskList = {}
+	end
+
+	if taskDataList == nil or type(taskDataList) ~= 'table' or #taskDataList == 0 then
+		return
+	end
+
+	for i = 1, #taskDataList do
+		self:UpdateSingleTaskData(taskDataList[i])
+	end
+
+end
+
+function Activity_ScoreAwardGameProxy:GetShowTaskList()
+
+	local showList = {}
+
+	for k, v in pairs(self.scoreAwardTaskList) do
+
+		local isFirst = true
+
+		if(v ~= nil)then
+
+			local tempList = {}
+
+			for key, value in pairs(v) do
+
+				if(value ~= nil)then
+					tempList[#tempList + 1] = value
+				end
+
+			end
+
+			table.sort(tempList,function (a,b)
+					return a.id < b.id
+				end)
+
+			for i = 1, #tempList do
+
+				if tempList[i].state == MsgType.EPointActivityTaskState.Rewarded then
+					showList[#showList + 1] = tempList[i]
+				else
+
+					if(isFirst)then
+						isFirst = false
+						showList[#showList + 1] = tempList[i]
+					end
+
+				end
+
+			end
+
+		end
+
+	end
+
+	table.sort(showList,function (a,b)
+
+			if(a.state == b.state)then
+				if(a.id < b.id)then
+					return true
+				else
+					return false
+				end
+			else
+				if a.state == MsgType.EPointActivityTaskState.Rewarded then
+					return false
+				elseif b.state == MsgType.EPointActivityTaskState.Rewarded then
+					return true
+				else
+					return a.state > b.state
+				end
+			end
+		end)
+
+	return showList
+end
+
+function Activity_ScoreAwardGameProxy:GetTaskPointsParams(groupId,taskId)
+
+	local groupList = self.scoreAwardTaskList[groupId]
+
+	local tempList = {}
+
+	for key, value in pairs(groupList) do
+
+		if(value ~= nil)then
+			tempList[#tempList + 1] = value
+		end
+
+	end
+
+	table.sort(tempList,function (a,b)
+			return a.id < b.id
+		end)
+
+	for i = 1, #tempList do
+
+		if tempList[i].id == taskId then
+			return #tempList,i
+		end
+
+	end
+
+	return #tempList,1
+
+end
+
+--获取可领奖的任务数目
+function Activity_ScoreAwardGameProxy:GetScoreAwardTaskCanRewardCount()
+
+	local canRewardCount = 0
+	local list = self:GetShowTaskList()
+
+	for i = 1, #list do
+
+		if list[i].state == MsgType.EPointActivityTaskState.CanReward then
+			canRewardCount = canRewardCount + 1
+		end
+
+	end
+
+	return canRewardCount
+
+end
+
+----------------------
+
+-----积分奖励列表
+
+function Activity_ScoreAwardGameProxy:setScoreRewardData(data)
+	local state1 = false
+	local state2 = false
+
+	if self.scoreRewardList[tonumber(data.groupId)] ~= nil then
+		state1 = self.scoreRewardList[tonumber(data.groupId)].rewardList[1].state or false
+		state2 = self.scoreRewardList[tonumber(data.groupId)].rewardList[2].state or false
+	end
+
+	self.scoreRewardList[tonumber(data.groupId)] = data
+
+	if state1 then
+		if
+			state1 == MsgType.EOperatingActivityRewardState.None and
+			data.rewardList[1].state == MsgType.EOperatingActivityRewardState.CanReward
+			then
+			self.scoreCanRewardCount = self.scoreCanRewardCount + 1
+		elseif
+			state1 == MsgType.EOperatingActivityRewardState.CanReward and
+			data.rewardList[1].state == MsgType.EOperatingActivityRewardState.Rewarded
+			then
+			self.scoreCanRewardCount = self.scoreCanRewardCount - 1
+		end
+	elseif data.rewardList[1].state == MsgType.EOperatingActivityRewardState.CanReward then
+		self.scoreCanRewardCount = self.scoreCanRewardCount + 1
+	end
+
+	if state2 then
+		if
+			state2 == MsgType.EOperatingActivityRewardState.None and
+			data.rewardList[2].state == MsgType.EOperatingActivityRewardState.CanReward
+			then
+			self.scoreCanRewardCount = self.scoreCanRewardCount + 1
+		elseif
+			state2 == MsgType.EOperatingActivityRewardState.CanReward and
+			data.rewardList[2].state == MsgType.EOperatingActivityRewardState.Rewarded
+			then
+			self.scoreCanRewardCount = self.scoreCanRewardCount - 1
+		end
+	elseif data.rewardList[2].state == MsgType.EOperatingActivityRewardState.CanReward then
+		self.scoreCanRewardCount = self.scoreCanRewardCount + 1
+	end
+end
+
+function Activity_ScoreAwardGameProxy:GetScoreRewardData(groupId, index)
+	groupId = tonumber(groupId)
+
+	if self.scoreRewardList[groupId] ~= nil then
+		for i = 1, #self.scoreRewardList[groupId].rewardList do
+			local oneScoreRewardData = self.scoreRewardList[groupId].rewardList[i]
+
+			if oneScoreRewardData ~= nil and oneScoreRewardData.id == index then
+				return oneScoreRewardData
+			end
+		end
+	end
+
+	return nil
+end
+
+function Activity_ScoreAwardGameProxy:GetScoreAwardGameTaskScoreRewardData(respData)
+
+	local data = MsgType.Response_PointActivity2_Reward:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	self:setScoreRewardData(data.rewardItem)
+
+	local cfg = CS.ItemconfigManager.inst:GetConfig(data.reward.itemId)
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.queueItem)
+	if (cfg ~= nil) then
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", 0, data.reward.itemId, data.reward.count)
+
+		func(CS_EventControllerInst, CS_GameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	else
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", data.reward.itemId, 0, data.reward.count)
+
+		func(CS_EventControllerInst, CS_GameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	end
+
+	--界面刷新
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_ScoreRewardPanel)
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshRedPoint_Activity_ScoreAwardGame_ScoreCanReward)
+
+
+end
+
+function Activity_ScoreAwardGameProxy:GetScoreAwardGameTaskScoreRewardListData(respData)
+
+	local data = MsgType.Response_PointActivity2_CheckReward:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	self.scorePoint = data.activityPoint
+	self.scorePoint_self = data.userActivityPoint
+
+	self.scoreCanRewardCount = 0;
+
+	for i = 1, #data.rewardList do
+		local groupData = data.rewardList[i]
+		self:setScoreRewardData(groupData)
+	end
+
+	--界面刷新
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_ScoreRewardPanel)
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshRedPoint_Activity_ScoreAwardGame_ScoreCanReward)
+
+end
+
+function Activity_ScoreAwardGameProxy:GetScoreAwardGameTaskScoreRewardChangeData(respData)
+
+	local data = MsgType.Response_PointActivity2_RewardChange:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+
+	self:setScoreRewardData(data.rewardItem)
+
+	--界面刷新
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_MainPanel)
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_ScoreRewardPanel)
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshRedPoint_Activity_ScoreAwardGame_ScoreCanReward)
+
+end
+
+function Activity_ScoreAwardGameProxy:GetCurScorePointLv()
+
+	local lv = 1
+
+	local num = #self.scoreRewardList
+
+	for i = num, 1, -1 do
+		local data = self.scoreRewardList[i]
+		if tonumber(self.scorePoint) >= tonumber(data.needPoint) then
+			lv = i
+			break
+		end
+	end
+
+	return tonumber(lv)
+
+end
+
+
+--获取当前实际可领取的奖励数目(个人积分，公会积分都满足 是否为vip)
+function Activity_ScoreAwardGameProxy:GetScoreReallyCanRewardCount()
+	local scoreReallyCanRewardCount = 0
+
+	local num = #self.scoreRewardList
+
+	for i = num, 1, -1 do
+		local data = self.scoreRewardList[i]
+
+		local selfScoreReach = tonumber(self.scorePoint_self) >= data.userNeedPoint
+		local unionScoreReach = tonumber(self.scorePoint) >= data.needPoint
+
+		for k = 1, #data.rewardList do
+			if data.rewardList[k].state == MsgType.EOperatingActivityRewardState.CanReward and selfScoreReach and unionScoreReach then
+				if(data.rewardList[k].vipFlag ~= 1 or (data.rewardList[k].vipFlag == 1 and CS.K_Vip_State.__CastFrom(CS.UserDataProxy.inst.playerData.vipState) == CS.K_Vip_State.Vip))then -- 非vip 或者vip奖励且玩家是vip的情况
+					scoreReallyCanRewardCount = scoreReallyCanRewardCount + 1
+				end
+			end
+		end
+	end
+
+	return scoreReallyCanRewardCount
+end
+
+--查看当前积分等级达到奖励列表中是否包含对应宠物id的奖励
+function Activity_ScoreAwardGameProxy:GetScoreRewardIndexByPetId(petId)
+
+	local lv = -1
+
+	local num = #self.scoreRewardList
+
+	for i = num, 1, -1 do
+
+		local data = self.scoreRewardList[i]
+
+		local selfScoreReach = tonumber(self.scorePoint_self) >= data.userNeedPoint
+
+		for k = 1, #data.rewardList do
+
+			local itemCfg = CS_itemConfigManagerInst:GetConfig(data.rewardList[k].item.itemId)
+
+			if itemCfg ~= nil and CS_ItemType.__CastFrom(itemCfg.type) == CS_ItemType.PetSkin and itemCfg.effect == petId then --找到了该宠物的数据
+
+				--如果活动开启 直接返回
+				if self.flag then
+
+					lv = i
+
+				else
+
+					--如果活动未开启 目前积分可领取 返回
+					if data.rewardList[k].state == MsgType.EOperatingActivityRewardState.CanReward and selfScoreReach then
+						lv = i
+					end
+
+				end
+
+				break
+
+			end
+
+		end
+	end
+
+	return tonumber(lv)
+
+end
+
+
+----------------------
+
+function Activity_ScoreAwardGameProxy:GetScoreAwardGamePointChangeData(respData)
+
+	local data = MsgType.Response_PointActivity2_ActivityPointChange:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	self.scorePoint = data.activityPoint
+	self.scorePoint_self = data.userActivityPoint
+
+	--界面刷新
+	EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_ScoreRewardPanel)
+
+end
+
+function Activity_ScoreAwardGameProxy:GetScoreAwardGameUnionRankListData(respData)
+
+	local data = MsgType.Response_PointActivity2_UnionRankList:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+
+	EventDispatcher:dispatchEvent(
+		GameEvent.Activity_ScoreAwardGameEvent.Activity_ScoreAwardGame_GetMemberRankMess,
+		data.rankList,
+		data.userRank
+	)
+
+
+end
+
+---------------------
+
+function Activity_ScoreAwardGameProxy:Clear()
+
+end
+
+
+
+-------------------------------------------相关数据类型---------------------------------------------------
+
+--ScoreAwardGame_TaskData
+
+ScoreAwardGame_TaskData = class()
+
+function ScoreAwardGame_TaskData:ctor()
+
+end
+
+function ScoreAwardGame_TaskData:SetData(serverData)
+
+	self.id = serverData.id
+	self.type = serverData.type
+	self.limit = serverData.param
+	self.param = serverData.process
+	self.state = serverData.state
+	self.allAwards = serverData.rewardList
+
+	self.cfg = ActivityTaskConfigManager:GetConfig(self.type)
+
+	self.operationData = CS.OperationData()
+	if(self.cfg == nil) then return end
+
+	self.isSpecialTask = self.cfg.pay_type == 2
+
+	self.operationData.type = CS.K_Operation_DataType.DailyTask
+	self.operationData.task_scenes = self.cfg.task_scenes
+	if(self.cfg.condition ~= nil and self.cfg.condition ~= "")then
+		self.operationData.condition_id = self.cfg.condition
+	end
+	self.operationData.dialog = self.cfg.dialog
+	if(self.cfg.task_guide_1 ~= nil and self.cfg.task_guide_1 ~= "")then
+		self.operationData.operations:Add(self.cfg.task_guide_1)
+	end
+	if(self.cfg.task_guide_2 ~= nil and self.cfg.task_guide_2 ~= "")then
+		self.operationData.operations:Add(self.cfg.task_guide_2)
+	end
+	if(self.cfg.task_guide_3 ~= nil and self.cfg.task_guide_3 ~= "")then
+		self.operationData.operations:Add(self.cfg.task_guide_3)
+	end
+	if(self.cfg.task_guide_4 ~= nil and self.cfg.task_guide_4 ~= "")then
+		self.operationData.operations:Add(self.cfg.task_guide_4)
+	end
+	if(self.cfg.task_guide_5 ~= nil and self.cfg.task_guide_5 ~= "")then
+		self.operationData.operations:Add(self.cfg.task_guide_5)
+	end
+
+end
+
+
+------------------------------------------------------------------------
+
+
+
+
+----------------------------------------------------------------------------------------------------------
+

@@ -1,0 +1,171 @@
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_EquipDataProxyInst = CS.EquipDataProxy.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+
+local EventDispatcher = require("event/EventDispatcher")
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local equipMakeListItem_dlc
+
+function InitComp()
+
+	equipMakeListItem_dlc = EquipMakeListItem_dlc.new()
+	equipMakeListItem_dlc:init(self.gameObject)
+	
+end
+
+function SetData(equipDrawingId)
+	
+	if equipMakeListItem_dlc~=nil then
+		equipMakeListItem_dlc:SetData(equipDrawingId)
+	end
+	
+end
+
+function clear()
+	
+	if equipMakeListItem_dlc~=nil then
+		equipMakeListItem_dlc:Clear()
+		equipMakeListItem_dlc = nil
+	end
+	
+end
+
+function onDisable()
+
+end
+
+function onDestroy()
+
+	clear()
+	
+end
+
+
+
+
+
+--EquipMakeListItem_dlc 实际逻辑在lua侧
+
+EquipMakeListItem_dlc = class()
+----
+
+function EquipMakeListItem_dlc:ctor()
+end
+
+function EquipMakeListItem_dlc:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.img_workerGameIconBg =self.contentPane:GetObjByName("img_workerGameIconBg"):GetComponent("Image")
+	self.img_workerGameTipsIcon = self.contentPane:GetObjByName("img_workerGameTipsIcon"):GetComponent("Image")
+	self.obj_workerGameMoreRate = self.contentPane:GetObjByName("obj_workerGameMoreRate")
+	self.tx_workerGameRate = self.contentPane:GetObjByName("tx_workerGameRate"):GetComponent("Text")
+	
+end
+
+
+function EquipMakeListItem_dlc:init(obj)
+
+	self:initComp(obj)
+	self.equipDrawingId = 0
+
+	self:addListeners()
+
+end
+
+function EquipMakeListItem_dlc:SetData(equipDrawingId)
+
+	if not Activity_WorkerGameProxy.inst.flag or (CS_UserDataProxyInst.playerData.level < CS_WorldParConfigManagerInst:GetConfig(323).parameters) then
+		self:clear()
+		return
+	end
+	
+	self.equipDrawingId = equipDrawingId
+	local equipData = CS_EquipDataProxyInst:GetEquipData(equipDrawingId)
+
+	if equipData ~= nil then
+
+		local workerGameRate = Activity_WorkerGameProxy.inst:GetMakingActivityRateByEquipDrawingId(equipDrawingId)
+
+		if workerGameRate == 0 then
+			self:clear()
+		else
+
+			self.img_workerGameIconBg.enabled = true
+			self.img_workerGameTipsIcon.enabled = true
+
+			if workerGameRate >= 2 then --双倍及以上
+
+				self.obj_workerGameMoreRate:SetActive(true)
+				self.tx_workerGameRate.text = "x"..tostring(workerGameRate)
+				
+			else
+				self.obj_workerGameMoreRate:SetActive(false)
+			end
+
+		end
+
+
+	else --未解锁的
+		self:clear()
+	end
+
+		
+end
+
+function EquipMakeListItem_dlc:clear()
+	
+	self.equipDrawingId = 0
+	self.img_workerGameIconBg.enabled = false
+	self.img_workerGameTipsIcon.enabled = false
+	self.obj_workerGameMoreRate:SetActive(false)
+	
+end
+
+function EquipMakeListItem_dlc:Clear()
+	
+	self:clear()
+	self:removeListeners()
+	
+end
+
+function EquipMakeListItem_dlc:refresh(flag)
+	
+	if self.equipDrawingId ~= 0 then
+		if flag then
+			self:SetData(self.equipDrawingId)
+		else
+			self:clear()
+		end
+	end
+	
+end
+
+function EquipMakeListItem_dlc:onMakingActivityDataChanged(index)
+	if self.equipDrawingId ~= 0 then
+		if Activity_WorkerGameProxy.inst.flag then
+			self:SetData(self.equipDrawingId)
+		else
+			self:clear()
+		end
+	end
+end
+
+function EquipMakeListItem_dlc:addListeners()
+
+	EventDispatcher:addEvent(GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,self,self.refresh)
+	EventDispatcher:addEvent(GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_MakingActivityDataChanged,self,self.onMakingActivityDataChanged)
+
+end
+
+function EquipMakeListItem_dlc:removeListeners()
+
+	EventDispatcher:removeEvent(GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,self,self.refresh)
+	EventDispatcher:removeEvent(GameEvent.Activity_WorkerGameEvent.RefreshUI_Activity_MakingActivityDataChanged,self,self.onMakingActivityDataChanged)
+
+end

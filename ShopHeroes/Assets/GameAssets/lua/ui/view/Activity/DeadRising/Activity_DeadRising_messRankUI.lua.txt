@@ -1,0 +1,336 @@
+
+--Activity_DeadRising_messRankUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local csGameTimerInst = CS.GameTimer.inst
+local Vector3 = CS.UnityEngine.Vector3
+local csWorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+Activity_DeadRising_messRankUI = class(ViewBase)
+
+function Activity_DeadRising_messRankUI:ctor()
+	self.viewID = Constants.ViewName.Activity_DeadRising_messRankUI
+	Activity_DeadRising_messRankUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function Activity_DeadRising_messRankUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	local superList =  contentPane:GetObjByName("scrollView")
+	self.scrollView = superList:GetComponent(CS_type_superList)
+	self.listItemCount = 0
+
+	self.titleIcon = contentPane:GetGUIIcon("titleIcon")
+	self.titleText = contentPane:GetText("titleText")
+	self.timeText = contentPane:GetText("timeText")
+	self.stateGroup = contentPane:GetObjByName("stateGroup"):GetComponent("ToggleGroupMarget")
+	self.toggleLinkObjs = contentPane:GetObjByName("toggleLinkObjs"):GetComponent("ObjList").objList
+	self.messIcon1 = contentPane:GetGUIIcon("messIcon1")
+	self.messIcon2 = contentPane:GetGUIIcon("messIcon2")
+	self.messIcon3 = contentPane:GetGUIIcon("messIcon3")
+	self.allScoreText = contentPane:GetText("allScoreText")
+	self.nothingTips = contentPane:GetText("nothingTips")
+	self.icon = contentPane:GetGUIIcon("icon")
+	self.selfRankText = contentPane:GetText("selfRankText")
+	self.selfRankValText = contentPane:GetText("selfRankValText")
+	self.selfRankValIcon = contentPane:GetGUIIcon("selfRankValIcon")
+	self.selfNameText = contentPane:GetText("selfNameText")
+	self.selfHeadIconTf = contentPane:GetObjByName("selfHeadIconTf").transform
+	self.bottomObj = contentPane:GetObjByName("bottomObj")
+
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+function Activity_DeadRising_messRankUI:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:hide()
+		end
+	)
+
+	self.stateGroup.OnSelectedIndexValueChange = function (index)
+		self:onSelectedIndexValueChange(index)
+	end
+
+	self.scrollView.itemRenderer = function(index,item)
+		self:ListItemRenderer(index,item)
+	end
+
+	self.remainTimer = 0
+	self.rankList = {}
+
+	self.itemCfg = nil
+	self.headGraphicSystem = nil
+
+	self.dataList = {}
+	self.index = 0
+end
+
+function Activity_DeadRising_messRankUI:DoShowAnimation()
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+end
+
+function Activity_DeadRising_messRankUI:DoHideAnimation()
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	csGameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end
+	)
+end
+
+function Activity_DeadRising_messRankUI:onHide()
+	--print("Activity_DeadRising_messRankUI onHide")
+	self:clearTimer()
+end
+
+function Activity_DeadRising_messRankUI:clearTimer()
+	if self.remainTimer ~= 0 then
+
+		csGameTimerInst:RemoveTimer(self.remainTimer)
+		self.remainTimer = 0
+
+	end
+end
+
+function Activity_DeadRising_messRankUI:SetUIData(index)
+
+	--self.titleIcon:SetSpriteURL(Activity_ScoreAwardGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Icon))
+	--self.titleText.text = Activity_ScoreAwardGameProxy.inst:GetActivityStr(MsgType.EOperatingActivityStringType.Name)
+
+	--local itemWdpCfg = csWorldParConfigManagerInst:GetConfig(8512)
+	--if(itemWdpCfg ~= nil)then
+		--self.itemCfg = CS.ItemconfigManager.inst:GetConfig(itemWdpCfg.parameters)
+		--if(self.itemCfg ~= nil)then
+			--self.messIcon2.iconImage.enabled = true
+			--self.messIcon2:SetSprite(self.itemCfg.atlas,self.itemCfg.icon)
+		--else
+			--self.messIcon2.iconImage.enabled = false
+		--end
+	--else
+		--self.messIcon2.iconImage.enabled = false
+	--end
+
+	self:setTimer()
+
+	self.stateGroup:OnEnableMethod(index)
+
+end
+
+function Activity_DeadRising_messRankUI:setTimer()
+
+	self:clearTimer()
+
+	--local remainTime = Activity_ScoreAwardGameProxy.inst.endtime_serverEndtime - csGameTimerInst.serverNow
+
+	--if(remainTime <= 0)then
+		--self.timeText.text = cs_LanguageManagerInst:GetValueByKey("已结束")
+	--else
+		--self.timeText.text = CS_TimeUtils.timeSpanStrip(remainTime,true)
+	--end
+
+	--self.remainTimer = csGameTimerInst:AddTimer(1,remainTime,function()
+
+			--local _remainTime = Activity_ScoreAwardGameProxy.inst.endtime_serverEndtime - csGameTimerInst.serverNow
+
+			--if(remainTime <= 0)then
+				--self:clearTimer()
+				--self.timeText.text = cs_LanguageManagerInst:GetValueByKey("已结束")
+			--else
+				--self.timeText.text = CS_TimeUtils.timeSpanStrip(remainTime,true)
+			--end
+
+		--end)
+end
+
+function Activity_DeadRising_messRankUI:onSelectedIndexValueChange(index)
+
+	self.index = index
+
+	CS.AudioManager.inst:PlaySound(11)
+
+	for i = 0,self.toggleLinkObjs.Count - 1 do
+		self.toggleLinkObjs[i]:SetActive(false)
+	end
+
+	self.toggleLinkObjs[index]:SetActive(true)
+
+	self:setState(index)
+
+end
+
+function Activity_DeadRising_messRankUI:setState(index)
+
+	if(index == 0)then -- 信息
+
+	elseif index == 1 then -- 排行
+		self:setRankData()
+	else
+
+	end
+
+end
+
+function Activity_DeadRising_messRankUI:setRankData()
+
+	self.allScoreText.text = ""
+	--self.nothingTips.gameObject:SetActive(true)
+	self.allScoreText.gameObject:SetActive(false)
+	self.bottomObj:SetActive(false)
+	self.scrollView.gameObject:SetActive(false)
+
+	EventDispatcher:dispatchEvent(GameEvent.Activity_DeadRisingEvent.Request_Activity_DeadRising_UnionRankList)
+
+end
+
+function Activity_DeadRising_messRankUI:getRankListData(rankList,selfRankData)
+
+	if self.index ~= 1 then
+		return
+	end
+
+	self.allScoreText.gameObject:SetActive(true)
+	self.bottomObj:SetActive(true)
+	self.scrollView.gameObject:SetActive(true)
+
+	self.rankList = rankList
+
+	if #self.rankList > 1 then
+
+		table.sort(self.rankList,function (a,b)
+
+				if a == nil or b == nil then
+					return false
+				end
+
+				if a.point > b.point then
+					return true
+				elseif a.point == b.point then
+					return false
+				else
+					return false
+				end
+			end)
+
+	end
+
+	self:SetListItemTotalCount(#self.rankList)
+
+	self.nothingTips.gameObject:SetActive(#self.rankList == 0)
+
+	local allPointNum = 0
+
+	for i = 1, #self.rankList do
+		allPointNum = self.rankList[i].point + allPointNum
+	end
+
+	self.allScoreText.text = tostring(allPointNum)
+
+	if(self.itemCfg ~= nil)then
+		self.icon.iconImage.enabled = true
+		self.selfRankValIcon.iconImage.enabled = true
+		self.icon:SetSprite(self.itemCfg.atlas,self.itemCfg.icon)
+		self.selfRankValIcon:SetSprite(self.itemCfg.atlas,self.itemCfg.icon)
+	else
+		self.icon.iconImage.enabled = false
+		self.selfRankValIcon.iconImage.enabled = false
+	end
+
+
+
+	if(selfRankData == nil)then
+		self.selfRankText.text = ""
+		self.selfRankValText.text = ""
+		self.selfNameText.text = ""
+	else
+		local rankVal = 1
+		for i = 1, #self.rankList do
+			if(self.rankList[i].userId == selfRankData.userId)then
+				rankVal = i
+				break
+			end
+		end
+
+		self.selfRankText.text = tostring(rankVal)
+		self.selfRankValText.text = tostring(selfRankData.point)
+		self.selfNameText.text = cs_LanguageManagerInst:GetValueByKey(selfRankData.name)
+		self:SetSelfRankPrefab(selfRankData.gender,selfRankData.userDress)
+	end
+
+end
+
+function Activity_DeadRising_messRankUI:SetSelfRankPrefab(gender,userDress)
+
+	if self.headGraphicSystem == nil or self.headGraphicSystem:IsNull() == true then
+
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+
+		func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(gender)),CS_SpineUtils.RoleDressToHeadDressIdList(userDress),CS.EGender.__CastFrom(gender),1.4,true,function (system)
+				self.headGraphicSystem = system
+				system.transform:SetParent(self.selfHeadIconTf)
+				system.transform.localScale = Vector3.one * 0.3
+				system.transform.localPosition = Vector3.down * 186
+				system:SetDirection(CS.RoleDirectionType.Right)
+			end)
+
+	else
+		CS_CharacterManagerInst:ReSetCharacter(self.headGraphicSystem,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(gender)),CS_SpineUtils.RoleDressToHeadDressIdList(userDress),CS.EGender.__CastFrom(gender))
+	end
+
+end
+
+function Activity_DeadRising_messRankUI:ListItemRenderer(index,item)
+
+	local prefabItem = item
+	if(index >= self.listItemCount)then
+		prefabItem.gameObject:SetActive(false)
+	end
+
+	if(index < self.listItemCount)then
+		prefabItem.gameObject:SetActive(true)
+		prefabItem:SetData(self.rankList[index + 1])
+	end
+
+end
+
+function Activity_DeadRising_messRankUI:SetListItemTotalCount(count)
+
+	self.listItemCount = count
+	if(count < 0)then
+		self.listItemCount = 0
+	end
+
+	self.scrollView.totalItemCount = count
+
+end
+------------------------------------------------

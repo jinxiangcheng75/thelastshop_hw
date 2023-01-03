@@ -1,0 +1,286 @@
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_SpriteList = typeof(CS.SpriteList)
+local CS_type_Typewriter = typeof(CS.Typewriter)
+local CS_type_AudioSource = typeof(CS.UnityEngine.AudioSource)
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_GUIHelper = CS.GUIHelper
+local CS_AudioManagerInst = CS.AudioManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local Scene = CS.UnityEngine.Screen
+local Vector2 = CS.UnityEngine.Vector2
+
+--Typewriter
+
+Typewriter = class()
+----
+
+function Typewriter:ctor()
+end
+
+function Typewriter:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaBehaviour)
+	self.audioSource = obj:GetComponent(CS_type_AudioSource)
+
+	self.img_bg = self.contentPane:GetImage("img_bg")
+	self.tx_typewriter = self.contentPane:GetText("tx_typewriter")
+
+	self.typewriterCtrl = self.contentPane:GetObjByName("tx_typewriter"):GetComponent(CS_type_Typewriter)
+
+	self.img_bgIcons = self.contentPane:GetComponent(CS_type_SpriteList).spriteList
+
+	self.button = self.gameObject:GetComponent("Button")
+
+end
+
+function Typewriter:init(obj)
+
+	self:initComp(obj)
+
+
+	local sizeDelta = CS.FGUI.inst.uiRootTF.sizeDelta
+
+	local len = sizeDelta.x > sizeDelta.y and sizeDelta.x or sizeDelta.y
+
+	self.img_bg.rectTransform.sizeDelta = Vector2.one * len
+
+	self.button.onClick:AddListener(function ()
+			self:GotoStepEnd()
+		end)
+
+end
+
+
+function Typewriter:tweenStartInit()
+
+	self.tweenEndCompleted = false
+	
+	self.talkStrs = StoryNpcConfigManager:GetStorys(1,-1)
+
+	for i = 1, #self.talkStrs do
+		self.talkStrs[i] = CS_LanguageManagerInst:GetValueByKey(self.talkStrs[i])
+		self.talkStrs[i] = string.gsub(self.talkStrs[i],"/n","\n")
+	end
+
+	self.index = 1
+	self.endIndex = #self.talkStrs
+
+	self.img_bgIconIndex = 0
+	self.img_bg.sprite = self.img_bgIcons[self.img_bgIconIndex]
+	self.img_bgIconIndex =  self.img_bgIconIndex + 1
+
+	self.tweenStrPlay = true
+	self.tweenImgPlay = true
+
+end
+
+function Typewriter:TweenEndComplete()
+
+	if self.tweenEndCompleted then
+		return 
+	end
+	
+	self.tweenEndCompleted = true
+	
+	--print("——打字机 整个动画end")
+
+	CS_GameTimerInst:AddTimer(1,1,function ()
+
+			CS.FGUI.inst:BlackMaskAnimation(function ()
+
+					self.gameObject:SetActive(false)
+
+				end,
+				function ()
+
+					if self.endCallback ~= nil then
+						self.endCallback()
+						self.endCallback = nil
+					end
+
+				end)
+		end)
+
+end
+
+function Typewriter:imgTween(delay)
+
+
+	if not self.tweenStrPlay then
+		
+		self:TweenEndComplete()
+		return
+		
+	elseif self.img_bgIconIndex == self.img_bgIcons.Count then
+		self.tweenImgPlay = false
+	end
+
+
+	--if 	self.img_bgIconIndex == self.img_bgIcons.Count then
+
+		--self.tweenImgPlay = false
+
+		----if not self.tweenStrPlay then
+
+		--self:TweenEndComplete()
+
+		----end
+
+		--return
+
+	--end
+
+
+	self.imgBgTween = self.img_bg:DOColor(CS_GUIHelper.GetColorByColorHex("000000"),3)
+
+	if delay > 0 then
+
+		self.imgBgTween:SetDelay(delay)
+
+	end
+
+
+	self.imgBgTween:OnComplete(function ()
+
+
+			self.img_bg.sprite = self.img_bgIcons[self.img_bgIconIndex]
+			self.imgBgTween = self.img_bg:DOColor(CS_GUIHelper.GetColorByColorHex("FFFFFF"),4)
+			self.imgBgTween:SetEase(CS.DG.Tweening.Ease.OutExpo)
+
+			self.imgBgTween:OnComplete(function ()
+
+					if not self.tweenEndCompleted then
+						self.img_bgIconIndex = self.img_bgIconIndex + 1
+						self:imgTween(0)
+					else
+						self:TweenEndComplete()
+					end
+
+				end)
+		end)
+
+end
+
+
+function Typewriter:ctrlStringTween()
+
+	if 	self.index > self.endIndex then
+
+		self.tweenStrPlay = false
+
+		if not self.tweenImgPlay then
+
+			self:TweenEndComplete()
+
+		end
+
+		return
+	end
+
+	local talkTx = self.talkStrs[self.index]
+
+	CS_GameTimerInst:AddTimer(0.1,1,function ()
+
+			self.audioSource.enabled = true
+
+		end)
+
+
+	self.typewriterCtrl:StartTweenString(talkTx,0.1,function ()
+
+			self.audioSource.enabled = false
+
+			CS_GameTimerInst:AddTimer(1,1,function ()
+					self.index = self.index + 1
+					self:ctrlStringTween()
+				end)
+
+		end)
+
+end
+
+function Typewriter:StartStringTween(endCallback)
+
+	self.endCallback = endCallback
+
+	--print("——打字机 整个动画start")
+
+	CS.FGUI.inst:BlackMaskAnimation(nil,function ()
+
+			self:tweenStartInit()
+
+			self:imgTween(3)
+			self:ctrlStringTween()
+
+		end,0,3)
+
+end
+
+function Typewriter:GotoStepEnd()
+	
+	if self.tweenStrPlay then
+
+		self.typewriterCtrl:GoToEnd()
+		
+	else
+		
+		if self.imgBgTween ~= nil then
+			self.imgBgTween:Kill(false)
+			self:TweenEndComplete()
+		end
+		
+	end
+
+	
+end
+
+
+--[[
+
+--function Typewriter:stringTween()
+
+--if 	self.index > self.endIndex then
+--print("——打字机 整个动画end")
+
+--if 	self.imgBgTween ~= nil then
+--self.imgBgTween:Kill()
+--self.imgBgTween = nil
+--end
+
+--return
+--end
+
+
+--self.tx_typewriter.text = ""
+
+--local talkTx = self.talkStrs[self.index]
+
+--local tween = self.tx_typewriter:DOText(talkTx,#talkTx * 0.05)
+
+----tween:SetEase(CS.DG.Tweening.Ease.InSine)
+
+----tween:OnUpdate(function ()
+
+----print("——打字机 doText动画dur——",tween.fullPosition)
+
+----end)
+
+--tween:OnComplete(function()
+
+--CS_GameTimerInst:AddTimer(0.2,1,function ()
+--self.index = self.index + 1
+--self:stringTween()
+--end)
+
+--end)
+
+--end
+
+]]
+
+
+return Typewriter

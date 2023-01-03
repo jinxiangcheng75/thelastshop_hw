@@ -1,0 +1,46 @@
+-- PetUpdateConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+PetUpdateConfig =
+class({
+		id = 1,
+		level = 1,
+		exp = 1,
+		feeding_cost_xinbi = 1,
+		feeding_cost_bullion = 1,
+		energy = 1,
+	})
+
+PetUpdateConfigManager = class()
+--PetUpdateConfigManager.cfgDict = {}
+local csv_name = "pet_update"
+
+function PetUpdateConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+
+	local cfgs = CSVParser:parseClass(csv, 3, PetUpdateConfig)
+	PetUpdateConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("PetUpdateConfigManager  错误")
+	end
+end
+
+function PetUpdateConfigManager:processConfigs(cfgs)
+
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		self.cfgDict[tonumber(c.id)] = c
+	end
+
+end
+
+
+
+function PetUpdateConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

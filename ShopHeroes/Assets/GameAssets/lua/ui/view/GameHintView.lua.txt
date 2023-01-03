@@ -1,0 +1,319 @@
+---------------------------------------------------------------------
+-- ShopHeroes (C) CompanyName, All Rights Reserved
+-- Created by: AuthorName
+-- Date: 2021-09-08 17:41:27
+---------------------------------------------------------------------
+
+-- To edit this template in: Data/Config/Template.lua
+-- To disable this template, check off menuitem: Options-Enable Template File
+
+---@class GameHintView
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/MallDataProxy")
+local csUnityUtils = CS.UnityUtils
+local gameHelpConfigManagerInst = CS.GameHelpNavigationConfigManager.inst
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+local csVector3 = CS.UnityEngine.Vector3
+local csUserDataProxyInst = CS.UserDataProxy.inst
+
+local graphicDressUp = nil
+
+
+GameHintView = class(ViewBase)
+
+--local closeBtn
+--local titleText
+--local msgText
+--local okBtn
+--local okBtnText
+--local goBtn
+--local goBtnText
+
+function GameHintView:ctor()
+	self.viewID = Constants.ViewName.GameHint_tip
+
+	GameHintView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+------------------------------------------------
+function GameHintView:onInit()
+	local comp = self.contentPanel
+	self.closeBtn = comp:GetButton("closeBtn")
+	self.titleText = comp:GetText("titleText")
+	self.msgText = comp:GetText("msgText")
+	self.okBtn = comp:GetButton("okBtn")
+	self.okBtnText = comp:GetText("okBtnText")
+	self.goBtn = comp:GetButton("goBtn")
+	self.goBtnText = comp:GetText("goBtnText")
+	self.window_1 = comp:GetObjByName("window1")
+	self.window_2 = comp:GetObjByName("window2")
+	self.msgText2 = comp:GetText("msgText2")
+	self.closeBtn2 = comp:GetButton("closeBtn2")
+	--self.titleText2 = comp:GetText("titleText2")
+	-- CS.DynamicScrollView 列表 scrollList
+	local listobj = comp:GetObjByName("scrollList")
+	self.scrollList = listobj:GetComponent(typeof(CS.Mosframe.DynamicScrollView))
+
+	self.scrollList.itemRenderer = function(index, obj)
+		self:ListItemRenderer(index, obj)
+	end
+	self.scrollList.itemUpdateInfo = function(index,item)
+
+		self:ListItemRenderer(index,item)
+	end
+
+	self.rolePos = comp:GetObjByName("rolePos"):GetComponent("Transform")
+
+	self.closeBtn2:ButtonClickTween(
+		function()
+			--点击了button
+			self:hide()
+		end
+	)
+	self.closeBtn:ButtonClickTween(
+		function()
+			--点击了button
+			self:hide()
+		end
+	)
+	self.titleText.text = csLanguageManagerInst:GetValueByKey("提示")
+	--self.titleText2.text = csLanguageManagerInst:GetValueByKey("提示")
+end
+
+function GameHintView:ListItemRenderer(index, obj)
+	print("LUA GameHintView onlistitemRanderer!".. index)
+	local itemComp = obj.gameObject:GetComponent(typeof(CS.LuaBehaviour))
+	if csUnityUtils.EqualsNull(itemComp) ==false then
+		local helpCfg = gameHelpConfigManagerInst:GetHelpConfig(self.currid)
+		if(helpCfg.help_type == 11)then
+			local curData = self.rechargeDatas[index + 1]
+			if(curData ~= nil)then
+				local itemCfg = CS.ItemconfigManager.inst:GetConfig(curData.rewardItem.itemId)
+				local msgtext = itemComp:GetText("itemText")
+				if(itemCfg ~= nil)then
+					msgtext.text = csLanguageManagerInst:GetValueByKey(itemCfg.name) .. " X " .. curData.rewardItem.count
+				else
+					msgtext.text = " X " .. curData.rewardItem.count
+				end
+
+				local btntext = itemComp:GetText("skipBtnText")
+				btntext.text = csLanguageManagerInst:GetValueByKey(CS.GamePay.inst:GetProductPrice(curData.payProduct.productId))
+				local guiicon = itemComp:GetGUIIcon("itemIcon")
+				guiicon:SetSprite(curData.pic1,curData.pic2)
+
+				local rebateObj = itemComp:GetObjByName("rebateObj")
+				local rebateText = itemComp:GetText("rebateText")
+				rebateObj:SetActive(curData.rebateState == 1)
+				rebateText.text = csLanguageManagerInst:GetValueByKey(curData.txt)
+
+				local skipBtn = itemComp:GetButton("skipBtn")
+				obj.index = index
+				obj:AddItemOnClickEvent(skipBtn,nil)
+				obj.clickCallback = function(index, obj)
+					if(curData == nil) then return end
+					if(curData.payProduct == nil) then return end
+					CS.GamePay.inst:Pay(curData.payProduct.priceId,curData.payProduct.productId,curData.payProduct.payActivityType,curData.payProduct.payActivityId,function (isSuccess)
+							if(isSuccess)then
+								--print("充值成功")
+							end
+						end
+					)
+				end
+			end
+		else
+			local linkcfg = self.linkCfgList[index]
+			local msgtext = itemComp:GetText("itemText")
+			msgtext.text = csLanguageManagerInst:GetValueByKey(linkcfg.help_dec)
+			local guiicon = itemComp:GetGUIIcon("itemIcon")
+			guiicon:SetSprite(linkcfg.atlas, linkcfg.icon)
+			local skipBtn = itemComp:GetButton("skipBtn")
+			local btntext = itemComp:GetText("skipBtnText")
+			if(linkcfg.btn_txt ~= nil and string.len(linkcfg.btn_txt) > 0)then
+				btntext.text = csLanguageManagerInst:GetValueByKey(linkcfg.btn_txt)
+				skipBtn.gameObject:SetActive(true)
+			else
+				skipBtn.gameObject:SetActive(false)
+			end
+
+			if(csUserDataProxyInst.playerData.level < linkcfg.unlock_lv)then
+				skipBtn.interactable = false
+				btntext.text = csLanguageManagerInst:GetValueByKey(linkcfg.unlock_txt,tostring(linkcfg.unlock_lv))
+			else
+				skipBtn.interactable = true
+			end
+
+			obj.index = index
+			obj:AddItemOnClickEvent(skipBtn,nil)
+			if(helpCfg.help_type ~= 6)then
+				obj.clickCallback = function(index, obj)
+					self:ListItemOnClick(index, obj)
+				end
+			else
+				obj.clickCallback = function(index, obj)
+					csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON)
+					self:ListItemOnClick(index, obj)
+				end
+			end
+		end
+	end
+end
+
+
+function GameHintView:ListItemOnClick(index, obj)
+	local linkcfg = self.linkCfgList[index]
+	self.currSkipBtnCall(linkcfg.id)
+end
+--function ViewBase:DoShowAnimation()
+--GameHintView.super:DoShowAnimation()
+--end
+
+--function ViewBase:DoHideAnimation()
+--GameHintView.super:DoHideAnimation()
+--end
+
+
+function GameHintView:onHide()
+	self.msgText.text = ""
+	--self.okBtnText.text = CS.LanguageManager.inst:GetValueByKey("知道了")
+	self.goBtnText.text = ""
+	self.okBtn.onClick:RemoveAllListeners()
+	self.goBtn.onClick:RemoveAllListeners()
+	self.currOkBtnCall = nil
+	self.currSkipBtnCall = nil
+	self.linkCfgList = nil
+
+	if self.currid ~= 31 then --金条不足补充 特殊处理 不走队列
+		csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON)
+	end
+
+	self.currid = -1
+
+end
+
+function  GameHintView:onShowed()
+
+end
+
+function GameHintView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function GameHintView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+------------------------------------------------
+
+
+function GameHintView:setUIInfo(helpid, okCall, skipCall,value)
+	self.currid = helpid
+	self.currOkBtnCall = okCall
+	self.currSkipBtnCall = skipCall
+
+	local helpcfg = gameHelpConfigManagerInst:GetHelpConfig(self.currid)
+	if(helpcfg == nil)then
+		return
+	end
+	if(helpcfg.link_type==1)then
+		self.window_1:SetActive(true)
+		self.window_2:SetActive(false)
+		self.msgText.text = csLanguageManagerInst:GetValueByKey(helpcfg.help_tips)
+		self.okBtnText.text = csLanguageManagerInst:GetValueByKey("知道了")
+
+		self.linkCfgList = gameHelpConfigManagerInst:GetHelpLinkByGroup(helpcfg.link_group_id)
+		if(CS.UnityUtils.EqualsNull(self.linkCfgList[0].btn_txt) == false) then
+
+			self.goBtnText.text = csLanguageManagerInst:GetValueByKey(self.linkCfgList[0].btn_txt)
+		end
+		self.okBtn.onClick:RemoveAllListeners()
+		self.goBtn.onClick:RemoveAllListeners()
+		if self.currOkBtnCall~=nil then
+			self.okBtn:ButtonClickTween(function()
+					self:okbtnOnClick(1)
+				end)
+		end
+		if self.currSkipBtnCall~=nil then
+			self.goBtn:ButtonClickTween(function()
+					self:skipBtnOnClick(1)
+				end)
+		end
+	else if helpcfg.link_type==2 then
+			self.window_1:SetActive(false)
+			self.window_2:SetActive(true)
+			self.msgText2.text = csLanguageManagerInst:GetValueByKey(helpcfg.help_tips);
+			self.linkCfgList = gameHelpConfigManagerInst:GetHelpLinkByGroup(helpcfg.link_group_id)
+			if(helpcfg.help_type ~= 11) then
+				self.scrollList.totalItemCount = self.linkCfgList.Count
+			else
+				self.value = value
+				local allRechargeDatas = MallDataProxy.inst.generalPurchaseList.purchaseList
+
+				self.rechargeDatas = {}
+				for i = 1, #allRechargeDatas do
+					if(allRechargeDatas[i].rewardItem.count >= self.value)then
+						self.rechargeDatas[#self.rechargeDatas + 1] = allRechargeDatas[i]
+
+						if(#self.rechargeDatas >= 2)then
+							break
+						end
+					end
+				end
+
+				if(#self.rechargeDatas <= 0)then
+					if(#allRechargeDatas > 0)then
+						self.rechargeDatas[#self.rechargeDatas + 1] = allRechargeDatas[#allRechargeDatas]
+					end
+					if(#allRechargeDatas > 1)then
+						self.rechargeDatas[#self.rechargeDatas + 1] = allRechargeDatas[#allRechargeDatas - 1]
+					end
+					if(#allRechargeDatas > 2)then
+						self.rechargeDatas[#self.rechargeDatas + 1] = allRechargeDatas[#allRechargeDatas - 2]
+					end
+				end
+
+				self.scrollList.totalItemCount = #self.rechargeDatas
+
+			end
+		end
+	end
+
+	self:SetPrefab()
+end
+
+function GameHintView:SetPrefab()
+	local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByModel")
+	local func = funcGeneric(CS.GraphicDressUpSystem)
+	func(CS_CharacterManagerInst,60000,0.14,true,function (system)
+			graphicDressUp = system
+			system.transform:SetParent(self.rolePos)
+			system.transform.localScale = csVector3(1,1,1) * 0.8
+			system.transform.localPosition = csVector3(0,0,0)
+			graphicDressUp:Play("idle_1",true)
+		end,nil)
+	--if(graphicDressUp == nil)then
+
+	--else
+	--CS_CharacterManagerInst:ReSetCharacterByModel(graphicDressUp,60000,true,nil)
+	----self:setRandomAnim(0)
+	--end
+end
+
+function GameHintView:okbtnOnClick(index)
+	--if(self.currOkBtnCall~=nil) then
+	--local helpcfg = gameHelpConfigManagerInst:GetHelpConfig(self.currid)
+	self.currOkBtnCall(self.linkCfgList[index-1].id)
+	--end
+end
+
+function GameHintView:skipBtnOnClick(index)
+	self.currSkipBtnCall(self.linkCfgList[index-1].id)
+end
+
+
+

@@ -1,0 +1,81 @@
+--表_class的key为类，value为类的虚表
+local _class={}
+
+--为什么要使用虚表呢？
+--[[
+使用虚表的话，那么类本身的元素会是稳定的，
+所有的变化都在虚表中进行，
+这样 封装了变化、也便于继承的实现
+]]
+
+function class(super)
+	--要创建的类class_type
+	local class_type={}
+
+	--构造函数，基类
+	class_type.ctor=false
+	class_type.super=super
+
+	--给类型class_type创建实例对象
+	--1、先依次从最顶层基类中调用构造方法
+	--2、然后设置元表
+	class_type.new=function(...)
+
+		--生成这个类对象
+		local obj={}
+
+		do
+			local create
+
+			--递归调用构造函数
+			create = function(c,...)
+				--super不为空，表示有基类
+				if c.super then
+					create(c.super,...)
+				end
+
+				--调用构造函数
+				if c.ctor then
+					c.ctor(obj,...)
+				end
+			end
+
+			create(class_type,...)
+		end
+
+		--设置obj的 __index为class_type的虚表
+		setmetatable(obj,{ __index=_class[class_type] })
+
+		return obj
+	end
+
+	--class_type类型的虚表，虚表中包含class_type中的元素
+	local vtb1={}
+	_class[class_type]=vtb1
+
+	--给类设置元表
+	--在给表添加新元素时，会在虚表中也添加
+	setmetatable(class_type,{
+			__newindex = function(t,k,v)
+				--print("__newindex k:", k, " v:", v)
+				vtb1[k] = v
+			end,
+			__index = function(t,k) return vtb1[k] end,
+		})
+
+
+	--super不为空，表示为继承
+	if super then
+		setmetatable(vtb1,{__index=
+				function(t,k)
+					--从基类找要找的元素，找到就放入派生类虚表中
+					local ret=_class[super][k]
+					vtb1[k]=ret
+
+					return ret
+				end
+			})
+	end
+
+	return class_type
+end

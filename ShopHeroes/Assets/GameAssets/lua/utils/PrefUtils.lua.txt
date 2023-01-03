@@ -1,0 +1,24 @@
+--PrefUtils
+
+local PrefUtils = {}
+local PlayerPrefs = CS.UnityEngine.PlayerPrefs
+
+function PrefUtils:GetString(key, defaultVal)
+	if key == nil then
+		error("PrefUtils:GetString key is nil")
+	end
+	return PlayerPrefs.GetString(key) or defaultVal
+end
+
+function PrefUtils:SetString(key, value)
+	if key == nil or value == nil then
+		error("PrefUtils:SetString key or value is nil")
+	end
+	return PlayerPrefs.SetString(key, value)
+end
+
+function PrefUtils:HasKey(key)
+	return PlayerPrefs.HasKey(key)
+end
+
+return PrefUtils

@@ -1,0 +1,272 @@
+---------------------------------------------------------------------
+
+require("utils/XLuaUtils")
+
+local Vector3 = CS.UnityEngine.Vector3
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+
+
+local CS_GameEventType = CS.GameEventType
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_TimeUtils = CS.TimeUtils
+local csGameTimerInst = CS.GameTimer.inst
+local EventDispatcher = require("event/EventDispatcher")
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+--UnionTaskItem
+
+local idleStateObj
+local idle_taskNameBgIcon
+local idle_taskNameTx
+local idle_difficultyIcon
+local idle_difficultyTx
+
+local doingStateObj
+local doing_slider
+local doing_sliderNameTx
+local doing_sliderProgressTx
+local doing_headTf
+local doing_headGraphicSystem = nil
+local doing_selfTipsObj
+local doing_countdownTx
+
+local vipImg
+
+local canAwardStateObj
+local canAward_taskNameTx
+
+local tipsStateObj
+
+local grayMaskObj
+
+local stars
+local headIcon
+local selfBtn
+
+----
+local timerId = 0
+local data
+local state
+
+local difficultIcons = {"lianmeng_dengjijiandan","lianmeng_dengjizhongdeng","lianmeng_dengjikunnan" }
+
+function InitComp()
+
+	idleStateObj = self.transform:Find("Bg/idleState").gameObject
+	idle_taskNameBgIcon = self.transform:Find("Bg/idleState/nameTxBg"):GetComponent(CS_type_GUIIcon)
+	idle_taskNameTx = self.transform:Find("Bg/idleState/taskNameTx"):GetComponent("Text")
+	idle_difficultyIcon = self.transform:Find("Bg/idleState/difficultyIcon"):GetComponent(CS_type_GUIIcon)
+	idle_difficultyTx = self.transform:Find("Bg/idleState/difficultyTx"):GetComponent("Text")
+
+	vipImg = self.transform:Find("Bg/bg"):GetComponent("Image")
+	
+	doingStateObj = self.transform:Find("Bg/doingState").gameObject
+	doing_slider = self.transform:Find("Bg/doingState/slider"):GetComponent("Slider")
+	doing_sliderNameTx = self.transform:Find("Bg/doingState/slider/tx_sliderLeft"):GetComponent("Text")
+	doing_sliderProgressTx = self.transform:Find("Bg/doingState/slider/tx_sliderRight"):GetComponent("Text")
+	doing_headTf = self.transform:Find("Bg/doingState/playerIconBg/headIconTf")
+	doing_selfTipsObj = self.transform:Find("Bg/doingState/selfTips").gameObject
+	doing_countdownTx = self.transform:Find("Bg/doingState/countdownIcon/countdownTx"):GetComponent("Text")
+
+	canAwardStateObj = self.transform:Find("Bg/canAwardState").gameObject
+	canAward_taskNameTx = self.transform:Find("Bg/canAwardState/taskNameTx"):GetComponent("Text")
+
+	tipsStateObj = self.transform:Find("Bg/tipsState").gameObject
+
+	
+	
+	local objList = self.transform:Find("Bg/stars"):GetComponent(CS_type_ObjList).objList
+	stars = {}
+
+	for i = 0,objList.Count - 1 do
+		stars[i+1] = objList[i].transform:GetComponent(CS_type_GUIIcon)
+	end
+
+	grayMaskObj = self.transform:Find("Bg/grayMask").gameObject
+	headIcon = self.transform:Find("Bg/headIconBg/headIcon"):GetComponent(CS_type_GUIIcon)
+	selfBtn = self.transform:GetComponent("Button")
+
+	selfBtn.onClick:AddListener(onSelfBtnClick)
+
+end
+
+
+function SetData(index)
+
+	idleStateObj:SetActive(false)
+	doingStateObj:SetActive(false)
+	canAwardStateObj:SetActive(false)
+	tipsStateObj:SetActive(false)
+	clearTimer()
+
+	--if index >= CS_UserDataProxyInst.UnionTaskList.Count then --最后一个
+		--data = nil
+		--state = 4
+		--vipImg.enabled = false
+		--tipsStateObj:SetActive(true)
+	--else
+		data = CS_UserDataProxyInst.UnionTaskList[index]
+	--end
+
+	grayMaskObj:SetActive(false)
+
+	local isSpecial = data.config.if_special == 1
+	
+	if 	data ~= nil then
+
+		for i = 1,#stars do
+
+			if i <= data.data.point then
+				stars[i]:SetSprite("__common_1", "lianmeng_shengwang")
+			else
+				stars[i]:SetSprite("union_atlas", isSpecial and "lianmeng_shengwang3" or "lianmeng_shengwang2")
+			end
+
+		end
+
+		headIcon:SetSprite("portrait_atlas",data.npcConfig.icon)
+		if(CS.UnityUtils.EqualsNull(data.config)) then
+			data.config = CS.UnionTaskConfigManager.inst:GetConfig(data.data.taskId)
+		end
+		vipImg.enabled = isSpecial
+		idle_taskNameBgIcon:SetSprite("union_atlas",isSpecial and "renwu_xuanshanglan5" or "renwu_xuanshanglan4")
+		
+		if CS.EUnionTaskState.__CastFrom(data.data.state) == CS.EUnionTaskState.Idle then --Idle
+
+			idleStateObj:SetActive(true)
+			idle_taskNameTx.text = CS_LanguageManagerInst:GetValueByKey(data.config.name)
+			idle_difficultyIcon:SetSprite("union_atlas",difficultIcons[data.config.difficulty])
+			idle_difficultyTx.text = CS_LanguageManagerInst:GetValueByKey(GetDifficultyStr(data.data.point))
+
+		elseif CS.EUnionTaskState.__CastFrom(data.data.state) == CS.EUnionTaskState.Doing  or (CS.EUnionTaskState.__CastFrom(data.data.state) == CS.EUnionTaskState.CanReward and data.data.userId ~= CS_UserDataProxyInst.playerData.userUid)  then --Doing
+
+			doingStateObj:SetActive(true)
+
+			if 	data.data.userId == CS_UserDataProxyInst.playerData.userUid then --自己
+				doing_selfTipsObj:SetActive(true)
+			else
+				doing_selfTipsObj:SetActive(false)
+				grayMaskObj:SetActive(true)
+			end
+
+			doing_slider.value =  data.data.process / data.data.limit
+
+			doing_sliderNameTx.text = CS_LanguageManagerInst:GetValueByKey(data.config.name)
+
+			doing_sliderProgressTx.text =  math.floor(data.data.process).."/"..math.floor(data.data.limit)
+
+			if doing_headGraphicSystem == nil or doing_headGraphicSystem:IsNull() == true then
+
+				local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+				local func = funcGeneric(CS.GraphicDressUpSystem)
+				
+				func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(data.data.gender),CS_SpineUtils.RoleDressToHeadDressIdList(data.data.userDress),CS.EGender.__CastFrom(data.data.gender),1.4,true,function (system)
+						doing_headGraphicSystem = system
+						system.transform:SetParent(doing_headTf);
+						system.transform.localScale = Vector3.one * 0.22;
+						system.transform.localPosition = Vector3.down * 140;
+						system:SetDirection(CS.RoleDirectionType.Right);
+					end)
+
+			else
+				CS_CharacterManagerInst:ReSetCharacter(doing_headGraphicSystem,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(data.data.gender),CS_SpineUtils.RoleDressToHeadDressIdList(data.data.userDress),CS.EGender.__CastFrom(data.data.gender))
+			end
+
+			setTimer()
+
+		elseif CS.EUnionTaskState.__CastFrom(data.data.state) == CS.EUnionTaskState.CanReward then --CanReward
+
+			canAwardStateObj:SetActive(true)
+			canAward_taskNameTx.text = CS_LanguageManagerInst:GetValueByKey(data.config.name)
+
+		end
+
+	end
+
+end
+
+function GetDifficultyStr(point)
+
+	local result = ""
+
+	if 	point == 1 then
+		result = "简单"
+	elseif point == 2 then
+		result = "中等"
+	elseif point == 3 then
+		result = "困难"
+	end
+
+	return result
+
+end
+
+
+function onSelfBtnClick()
+	
+	if data == nil or data:IsNull() == true then
+		return
+	end
+	
+	if CS.EUnionTaskState.__CastFrom(data.data.state) == CS.EUnionTaskState.Idle then --Idle
+
+		EventDispatcher:dispatchEvent(GameEvent.UnionEvent.ShowUI_UnionTaskCheckView,data)
+
+	elseif CS.EUnionTaskState.__CastFrom(data.data.state) == CS.EUnionTaskState.Doing or (CS.EUnionTaskState.__CastFrom(data.data.state) == CS.EUnionTaskState.CanReward and data.data.userId ~= CS_UserDataProxyInst.playerData.userUid) then --Doing
+
+		if data.data.userId == CS_UserDataProxyInst.playerData.userUid then --TODO 新增逻辑
+			
+			EventDispatcher:dispatchEvent(GameEvent.UnionEvent.ShowUI_UnionSelfTaskDetailUI,data)
+			
+		else
+			
+			EventDispatcher:dispatchEvent(GameEvent.UnionEvent.ShowTips_UnionTaskItemOtherInfo,self.transform,data.data.level,data.data.name)
+			
+		end
+
+	elseif CS.EUnionTaskState.__CastFrom(data.data.state) == CS.EUnionTaskState.CanReward then --CanReward
+		
+		
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+		local func_1 = funcGeneric(CS.System.Int32)
+		
+		func_1(CS_EventControllerInst,CS_GameEventType.UnionEvent.UNION_REQUEST_REWARDUNIONTASK,data.data.taskUid)
+		
+	end
+
+
+end
+
+
+function clearTimer()
+
+	if timerId ~= 0 then
+
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = 0
+	end
+
+end
+
+function setTimer()
+
+	clearTimer()
+	timerMethod()
+	timerId = csGameTimerInst:AddTimer(1,timerMethod)
+end
+
+function timerMethod()
+	doing_countdownTx.text = CS_TimeUtils.timeSpanStrip(data.remainTime,true)
+end
+
+function onDestroy()
+	
+	clearTimer()
+	
+end

@@ -1,0 +1,635 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local csGUIHelper = CS.GUIHelper
+
+--FurnitureSelectionItem
+
+local img_bg
+local img_titleBg
+local img_palette
+local img_bottomBg
+
+local img_iconBg
+local img_icon
+local img_level
+local txt_level
+local img_num
+local txt_num
+local txt_title
+local img_subTypeIcon
+local img_mark
+local txt_mark
+local img_cost
+local txt_cost
+local txt_owned
+local txt_storeNum
+local txt_sellOut
+local txt_type
+local img_contentTypeList
+local VarietyIconsTf
+local unlock
+local slider_unlock
+local text_unlock
+local txt_unlockSlider
+local txt_lockVipText
+local vipImg
+
+local giftBgIcon
+local giftIcon
+
+local buffObj
+local buffTextList
+
+local button
+local btnAnimator
+
+local txt_type2
+local txt_mark2
+local img_mark2
+
+local luxuryObj
+local luxuryNumText
+
+local isShowAnimed
+
+local isFull
+
+local _data
+
+function InitComp()
+	img_bg = self:GetObjByName("img_bg"):GetComponent(CS_type_GUIIcon)
+	img_titleBg = self:GetObjByName("img_titleBg"):GetComponent(CS_type_GUIIcon)
+	img_palette = self:GetObjByName("img_palette"):GetComponent("Image")
+	img_bottomBg = self:GetObjByName("img_bottomBg"):GetComponent("Image")
+
+	img_iconBg = self:GetObjByName("img_iconBg"):GetComponent(CS_type_GUIIcon)
+	img_icon = self:GetObjByName("img_icon"):GetComponent(CS_type_GUIIcon)
+	img_level = self:GetObjByName("img_level"):GetComponent("Image")
+	txt_level = self:GetObjByName("txt_level"):GetComponent("Text")
+	img_num = self:GetObjByName("img_num"):GetComponent("Image")
+	txt_num = self:GetObjByName("txt_num"):GetComponent("Text")
+	txt_title = self:GetObjByName("txt_title"):GetComponent("Text")
+	img_subTypeIcon = self:GetObjByName("img_subTypeIcon"):GetComponent(CS_type_GUIIcon)
+	img_mark = self:GetObjByName("img_mark"):GetComponent(CS_type_GUIIcon)
+	txt_mark = self:GetObjByName("txt_mark"):GetComponent("Text")
+	img_cost = self:GetObjByName("img_cost"):GetComponent(CS_type_GUIIcon)
+	txt_cost = self:GetObjByName("txt_cost"):GetComponent("Text")
+	txt_owned = self:GetObjByName("txt_owned"):GetComponent("Text")
+	txt_storeNum = self:GetObjByName("txt_storeNum"):GetComponent("Text")
+	txt_sellOut = self:GetObjByName("txt_sellOut"):GetComponent("Text")
+	txt_type = self:GetObjByName("txt_type"):GetComponent("Text")
+
+	img_contentTypeList = {}
+	local objList = self:GetObjByName("img_contentTypeList"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList.Count - 1 do
+		img_contentTypeList[#img_contentTypeList + 1] = objList[i]:GetComponent(CS_type_GUIIcon)
+	end
+
+	VarietyIconsTf = self:GetObjByName("VarietyIconsTf").transform
+	unlock = self:GetObjByName("unlock").transform
+	slider_unlock = self:GetObjByName("slider_unlock"):GetComponent("Slider")
+	text_unlock = self:GetObjByName("text_unlock"):GetComponent("Text")
+	txt_unlockSlider = self:GetObjByName("txt_unlockSlider"):GetComponent("Text")
+	txt_lockVipText = self:GetObjByName("txt_lockVipText"):GetComponent("Text")
+	vipImg = self:GetObjByName("vipImg"):GetComponent("Image")
+
+	giftBgIcon = self:GetObjByName("giftBgIcon"):GetComponent(CS_type_GUIIcon)
+	giftIcon = self:GetObjByName("giftIcon"):GetComponent(CS_type_GUIIcon)
+
+	buffObj = self:GetObjByName("buffObj")
+
+	buffTextList = {}
+	local buffTextObjList = self:GetObjByName("buffTextList"):GetComponent(CS_type_ObjList).objList
+	for i = 0, buffTextObjList.Count - 1 do
+		buffTextList[#buffTextList + 1] = buffTextObjList[i]:GetComponent("Text")
+	end
+
+	button = self.gameObject:GetComponent("Button")
+	btnAnimator = self:GetObjByName("btnAnimator"):GetComponent("Animator")
+
+	txt_type2 = self:GetObjByName("txt_type2"):GetComponent("Text")
+	txt_mark2 = self:GetObjByName("txt_mark2"):GetComponent("Text")
+	img_mark2 = self:GetObjByName("img_mark2"):GetComponent("GUIIcon")
+
+	luxuryObj = self:GetObjByName("luxuryObj")
+	luxuryNumText = self:GetObjByName("luxuryNum"):GetComponent("Text")
+
+	init()
+end
+
+function onButtonClick()
+	--_data.furnitureDisplayData
+	--_data.furnitureDisplayType
+
+	local cfg = CS.FurnitureConfigManager.inst:getConfig(_data.furnitureDisplayData.id)
+
+	if(isFull) then
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+		func(CS_EventControllerInst, CS_GameEventType.SHOWUI_TEXTMSGTIP, CS_LanguageManagerInst:GetValueByKey("该家具数量已达上限！"),csGUIHelper.GetColorByColorHex("FF2828"))
+		return
+	end
+
+	if (cfg.cost_type == 3) then
+		if (CS.K_Vip_State.__CastFrom(CS_UserDataProxyInst.playerData.vipState) ~= CS.K_Vip_State.Vip) then
+			EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_BuyVipUI, 0)
+			return
+		end
+	elseif cfg.cost_type == 4 and _data.furnitureDisplayData.storeNum <= 0 then
+		EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.CSCallLua_ShowGiftDeatilUI, cfg.cost_num)
+		return
+	end
+
+	if CS.kFurnitureDisplayType.__CastFrom(_data.furnitureDisplayType) == CS.kFurnitureDisplayType.ResourceBin then
+		local resUpCfg = CS.FurnitureUpgradeConfigManager.inst:GetResourceBinUpgradeConfig(cfg.type_2, 1)
+
+		if
+			resUpCfg ~= nil and CS_UserDataProxyInst:GetBuildingData(resUpCfg.build_id) ~= nil and
+			(CS_UserDataProxyInst:GetBuildingData(resUpCfg.build_id).state == MsgType.EBuildState.EB_Lock or
+				CS_UserDataProxyInst:GetBuildingData(resUpCfg.build_id).level < resUpCfg.build_level)
+			then
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.System.Int32)
+			func(CS_EventControllerInst, CS_GameEventType.CityBuildingEvent.BUILDING_ONCLICK, resUpCfg.build_id)
+			return
+		end
+	end
+
+	if cfg.type_1 == 7 or cfg.type_1 == 8 or cfg.type_1 == 9 then
+		local full = CS_UserDataProxyInst.shopData:indoorMapFurniture() >= CS_UserDataProxyInst.shopData:furnitureLimit()
+
+		if full then
+			EventDispatcher:dispatchEvent(
+				GameEvent.MsgTipEvent.ShowTextMsgTip,
+				CS_LanguageManagerInst:GetValueByKey("扩建您的店铺，获得更多空间。"),
+				"FF2828"
+			)
+
+			if CS_UserDataProxyInst.shopData.shopLevel == CS.StaticConstants.shopMap_MaxLevel then
+				return
+			end
+
+			--格子不足
+			EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI, 25,function ()
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.DesignMode,CS.System.Int32)
+					func(
+						CS_EventControllerInst,
+						CS_GameEventType.ShopDesignEvent.EDITMODE_CHANGE,
+						CS.DesignMode.normal,
+						CS.IndoorMap.tempItemUid
+					)
+				end)
+
+			return
+		end
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.ShopDesignEvent.HideUI_FurnitureSelectionUI)
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.FurnitureDisplayData)
+	func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.Create_Furniture, _data.furnitureDisplayData)
+
+	EventDispatcher:dispatchEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Create_Furniture, _data.furnitureDisplayData)
+end
+
+function init()
+	_data = nil
+	isShowAnimed = false
+
+	button.onClick:AddListener(
+		function()
+			onButtonClick()
+		end
+	)
+end
+
+function showAnim(index)
+	if isShowAnimed then
+		return
+	end
+
+	isShowAnimed = true
+	self.gameObject:SetActive(false)
+
+	CS_GameTimerInst:AddTimer(
+		0.28 + 0.02 * index,
+		1,
+		function()
+			self.gameObject:SetActive(true)
+			btnAnimator:CrossFade("show", 0)
+			btnAnimator:Update(0)
+			btnAnimator:Play("show")
+		end
+	)
+end
+
+function SetData(data) --CS.FurnitureDisplayData , kFurnitureDisplayType , needShowAni
+	ClearData()
+
+	_data = data
+
+	local furnitureDisplayData = data.furnitureDisplayData
+	local displayType = data.furnitureDisplayType
+	local needShowAni = data.needShowAni
+
+	local cfg = furnitureDisplayData.cfg
+	self.gameObject.name = tostring(cfg.id)
+	img_icon:SetSprite(cfg.atlas, cfg.icon)
+	img_bottomBg.enabled = true
+	txt_title.text = CS_LanguageManagerInst:GetValueByKey(cfg.name)
+	img_subTypeIcon:SetSprite("shopdesign_atlas", CS.StaticConstants.furnitureSubTypeIconNames[cfg.type_1])
+
+	txt_lockVipText.enabled = false
+	vipImg.enabled = false
+	buffObj:SetActive(false)
+
+	giftBgIcon.gameObject:SetActive(false)
+
+	if
+		CS.kFurnitureDisplayType.__CastFrom(displayType) == CS.kFurnitureDisplayType.ResourceBin or
+		CS.kFurnitureDisplayType.__CastFrom(displayType) == CS.kFurnitureDisplayType.ShelfAndTrunk
+		then
+		img_level.gameObject:SetActive(true)
+		txt_level.text = tostring(furnitureDisplayData.level)
+	else
+		img_level.gameObject:SetActive(false)
+	end
+
+	--未解锁
+	local playerLv = CS_UserDataProxyInst.playerData.level
+
+	img_palette.enabled = false
+
+	local resBinUpgradeCfg = nil
+	if CS.kFurnitureDisplayType.__CastFrom(displayType) == CS.kFurnitureDisplayType.ResourceBin then
+		resBinUpgradeCfg = CS.FurnitureUpgradeConfigManager.inst:GetResourceBinUpgradeConfig(cfg.type_2, 1)
+	end
+
+	if (cfg.unlock_lv > playerLv and furnitureDisplayData.storeNum <= 0) then
+		setLockState(playerLv, cfg)
+	elseif
+		CS.kFurnitureDisplayType.__CastFrom(displayType) == CS.kFurnitureDisplayType.ResourceBin and resBinUpgradeCfg ~= nil and
+		CS_UserDataProxyInst:GetBuildingData(resBinUpgradeCfg.build_id) ~= nil and
+		(CS_UserDataProxyInst:GetBuildingData(resBinUpgradeCfg.build_id).state == MsgType.EBuildState.EB_Lock or
+			CS_UserDataProxyInst:GetBuildingData(resBinUpgradeCfg.build_id).level < resBinUpgradeCfg.build_level)
+		then --资源篮 并且未解锁
+		setLockState_resBin(resBinUpgradeCfg)
+	else
+		setUnlockState(cfg, furnitureDisplayData, needShowAni)
+	end
+end
+
+function setLockState(playerLv, cfg)
+	unlock.gameObject:SetActive(true)
+	img_num.gameObject:SetActive(false)
+	txt_type.gameObject:SetActive(false)
+	--txt_type2.gameObject:SetActive(false)
+	txt_cost.gameObject:SetActive(false)
+	luxuryObj:SetActive(false)
+	VarietyIconsTf.gameObject:SetActive(false)
+	button.enabled = false
+	img_bg:SetSprite("__common_1", "zhizuo_wupindi1")
+	img_titleBg:SetSprite("__common_1", "zhizuo_mingzidihui")
+	img_iconBg:SetSprite("__common_1", "cktb_wupinkuang")
+	text_unlock.text = CS_LanguageManagerInst:GetValueByKey("解锁等级：") .. tostring(cfg.unlock_lv)
+	slider_unlock.gameObject:SetActive(true)
+	slider_unlock.value = playerLv * 1.0 / cfg.unlock_lv
+	txt_unlockSlider.text = tostring(playerLv) .. "/" .. tostring(cfg.unlock_lv)
+
+	CS.GUIHelper.SetSingleUIGray(img_iconBg.transform, true)
+end
+
+function setLockState_resBin(resUpCfg)
+	button.enabled = true
+	unlock.gameObject:SetActive(true)
+	img_num.gameObject:SetActive(false)
+	txt_type.gameObject:SetActive(false)
+	--txt_type2.gameObject:SetActive(false)
+	luxuryObj:SetActive(false)
+	txt_cost.gameObject:SetActive(false)
+	VarietyIconsTf.gameObject:SetActive(false)
+	txt_sellOut.gameObject:SetActive(false)
+	img_bg:SetSprite("__common_1", "zhizuo_wupindi1")
+	img_titleBg:SetSprite("__common_1", "zhizuo_mingzidihui")
+	img_iconBg:SetSprite("__common_1", "cktb_wupinkuang")
+	text_unlock.text = CS_LanguageManagerInst:GetValueByKey("解锁需求")
+	slider_unlock.gameObject:SetActive(false)
+	txt_unlockSlider.text = CS_LanguageManagerInst:GetValueByKey("{0}等级{1}",CS_LanguageManagerInst:GetValueByKey(CS_UserDataProxyInst:GetBuildingData(resUpCfg.build_id).config.name),tostring(resUpCfg.build_level))
+	--CS_LanguageManagerInst:GetValueByKey(CS_UserDataProxyInst:GetBuildingData(resUpCfg.build_id).config.name) ..
+	--tostring(resUpCfg.build_level) .. CS_LanguageManagerInst:GetValueByKey("级")
+	txt_storeNum.gameObject:SetActive(false)
+
+	CS.GUIHelper.SetSingleUIGray(img_iconBg.transform, true)
+end
+
+function setUnlockState(cfg, furnitureDisplayData, needShowAni)
+	isFull = false
+	unlock.gameObject:SetActive(false)
+	CS.GUIHelper.SetSingleUIGray(img_iconBg.transform, false)
+	if (cfg.luxury > 0) then
+		luxuryObj:SetActive(true)
+		luxuryNumText.text = tostring(cfg.luxury)
+	else
+		luxuryObj:SetActive(false)
+	end
+
+	local isStorable = CS_UserDataProxyInst:CheckStorableType(cfg.type_1)
+
+	if isStorable then
+		local guideInfo = CS.GuideDataProxy.inst.CurInfo
+		if CS.kTileGroupType.__CastFrom(cfg.type_1) == CS.kTileGroupType.Shelf then
+			txt_type.gameObject:SetActiveFalse()
+			--txt_type2.gameObject:SetActive(false)
+			VarietyIconsTf.gameObject:SetActiveTrue()
+
+			local types = CS.ShelfUpgradeConfigManager.inst:GetShelfImgTypes(cfg.type_2, false)
+
+			for i = 1, #img_contentTypeList do
+				if (i - 1 < types.Count) then
+					img_contentTypeList[i].transform.parent.gameObject:SetActive(true)
+
+					local classcfg = CS.EquipConfigManager.inst:GetEquipTypeByID(types[i - 1])
+					img_contentTypeList[i]:SetSprite(classcfg.Atlas, classcfg.icon)
+				else
+					img_contentTypeList[i].transform.parent.gameObject:SetActive(false)
+				end
+			end
+		else
+			VarietyIconsTf.gameObject:SetActive(false)
+			txt_type.gameObject:SetActive(true)
+
+			if CS.kTileGroupType.__CastFrom(cfg.type_1) == CS.kTileGroupType.Trunk then
+				txt_type.text = CS_LanguageManagerInst:GetValueByKey("仓库")
+				local trunkUpgradeConfig = CS.TrunkUpgradeConfigManager.inst:getConfig(furnitureDisplayData.level)
+				img_mark:SetSprite("shopdesign_atlas", "jiaju_neirong")
+				txt_mark.text = tostring(trunkUpgradeConfig.space)
+			elseif CS.kTileGroupType.__CastFrom(cfg.type_1) == CS.kTileGroupType.ResourceBin then
+				txt_type.text = CS_LanguageManagerInst:GetValueByKey("资源")
+				local subCfg = CS.ResourceBinUpgradeConfigManager.inst:getConfigByType(cfg.type_2, furnitureDisplayData.level)
+
+				img_mark:SetSprite("item_atlas", "icon_ziyuan" .. tostring(subCfg.type))
+				txt_mark.text = tostring(subCfg.store)
+			end
+		end
+
+		local placeTotal = furnitureDisplayData.cfg.placement_num
+		local placedNum = furnitureDisplayData.placedNum
+		local storeNum = furnitureDisplayData.storeNum
+		txt_storeNum.gameObject:SetActive(storeNum > 0)
+
+		img_bottomBg.enabled = storeNum == 0
+		if (storeNum == 0) then
+			img_bg:SetSprite("__common_1", "zhizuo_wupindi")
+			img_titleBg:SetSprite("__common_1", "zhizuo_mingzidi")
+			img_iconBg:SetSprite("__common_1", "cktb_wupinkuang")
+		else
+			img_bg:SetSprite("shopdesign_atlas", "jiaju_zjinbianditu")
+			img_titleBg:SetSprite("__common_1", "zhizuo_mingzidi1")
+			img_iconBg:SetSprite("shopdesign_atlas", "jiaju_zjinbianditu1")
+		end
+
+		txt_storeNum.text = tostring(storeNum)
+		txt_cost.text = CS.System.String.Format("{0:N0}", furnitureDisplayData.costNum)
+		img_cost:SetSprite(
+			"__common_1",
+			furnitureDisplayData.cfg.cost_type == 1 and "zhuejiemian_meiyuan" or "zhuejiemian_jinkuai"
+		)
+
+		if (placeTotal ~= -1) then --不是无上限的
+			img_num.gameObject:SetActive(true)
+			txt_num.text = tostring(placedNum) .. "/" .. tostring(placeTotal)
+			isFull = not (placedNum < placeTotal or storeNum > 0)
+			--button.enabled = placedNum < placeTotal or storeNum > 0
+
+			if (placedNum == placeTotal and storeNum <= 0) then
+				img_bg:SetSprite("__common_1", "zhizuo_wupindi1")
+				img_titleBg:SetSprite("__common_1", "zhizuo_mingzidihui")
+				img_iconBg:SetSprite("__common_1", "cktb_wupinkuang")
+			end
+
+			txt_sellOut.gameObject:SetActive(placedNum == placeTotal and storeNum <= 0)
+			txt_cost.gameObject:SetActive(placedNum ~= placeTotal and storeNum <= 0)
+			CS.GUIHelper.SetSingleUIGray(img_iconBg.transform, placedNum == placeTotal and storeNum <= 0)
+		else
+			txt_cost.gameObject:SetActive(storeNum == 0)
+			txt_sellOut.gameObject:SetActive(false)
+			button.enabled = true
+			img_num.gameObject:SetActive(placedNum ~= 0)
+			txt_num.text = tostring(placedNum)
+		end
+
+		if (not guideInfo.isAllOver) then
+			if
+				CS.K_Guide_Type.__CastFrom(guideInfo.m_curCfg.guide_type) == CS.K_Guide_Type.RestrictClick or
+				CS.K_Guide_Type.__CastFrom(guideInfo.m_curCfg.guide_type) == CS.K_Guide_Type.TipsAndRestrictClick
+				then
+				if (CS_UserDataProxyInst.playerData.designFreeCount > 0) then
+					if (cfg.id == tonumber(guideInfo.m_curCfg.conditon_param_1)) then
+						txt_cost.gameObject:SetActive(false)
+						txt_storeNum.gameObject:SetActive(true)
+						txt_storeNum.text = CS_LanguageManagerInst:GetValueByKey("免费")
+					end
+				end
+			end
+		end
+
+		if (CS.GuideManager.inst.isInTriggerGuide) then
+			local triggerData = CS.HotfixBridge.inst:GetTriggerData()
+
+			if (triggerData.triggerType == 3 and cfg.id == triggerData.triggerCondition) then
+				txt_cost.gameObject:SetActive(false)
+				txt_storeNum.gameObject:SetActive(true)
+				txt_storeNum.text = CS_LanguageManagerInst:GetValueByKey("免费")
+			end
+		end
+	else --家具类
+		txt_sellOut.gameObject:SetActive(false)
+		img_num.gameObject:SetActive(false)
+		VarietyIconsTf.gameObject:SetActive(false)
+		txt_type.gameObject:SetActive(true)
+
+		button.enabled = true
+		CS.GUIHelper.SetUIGray(self.gameObject.transform, false)
+		local allNum = CS_UserDataProxyInst:GetFuritureCount(furnitureDisplayData.id)
+		local storeNum = furnitureDisplayData.storeNum
+
+		img_bottomBg.enabled = storeNum == 0
+
+		if (storeNum == 0) then
+			img_bg:SetSprite("__common_1", "zhizuo_wupindi")
+			img_titleBg:SetSprite("__common_1", "zhizuo_mingzidi")
+			img_iconBg:SetSprite("__common_1", "cktb_wupinkuang")
+		else
+			img_bg:SetSprite("shopdesign_atlas", "jiaju_zjinbianditu")
+			img_titleBg:SetSprite("__common_1", "zhizuo_mingzidi1")
+			img_iconBg:SetSprite("shopdesign_atlas", "jiaju_zjinbianditu1")
+		end
+
+		local placeTotal = furnitureDisplayData.cfg.placement_num
+		local placedNum = furnitureDisplayData.placedNum
+
+		txt_storeNum.gameObject:SetActive(storeNum > 0)
+		txt_storeNum.text = tostring(storeNum)
+
+		if (placeTotal ~= -1) then --不是无上限的
+			img_num.gameObject:SetActive(true)
+			txt_num.text = tostring(placedNum) .. "/" .. tostring(placeTotal)
+
+			isFull = not (placedNum < placeTotal or storeNum > 0)
+			--button.enabled = isFull
+
+			if (placedNum == placeTotal and storeNum <= 0) then
+				img_bg:SetSprite("__common_1", "zhizuo_wupindi1")
+				img_titleBg:SetSprite("__common_1", "zhizuo_mingzidihui")
+				img_iconBg:SetSprite("__common_1", "cktb_wupinkuang")
+			end
+
+			txt_sellOut.gameObject:SetActive(placedNum == placeTotal and storeNum <= 0)
+			txt_cost.gameObject:SetActive(placedNum ~= placeTotal and storeNum <= 0)
+			CS.GUIHelper.SetSingleUIGray(img_iconBg.transform, placedNum == placeTotal and storeNum <= 0)
+		else
+			img_num.gameObject:SetActive(allNum ~= 0)
+			txt_num.text = tostring(allNum)
+
+			txt_cost.gameObject:SetActive(storeNum == 0)
+
+			img_cost:SetSprite(
+				"__common_1",
+				furnitureDisplayData.cfg.cost_type == 1 and "zhuejiemian_meiyuan" or "zhuejiemian_jinkuai"
+			)
+			txt_cost.text = CS.System.String.Format("{0:N0}", furnitureDisplayData.costNum)
+		end
+
+		if CS.kTileGroupType.__CastFrom(cfg.type_1) == CS.kTileGroupType.Carpet then
+			txt_type.text = CS_LanguageManagerInst:GetValueByKey("大小")
+			img_mark:SetSprite("shopdesign_atlas", "jiaju_bianjikongjian")
+			txt_mark.text = tostring(cfg.width) .. "X" .. tostring(cfg.height)
+		else
+			txt_type.gameObject:SetActive(false)
+			txt_type.text = ""
+			img_mark.iconImage.enabled = false
+			txt_mark.text = ""
+
+			if CS.UnityUtils.EqualsNull(cfg.buff_ids) == false and cfg.buff_ids.Length > 0 then
+				buffObj:SetActive(true)
+				for i = 1, #buffTextList do
+					if (i - 1 < cfg.buff_ids.Length) then
+						buffTextList[i].gameObject:SetActive(true)
+						local buffCfg = CS.FurnitureBuffConfigManager.inst:GetConfig(cfg.buff_ids[i - 1])
+
+						if buffCfg ~= nil then
+							buffTextList[i].text = CS_LanguageManagerInst:GetValueByKey(buffCfg.buff_txt, tostring(buffCfg:getEffectVal()))
+						end
+					else
+						buffTextList[i].gameObject:SetActive(false)
+					end
+				end
+			else
+				if (cfg.energy > 0) then
+					txt_type.gameObject:SetActive(true)
+					txt_type.text = CS_LanguageManagerInst:GetValueByKey("能量")
+					img_mark:SetSprite("__common_1", "zhuejiemian_tili")
+					txt_mark.text = tostring(cfg.energy)
+				end
+			end
+		end
+
+		if (cfg.cost_type == 3) then --Vip
+			if (cfg.luxury > 0) then
+				--txt_type2.gameObject:SetActive(false)
+				luxuryObj:SetActive(true)
+				luxuryNumText.text = tostring(cfg.luxury)
+			end
+
+			txt_cost.gameObject:SetActive(false)
+			txt_lockVipText.enabled = true
+
+			if CS.K_Vip_State.__CastFrom(CS_UserDataProxyInst.playerData.vipState) ~= CS.K_Vip_State.Vip then
+				vipImg.enabled = true
+				txt_lockVipText.text = CS_LanguageManagerInst:GetValueByKey("购买贵宾特权获取")
+			else
+				vipImg.enabled = false
+
+				if (cfg.cost_num > CS_UserDataProxyInst.playerData.vipLevel) then
+					button.enabled = false
+					txt_lockVipText.enabled = true
+					txt_lockVipText.text = CS_LanguageManagerInst:GetValueByKey("特权卡等级达到{0}级可解锁", tostring(cfg.cost_num))
+				else
+					--button.enabled = true
+					txt_lockVipText.enabled = false
+				end
+			end
+		elseif (cfg.cost_type == 4) then --礼包
+			txt_cost.gameObject:SetActive(false)
+
+			if (allNum <= 0) then
+				local directPurchaseData = DirectPurchaseProxy.inst:GetDirectPurchaseDataById(cfg.cost_num)
+
+				if directPurchaseData ~= nil then
+					giftBgIcon.gameObject:SetActive(true)
+					giftBgIcon:SetSprite(directPurchaseData.data.atlasIcon, directPurchaseData.data.icon1)
+					giftIcon:SetSprite(directPurchaseData.btnIconAtlas, directPurchaseData.btnIcon)
+				else
+					giftBgIcon.gameObject:SetActive(false)
+				end
+			else
+				giftBgIcon.gameObject:SetActive(false)
+			end
+		else
+			txt_cost.gameObject:SetActive(storeNum <= 0)
+			img_cost:SetSprite(
+				"__common_1",
+				furnitureDisplayData.cfg.cost_type == 1 and "zhuejiemian_meiyuan" or "zhuejiemian_jinkuai"
+			)
+			txt_cost.text = tostring(cfg.cost_num)
+		end
+
+		local guideInfo = CS.GuideDataProxy.inst.CurInfo
+
+		if (not guideInfo.isAllOver) then
+			if
+				CS.K_Guide_Type.__CastFrom(guideInfo.m_curCfg.guide_type) == CS.K_Guide_Type.RestrictClick or
+				CS.K_Guide_Type.__CastFrom(guideInfo.m_curCfg.guide_type) == CS.K_Guide_Type.TipsAndRestrictClick
+				then
+				if (CS_UserDataProxyInst.playerData.designFreeCount > 0) then
+					if (cfg.id == tonumber(guideInfo.m_curCfg.conditon_param_1)) then
+						txt_cost.gameObject:SetActive(false)
+						txt_storeNum.gameObject:SetActive(true)
+						txt_storeNum.text = CS_LanguageManagerInst:GetValueByKey("免费")
+					end
+				end
+			end
+		end
+
+		if (CS.GuideManager.inst.isInTriggerGuide) then
+			local triggerData = CS.HotfixBridge.inst:GetTriggerData()
+
+			if (triggerData.triggerType == 3 and cfg.id == triggerData.triggerCondition) then
+				txt_cost.gameObject:SetActive(false)
+				txt_storeNum.gameObject:SetActive(true)
+				txt_storeNum.text = CS_LanguageManagerInst:GetValueByKey("免费")
+			end
+		end
+	end
+
+	CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(txt_type.rectTransform)
+
+	if self.index < 9 and needShowAni then
+		showAnim(self.index)
+	end
+end
+
+function ClearData()
+	isShowAnimed = false
+end

@@ -1,0 +1,248 @@
+---------------------------------------------------------------------
+
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector3 = CS.UnityEngine.Vector3
+
+local csGameEventType = CS.GameEventType
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_FurnitureConfigManagerInst = CS.FurnitureConfigManager.inst
+local CS_FurnitureUpgradeConfigManagerInst = CS.FurnitureUpgradeConfigManager.inst
+local CS_ExtensionConfigManagerInst = CS.ExtensionConfigManager.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+
+local csGameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+--MemberAidItem
+
+local lvTx
+local playerNameTx
+local upTipTx
+local timeSlider
+local sliderFillIcon
+local sliderTx
+local commonAidBtn
+local gemAidBtn
+local gemAidTx
+local headIconTf
+
+local headGraphicSystem = nil
+
+----
+local timerId = 0
+local data
+
+function InitComp()
+
+	lvTx = self.transform:Find("Bg/lvBg/lvTx"):GetComponent("Text")
+	playerNameTx = self.transform:Find("Bg/playerName"):GetComponent("Text")
+	upTipTx = self.transform:Find("Bg/aidTips"):GetComponent("Text")
+	timeSlider = self.transform:Find("Bg/slider"):GetComponent("Slider")
+	sliderFillIcon = self.transform:Find("Bg/slider/Fill Area/Fill"):GetComponent(CS_type_GUIIcon)
+	sliderTx = self.transform:Find("Bg/slider/sliderTips"):GetComponent("Text")
+	commonAidBtn = self.transform:Find("Bg/aidBtn"):GetComponent("Button")
+	gemAidBtn = self.transform:Find("Bg/aidByGemBtn"):GetComponent("Button")
+	gemAidTx = self.transform:Find("Bg/aidByGemBtn/gemTx"):GetComponent("Text")
+	headIconTf = self.transform:Find("Bg/playerIconBg/headIconTf")
+
+	commonAidBtn:ButtonClickTween(
+		function ()
+			onCommonAidBtnClick()
+		end
+	)
+
+	gemAidBtn:ButtonClickTween(
+		function ()
+			EventDispatcher:dispatchEvent(GameEvent.UnionEvent.ShowUI_UnionAidMemberByGemUIView,data)
+		end
+	)
+
+end
+
+function SetData(index)
+
+	data = CS_UserDataProxyInst.union_aidShowList[index]
+
+	lvTx.text = tostring(data.severData.userLevel)
+
+	if headGraphicSystem == nil or headGraphicSystem:IsNull() == true then
+
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		
+		func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(data.severData.gender),CS_SpineUtils.RoleDressToHeadDressIdList(data.severData.userDress),CS.EGender.__CastFrom(data.severData.gender),1.4,true,function (system)
+				headGraphicSystem = system
+				system.transform:SetParent(headIconTf);
+				system.transform.localScale = Vector3.one * 0.35;
+				system.transform.localPosition = Vector3.down * 220;
+				system:SetDirection(CS.RoleDirectionType.Right);
+			end)
+
+	else
+		CS_CharacterManagerInst:ReSetCharacter(headGraphicSystem,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(data.severData.gender),CS_SpineUtils.RoleDressToHeadDressIdList(data.severData.userDress),CS.EGender.__CastFrom(data.severData.gender))
+	end
+
+
+
+	local helped = false;
+
+	for i = 0, data.severData.memberList.Count - 1 do
+
+		if 	data.severData.memberList[i].userId == CS_UserDataProxyInst.playerData.userUid then
+			helped = true;
+			break;
+		end
+
+	end
+
+	commonAidBtn.gameObject:SetActive(not helped)
+	gemAidBtn.gameObject:SetActive(helped)
+	sliderFillIcon:SetSprite("union_atlas",helped == true and "tanxian_xiuxidi1" or "chengjiu_jindu1")
+
+	playerNameTx.text = CS_LanguageManagerInst:GetValueByKey(data.severData.name)
+
+
+	local upgradingItemName = ""
+
+	if data.severData.furnitureUid == 99999 then --扩建
+
+		local extensionConfig = CS_ExtensionConfigManagerInst:GetExtensionConfig(data.severData.level + 1)
+
+		if extensionConfig:IsNull() == false then
+
+			upgradingItemName = "店铺"
+			timeSlider.maxValue = extensionConfig.time
+			setTimer()
+
+		end
+
+
+	else --家具
+
+		local furnitureCfg = nil
+		local furnitureUpCfg = nil
+
+		furnitureCfg = nil
+		furnitureUpCfg = nil
+
+		furnitureCfg = CS_FurnitureConfigManagerInst:getConfig(data.severData.furnitureId)
+
+		if furnitureCfg ~= nil and furnitureCfg:IsNull() == false then
+
+			if 	furnitureCfg.type_1 == 6 then --柜台
+				furnitureUpCfg = CS_FurnitureUpgradeConfigManagerInst:GetCounterUpgradeConfig(data.severData.level + 1)
+			elseif furnitureCfg.type_1 == 7 then --货架
+				furnitureUpCfg = CS_FurnitureUpgradeConfigManagerInst:GetShelfUpgradeConfig(furnitureCfg.type_2,data.severData.level + 1)
+			elseif furnitureCfg.type_1 == 8 then --储物箱
+				furnitureUpCfg = CS_FurnitureUpgradeConfigManagerInst:GetTrunkUpgradeConfig(data.severData.level + 1)
+			elseif furnitureCfg.type_1 == 9 then --资源箱
+				furnitureUpCfg = CS_FurnitureUpgradeConfigManagerInst:GetResourceBinUpgradeConfig(furnitureCfg.type_2,data.severData.level + 1)
+			end
+
+
+			if  furnitureUpCfg ~= nil and furnitureUpCfg:IsNull() == false then
+				upgradingItemName = string.sub(furnitureCfg.name,2 * 3 + 1)
+				timeSlider.maxValue = furnitureUpCfg.time
+				setTimer()
+
+			end
+		end
+	end
+
+
+	upTipTx.text = CS_LanguageManagerInst:GetValueByKey("正在升级{0}至{1}级",CS_LanguageManagerInst:GetValueByKey(upgradingItemName),data.severData.level + 1)
+
+
+end
+
+
+function setTimer()
+
+	clearTimer()
+
+	timerMethod()
+	timerId = csGameTimerInst:AddTimer(1,timerMethod)
+end
+
+function timerMethod()
+	timeSlider.value = timeSlider.maxValue - data.remainTime
+	sliderTx.text = CS_TimeUtils.timeSpanStrip(data.remainTime,true)
+	
+	local costGem = math.ceil(CS.DiamondCountUtils.GetFurnitureUpgradeDiamonds(data.remainTime) * 0.9)
+	gemAidTx.text = tostring(costGem)
+	--gemAidTx.color = CS_UserDataProxyInst.playerData.gem < costGem and CS.GUIHelper.GetColorByColorHex("FF2828") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+	
+end
+
+function onCommonAidBtnClick()
+
+	local time = calAccelTime(data.remainTime)
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+
+	func(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("已帮助{0}减少{1}",CS_LanguageManagerInst:GetValueByKey(data.severData.name),CS_TimeUtils.timeSpanStrip(time,true)), CS.GUIHelper.GetColorByColorHex("Fe4747"))
+
+	EventDispatcher:dispatchEvent(GameEvent.UnionEvent.Request_UnionHelpMember,data.severData.furnitureUid,data.severData.userId,0,0)
+
+end
+
+
+function calAccelTime(secs)
+
+	local accelTime = 0
+
+	if secs > CS_WorldParConfigManagerInst:GetConfig(2009).parameters then
+		
+		 accelTime = math.floor(secs * CS_WorldParConfigManagerInst:GetConfig(2015).parameters / 100.0)
+		
+	elseif secs > CS_WorldParConfigManagerInst:GetConfig(2010).parameters and secs <= CS_WorldParConfigManagerInst:GetConfig(2009).parameters then
+
+		accelTime = math.floor(secs * CS_WorldParConfigManagerInst:GetConfig(2016).parameters / 100.0)
+		
+	elseif secs > CS_WorldParConfigManagerInst:GetConfig(2011).parameters and secs <= CS_WorldParConfigManagerInst:GetConfig(2010).parameters then
+		
+		accelTime = math.floor(secs * CS_WorldParConfigManagerInst:GetConfig(2017).parameters / 100.0)
+		
+	elseif secs > CS_WorldParConfigManagerInst:GetConfig(2012).parameters and secs <= CS_WorldParConfigManagerInst:GetConfig(2011).parameters then
+	
+		accelTime = math.floor(secs * CS_WorldParConfigManagerInst:GetConfig(2018).parameters / 100.0)
+		
+	elseif secs > CS_WorldParConfigManagerInst:GetConfig(2013).parameters and secs <= CS_WorldParConfigManagerInst:GetConfig(2012).parameters then	
+	
+		accelTime = math.floor(secs * CS_WorldParConfigManagerInst:GetConfig(2019).parameters / 100.0)
+		
+	elseif secs > CS_WorldParConfigManagerInst:GetConfig(2014).parameters and secs <= CS_WorldParConfigManagerInst:GetConfig(2013).parameters then
+		
+		accelTime = math.floor(secs * CS_WorldParConfigManagerInst:GetConfig(2020).parameters / 100.0)
+		
+	end
+
+	return accelTime
+
+end
+
+function clearTimer()
+	
+	if timerId ~= 0 then
+
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = 0
+
+	end
+	
+end
+
+function onDestroy()
+	clearTimer()
+end

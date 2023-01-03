@@ -1,0 +1,27 @@
+--[[
+JSON4Lua example script.
+Demonstrates the simple functionality of the json module.
+]]--
+json = require('Libs.json.json')
+
+
+-- Object to JSON encode
+test = {
+  one='first',two='second',three={2,3,5}
+}
+
+jsonTest = json.encode(test)
+
+Logger.Print('JSON encoded test is: ' .. jsonTest)
+
+-- Now JSON decode the json string
+result = json.decode(jsonTest)
+if  _G.next(result)~=nil then
+	Logger.Print ("The decoded table result:"..result['one'])
+end
+--table.foreach(result,print)
+Logger.Print ("The decoded table result.three")
+--table.foreach(result.three, print)
+ function e()
+	Logger.Print('i am e')
+ end

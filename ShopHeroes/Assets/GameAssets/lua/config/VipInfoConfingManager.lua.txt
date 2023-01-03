@@ -1,0 +1,67 @@
+-- VipInfoConfingManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+VipInfoConfigData =
+class(
+	{
+		id,
+		type,
+		level,
+		txt,
+		title,
+		pic_1,
+		pic_2,
+		active_txt,
+		active_type,
+	}
+)
+
+VipInfoConfingManager = class()
+--VipInfoConfingManager.cfgDict = {}
+local csv_name = "vip_level_show"
+
+function VipInfoConfingManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("VipInfoConfingManager:InitCSVConfig csv:", csv)
+	local cfgs = CSVParser:parseClass(csv, 3, VipInfoConfigData)
+	VipInfoConfingManager:processConfigs(cfgs)
+	if csv == nil then
+		print("VipInfoConfingManager  错误")
+	end
+end
+
+function VipInfoConfingManager:processConfigs(cfgs)
+	--print("VipInfoConfingManager:processConfigs ", cfgs, " len:", #cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		--print("VipInfoConfingManager c i:", i," c:", c, " idtype:", type(c.id) , "id is",c.id)
+		self.cfgDict[tonumber(c.id)] = c
+	end
+	print("VipInfoConfingManager:processConfigs completed")
+end
+
+function VipInfoConfingManager:GetConfig(id)
+	return VipInfoConfingManager.cfgDict[id]
+end
+
+function VipInfoConfingManager:GetConfigByType(panelType)
+	local cfgList = {}
+	local listIndex = 1
+	
+	for index, value in pairs(VipInfoConfingManager.cfgDict) do
+		if(tonumber(value.type) == panelType)then
+			cfgList[listIndex] = value
+			listIndex = listIndex + 1
+		end
+	end
+	table.sort(cfgList,function (t1,t2)
+		return tonumber(t1.id) < tonumber(t2.id)
+	end)
+
+	return cfgList
+end

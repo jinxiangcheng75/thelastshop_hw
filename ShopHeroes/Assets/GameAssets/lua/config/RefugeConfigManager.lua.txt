@@ -1,0 +1,59 @@
+-- RefugeConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+RefugeConfigData =
+class(
+	{
+		id,
+		name,
+		min_lv,
+		max_lv,
+		atlas_icon,
+		icon,
+		dec
+	}
+)
+
+RefugeConfigManager = class()
+--RefugeConfigManager.cfgDict = {}
+local csv_name = "activity_shelter"
+
+function RefugeConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("RefugeConfigManager:InitCSVConfig csv:", csv)
+	local cfgs = CSVParser:parseClass(csv, 3, RefugeConfigData)
+	RefugeConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("RefugeConfigManager  错误")
+	end
+end
+
+function RefugeConfigManager:processConfigs(cfgs)
+	--print("RefugeConfigManager:processConfigs ", cfgs, " len:", #cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		--print("RefugeConfigManager c i:", i," c:", c, " idtype:", type(c.level))
+		self.cfgDict[tonumber(c.id)] = c
+	end
+	print("RefugeConfigManager:processConfigs completed")
+end
+
+function RefugeConfigManager:GetAllConfigs()
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+		tempList[index] = v
+		index = index + 1
+	end
+
+	return tempList
+end
+
+function RefugeConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

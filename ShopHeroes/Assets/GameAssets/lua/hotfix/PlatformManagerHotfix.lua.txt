@@ -1,0 +1,37 @@
+
+-- PlatformManagerHotfix 临时决策 仅热修复更改
+
+local CS_EventControllerInst = CS.EventController.inst
+
+--xlua.private_accessible(CS.PlatformManager)
+
+xlua.hotfix(
+	CS.PlatformManager,
+	"IsRewardedVideoAvailable",
+	function(self)
+		return true;
+	end
+)
+
+
+xlua.hotfix(
+	CS.PlatformManager,
+	"PlayRewardedVideo",
+	function(self, adtype)
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.System.String)
+		func(
+			CS_EventControllerInst,
+			CS.AdEvent.RewardedVideoAdRewarded,
+			adtype
+		)
+
+		func(
+			CS_EventControllerInst,
+			CS.AdEvent.RewardedVideoAdClosed,
+			adtype
+		)
+
+	end
+)

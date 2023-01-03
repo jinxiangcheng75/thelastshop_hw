@@ -1,0 +1,43 @@
+local icon
+local nameText
+local slider
+local scheduleText
+local goBtn
+local okImg
+
+local data
+local csLanguageManagerInst = CS.LanguageManager.inst
+
+function InitComp()
+	icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	nameText = self:GetObjByName("nameText"):GetComponent("Text")
+	slider = self:GetObjByName("slider"):GetComponent("Slider")
+	scheduleText = self:GetObjByName("scheduleText"):GetComponent("Text")
+	goBtn = self:GetObjByName("goBtn"):GetComponent("Button")
+	okImg = self:GetObjByName("okImg"):GetComponent("Image")
+
+	goBtn:ButtonClickTween(function ()
+			GUIManager.inst:HideView(Constants.ViewName.GuideTaskInfoUIView)
+			CS.GoOperationManager.inst:StartJumpOperation(data.operationData)
+		end)
+end
+
+function SetData(_taskData)
+	data = _taskData
+
+	icon:SetSprite(data.atlas,data.icon)
+	nameText.text = csLanguageManagerInst:GetValueByKey(data.descBig)
+	slider.maxValue = data.limit
+	slider.value = data.param
+	local showParam = 0
+	if(data.param >= data.limit)then
+		showParam = data.limit
+	else
+		showParam = data.param
+	end
+
+	scheduleText.text = showParam .. "/" .. data.limit
+
+	goBtn.gameObject:SetActive(data.state == 1)
+	okImg.enabled = data.state == 2
+end

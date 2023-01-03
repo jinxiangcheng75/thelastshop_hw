@@ -1,0 +1,167 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/Luxury/LuxuryInfoUIView")
+require("ui/view/Luxury/LuxuryRankUIView")
+require("ui/view/Luxury/LuxuryLevelUpUIView")
+require("ui/view/Luxury/LuxuryTipUIView")
+require("network/NetworkEvent")
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_Type_LuaListItem = typeof(CS.LuaListItem)
+local CS_GameObject = CS.UnityEngine.GameObject
+
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csStaticConstants = CS.StaticConstants
+local csGUIHelper = CS.GUIHelper
+
+LuxurySystem = class(BaseSystem)
+LuxurySystem.super = BaseSystem
+
+local luxuryInfoUIView
+local luxuryRankUIView
+local luxuryLevelUpUIView
+local luxuryTipUIView
+
+function LuxurySystem:ctor()
+end
+
+function LuxurySystem:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.LuxuryEvent.ShowUI_LuxuryInfo,self,self.openLuxuryInfoUI)
+	EventDispatcherInis:addEvent(GameEvent.LuxuryEvent.RefreshUI_Luxury,self,self.refreshLuxury)
+	EventDispatcherInis:addEvent(GameEvent.LuxuryEvent.Request_LuxuryRank,self,self.requestLuxuryRank)
+	EventDispatcherInis:addEvent(GameEvent.LuxuryEvent.HideUI_LuxuryRank,self,self.hideLuxuryRankUI)
+	EventDispatcherInis:addEvent(GameEvent.LuxuryEvent.ShowUI_LuxuryLevelUp,self,self.openLuxuryLevelUI)
+	EventDispatcherInis:addEvent(GameEvent.LuxuryEvent.ShowUI_LuxuryTip,self,self.openLuxuryTipUI)
+
+	--NetworkEvent:SetCallback(MsgTypeCmd.Response_User_ProsperityRankList_Cmd,
+		--function (resp)
+			--print("Response_User_ProsperityRankList success",resp)
+			--self:GetLuxuryRankData(resp)
+		--end,
+		--function (code)
+			--print("Response_User_ProsperityRankList fail --- code",code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取豪华度排行数据失败!")
+		--end
+	--)
+
+	NetworkEvent:SetCallback(MsgTypeCmd.Response_User_ProsperityLevelUp_Cmd,
+		function (resp)
+			print("Response_User_ProsperityLevelUp success",resp)
+			self:GetLuxuryLevelUpData(resp)
+		end,
+		function (code)
+			print("Response_User_ProsperityLevelUp fail --- code",code)
+			csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取豪华度升级数据失败!")
+		end
+	)
+end
+
+function LuxurySystem:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.LuxuryEvent.ShowUI_LuxuryInfo,self.openLuxuryInfoUI)
+	EventDispatcherInis:removeEvent(GameEvent.LuxuryEvent.RefreshUI_Luxury,self.refreshLuxury)
+	EventDispatcherInis:removeEvent(GameEvent.LuxuryEvent.Request_LuxuryRank,self.requestLuxuryRank)
+	EventDispatcherInis:removeEvent(GameEvent.LuxuryEvent.HideUI_LuxuryRank,self.hideLuxuryRankUI)
+	EventDispatcherInis:removeEvent(GameEvent.LuxuryEvent.ShowUI_LuxuryLevelUp,self.openLuxuryLevelUI)
+	EventDispatcherInis:removeEvent(GameEvent.LuxuryEvent.ShowUI_LuxuryTip,self.openLuxuryTipUI)
+
+end
+
+function LuxurySystem:GetLuxuryLevelUpData(respData)
+	local data = MsgType.Response_User_ProsperityLevelUp:New(respData)
+	if(CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success)then return end
+
+	local val = CS.Award_AboutVal()
+	val.type = CS.ReceiveInfoUIType.LuxuryUp
+	val.val = data.level
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.Award_AboutVal)
+	func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, val)
+end
+
+function LuxurySystem:GetLuxuryRankData(respData)
+	local data = MsgType.Response_User_ProsperityRankList:New(respData)
+	if(CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success)then return end
+	--self:hideLuxuryInfoUI()
+	if(#data.rankList > 0)then
+		self:openLuxuryRankUI(data)
+	else
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+		func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, csLanguageManagerInst:GetValueByKey("正在处理排行数据，请稍后查看！"),csGUIHelper.GetColorByColorHex("FF2828"))
+	end
+	--EventDispatcherInis:dispatchEvent(GameEvent.OnlineRewardEvent.RefreshUI_OnlineInfo)
+end
+
+function LuxurySystem:openLuxuryTipUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.LuxuryTipUIView,
+		function(view)
+			luxuryTipUIView = view
+			luxuryTipUIView:SetUIData()
+		end
+	)
+end
+
+function LuxurySystem:openLuxuryLevelUI(level)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.LuxuryLevelUpUIView,
+		function(view)
+			luxuryLevelUpUIView = view
+			luxuryLevelUpUIView:SetUIData(level)
+		end
+	)
+end
+
+function LuxurySystem:hideLuxuryRankUI()
+	GUIManager.inst:HideView(Constants.ViewName.LuxuryRankUIView)
+end
+
+function LuxurySystem:openLuxuryRankUI(data)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.LuxuryRankUIView,
+		function(view)
+			luxuryRankUIView = view
+			luxuryRankUIView:SetUIData(data)
+		end
+	)
+end
+
+function LuxurySystem:hideLuxuryInfoUI()
+	GUIManager.inst:HideView(Constants.ViewName.LuxuryInfoUIView)
+end
+
+function LuxurySystem:openLuxuryInfoUI(data)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.LuxuryInfoUIView,
+		function(view)
+			luxuryInfoUIView = view
+			luxuryInfoUIView:SetUIData(data)
+		end
+	)
+end
+
+function LuxurySystem:refreshLuxury(luxuryItem)
+	if(luxuryItem ~= nil)then
+		luxuryItem.gameObject:SetActive(true)
+		luxuryItem:SetData(CS.UserDataProxy.inst.playerData.prosperity)
+	end
+end
+
+function LuxurySystem:requestLuxuryRank()
+	local rep = MsgType.Request_User_ProsperityRankList:New()
+	rep:Send()
+end
+
+function LuxurySystem:OnEnter()
+	LuxurySystem.super.OnEnter(self)
+end
+
+function LuxurySystem:OnExit()
+	LuxurySystem.super.OnExit(self)
+end

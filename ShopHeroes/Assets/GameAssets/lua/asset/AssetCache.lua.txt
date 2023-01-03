@@ -1,0 +1,10 @@
+--AssetCache
+
+local AssetCache = class()
+
+function AssetCache:ctor()
+	self.mSpriteAtlasCaches = {}
+	self.mUIInsCaches = {}
+	self.mLoadedCaches = {}
+	self.mSceneCaches = {}
+end

@@ -1,0 +1,127 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local csVector3 = CS.UnityEngine.Vector3
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+local goldenRankItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	goldenRankItem_dlc = GoldenRankItem_dlc.new()
+	goldenRankItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if goldenRankItem_dlc~=nil then
+		goldenRankItem_dlc:Clear()
+		goldenRankItem_dlc = nil
+	end
+end
+
+function SetData(_data)
+	if goldenRankItem_dlc~=nil then
+		goldenRankItem_dlc:SetData(_data,self.index)
+	end
+end
+
+GoldenRankItem_dlc = class()
+
+function GoldenRankItem_dlc:ctor()
+
+end
+
+function GoldenRankItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+
+	self.headGraphicSystem = nil
+	self.rankData = nil
+end
+
+function GoldenRankItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.headIconTf = self.contentPane:GetObjByName("headIconTf").transform
+	self.nameText = self.contentPane:GetObjByName("nameText"):GetComponent("Text")
+	self.scoreText = self.contentPane:GetObjByName("scoreText"):GetComponent("Text")
+	self.icon = self.contentPane:GetObjByName("icon"):GetComponent("GUIIcon")
+	self.rankText = self.contentPane:GetObjByName("rankText"):GetComponent("Text")
+	self.bg = self.contentPane:GetObjByName("bg"):GetComponent("Image")
+	self.headBgIcon = self.contentPane:GetObjByName("headBgIcon"):GetComponent("GUIIcon")
+end
+
+function GoldenRankItem_dlc:SetData(_data,index)
+	
+	if(_data == nil) then return end
+
+	self.rankData = _data
+	
+	self.nameText.text = cs_LanguageManagerInst:GetValueByKey(self.rankData.name)
+	self.scoreText.text = tostring(self.rankData.point)
+	self.rankText.text = tostring(index + 1)
+	
+	self.bg.enabled = index % 2 == 1
+	
+	if(index == 0)then
+		self.headBgIcon:SetSprite("goldenCity_atlas","renwu_mingwangtxk")
+	else
+		self.headBgIcon:SetSprite("goldenCity_atlas","renwu_mingwangtxk3")
+	end
+	
+	local itemWdpCfg = CS.WorldParConfigManager.inst:GetConfig(8403)
+	if(itemWdpCfg ~= nil)then
+		local itemCfg = CS.ItemconfigManager.inst:GetConfig(itemWdpCfg.parameters)
+		if(itemCfg ~= nil)then
+			self.icon.enabled = true
+			self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+		else
+			self.icon.enabled = false
+		end
+	else
+		self.icon.enabled = false
+	end
+	
+	self:SetPrefab()
+	
+end
+
+function GoldenRankItem_dlc:SetPrefab()
+	if self.headGraphicSystem == nil or self.headGraphicSystem:IsNull() == true then
+
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+
+		func(CS_CharacterManagerInst,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(self.rankData.gender)),CS_SpineUtils.RoleDressToHeadDressIdList(self.rankData.userDress),CS.EGender.__CastFrom(self.rankData.gender),1.4,true,function (system)
+				self.headGraphicSystem = system
+				system.transform:SetParent(self.headIconTf)
+				system.transform.localScale = csVector3.one * 0.3
+				system.transform.localPosition = csVector3.down * 186
+				system:SetDirection(CS.RoleDirectionType.Right)
+			end)
+
+	else
+		CS_CharacterManagerInst:ReSetCharacter(self.headGraphicSystem,CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(CS.EGender.__CastFrom(self.rankData.gender)),CS_SpineUtils.RoleDressToHeadDressIdList(self.rankData.userDress),CS.EGender.__CastFrom(self.rankData.gender))
+	end
+end
+
+function GoldenRankItem_dlc:Clear()
+
+	self:removeListeners()
+
+end
+
+function GoldenRankItem_dlc:addListeners()
+
+end
+
+function GoldenRankItem_dlc:removeListeners()
+
+end

@@ -1,0 +1,549 @@
+
+--ChatView
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_BtnList = typeof(CS.BtnList)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local CS_ChatDataProxyInst = CS.ChatDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+--确认提示界面
+ChatView = class(ViewBase)
+
+function ChatView:ctor()
+	self.viewID = Constants.ViewName.ChatView
+	ChatView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+
+	self.subEmojiLineCount = 7
+
+end
+------------------------------------------------
+
+
+function ChatView:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.btn_close = contentPane:GetButton("btn_close")
+	self.btn_mask = contentPane:GetButton("btn_mask")
+	self.inputField = contentPane:GetObjByName("inputField"):GetComponent("InputField")
+	self.btn_emoji = contentPane:GetButton("btn_emoji")
+	self.btn_send = contentPane:GetButton("btn_send")
+	self.superView = contentPane:GetObjByName("superView"):GetComponent(CS_type_superList)
+	self.toggle_world = contentPane:GetObjByName("toggle_world"):GetComponent("Toggle")
+	self.toggle_sys = contentPane:GetObjByName("toggle_sys"):GetComponent("Toggle")
+	self.toggle_union = contentPane:GetObjByName("toggle_union"):GetComponent("Toggle")
+	self.showAnim = contentPane:GetObjByName("showAnim"):GetComponent("DOTweenAnimation")
+	self.tf_noneMsg = contentPane:GetObjByName("tf_noneMsg").transform
+	self.obj_raceLamp = contentPane:GetObjByName("obj_raceLamp")
+	self.rectTf_raceLamp = contentPane:GetObjByName("rectTf_raceLamp"):GetComponent("RectTransform")
+	self.tx_raceLamp = contentPane:GetText("tx_raceLamp")
+	self.obj_worldRedPoint = contentPane:GetObjByName("obj_worldRedPoint")
+	self.obj_unionRedPoint = contentPane:GetObjByName("obj_unionRedPoint")
+	self.obj_sysRedPoint = contentPane:GetObjByName("obj_sysRedPoint")
+
+	self.obj_emojiSubPanel = contentPane:GetObjByName("obj_emojiSubPanel")
+	self.superList_emoji = contentPane:GetObjByName("superList_emoji"):GetComponent(CS_type_superList)
+	self.btn_closeEmojiSubPanel = contentPane:GetButton("btn_closeEmojiSubPanel")
+
+
+	self.obj_otherSubSettingPanel = contentPane:GetObjByName("obj_otherSubSettingPanel")
+	self.tf_otherSubSettingBg = contentPane:GetObjByName("tf_otherSubSettingBg"):GetComponent("RectTransform")
+	self.btn_closeOtherSubSettingPanel = contentPane:GetButton("btn_closeOtherSubSettingPanel")
+	self.tx_otherSettingLv = contentPane:GetText("tx_otherSettingLv")
+	self.tx_otherSettingUserName = contentPane:GetText("tx_otherSettingUserName")
+	self.btn_otherSettingLookInfo = contentPane:GetButton("btn_otherSettingLookInfo")
+	self.btn_otherSettingAiteOther = contentPane:GetButton("btn_otherSettingAiteOther")
+	self.btn_otherSettingLookUnion = contentPane:GetButton("btn_otherSettingLookUnion")
+	self.btn_otherSettingBlockOther = contentPane:GetButton("btn_otherSettingBlockOther")
+
+
+end
+
+
+function ChatView:onInit()
+
+	self:initComp()
+
+	--self.NonBreakingSpace = "\u00A0";--不换行空格的Unicode编码
+	self.currTable = 0
+	self.currChannelList = nil
+	self.isInitToggle = false
+	self.allShowEmojiCfgs = ChatEmojiConfigManager:GetAllShowConfig()
+	self.isInitEmojiSuperList = false
+	self.otherSettingChatData = nil
+	self.otherSettingChatDataNickName = ""
+
+	self.btn_close:ButtonClickTween(function ()
+			self:hide()
+		end)
+
+	self.btn_mask.onClick:AddListener(function ()
+			self:hide()
+		end)
+
+	self.btn_send.onClick:AddListener(function ()
+			self:sendMsg();
+		end)
+
+	self.superView.itemRenderer = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+	self.superView.clearItemRender = function(index,item)
+		self:superListItemClearRenderer(index,item)
+	end
+
+	self.toggle_world.onValueChanged:AddListener(function (isOn)
+
+			if isOn then
+
+				if self.isInitToggle then
+
+					self.obj_worldRedPoint:SetActive(false)
+
+				end
+
+				self:MesgeTableChange(0)
+
+			end
+
+		end)
+
+	self.toggle_union.onValueChanged:AddListener(function (isOn)
+
+			if isOn then
+
+				if self.isInitToggle then
+
+					self.obj_unionRedPoint:SetActive(false)
+
+				end
+
+				self:MesgeTableChange(2)
+
+			end
+
+		end)
+
+	self.toggle_sys.onValueChanged:AddListener(function (isOn)
+
+			if isOn then
+
+				if self.isInitToggle then
+
+					self.obj_sysRedPoint:SetActive(false)
+
+				end
+
+				self:MesgeTableChange(3)
+
+			end
+
+		end)
+
+	self.currTable = CS.SaveManager.inst:GetInt("chatCurrTable");
+
+	---emoji
+	self.btn_emoji.onClick:AddListener(function ()
+			self:onEmojiBtnClick()
+		end)
+
+	self.btn_closeEmojiSubPanel.onClick:AddListener(function ()
+			self:onCloseEmojiSubPanelBtnClick()
+		end)
+
+	self.superList_emoji.itemRenderer = function(index,item)
+		self:superList_emojiItemRenderer(index,item)
+	end
+
+	---otherSetting
+	self.btn_closeOtherSubSettingPanel.onClick:AddListener(function ()
+			self:onCloseOtherSubSettingPanelBtnClick()
+		end)
+
+	self.btn_otherSettingLookInfo:ButtonClickTween(function ()
+			self:onOtherSettingLookInfoBtnClick()
+		end)
+
+	self.btn_otherSettingAiteOther:ButtonClickTween(function ()
+			self:onOtherSettingAiteOtherBtnClick()
+		end)
+
+	self.btn_otherSettingLookUnion:ButtonClickTween(function ()
+			self:onOtherSettingLookUnionBtnClick()
+		end)
+
+	self.btn_otherSettingBlockOther:ButtonClickTween(function ()
+			self:onOtherSettingBlockOtherBtnClick()
+		end)
+
+end
+
+function ChatView:DoShowAnimation()
+
+	self.showAnim.onComplete:AddListener(function ()
+			self:onShowed()
+		end)
+
+	self.showAnim:DOPlayForward();
+
+end
+
+function ChatView:DoHideAnimation()
+
+	self.showAnim.onRewind:AddListener(function ()
+			self:HideView()
+		end)
+
+	self.showAnim:DOPlayBackwards();
+
+end
+
+function ChatView:onShowed()
+
+
+	self.showAnim.transform.localPosition = Vector3.zero;
+	self.showAnim.onComplete:RemoveAllListeners();
+	self.isInitToggle = true;
+
+	if self.currTable == 0 then
+
+		self.toggle_world.isOn = true
+
+	elseif self.currTable == 2 then
+
+		self.toggle_union.isOn = true
+
+	elseif self.currTable == 3 then
+
+		self.toggle_sys.isOn = true
+
+	end
+
+	--EventController.inst.TriggerEvent(GameEventType.ChatSysEvent.CHAT_CHANNEL_CHANGE, currTable);
+	--self:UpdateView(CS_ChatDataProxyInst:GetChatList(self.currTable))
+
+	self:showRaceLampText();
+
+
+end
+
+function ChatView:onEmojiBtnClick()
+
+	self.obj_emojiSubPanel:SetActive(true)
+
+	if self.isInitEmojiSuperList == false then
+
+		self.isInitEmojiSuperList = true
+		self:SetEmojiListItemTotalCount(#self.allShowEmojiCfgs)
+
+	end
+
+end
+
+function ChatView:onCloseEmojiSubPanelBtnClick()
+
+	self:CloseEmojiSubPanel();
+
+end
+
+function ChatView:CloseEmojiSubPanel()
+
+	self.obj_emojiSubPanel:SetActive(false)
+
+end
+
+function ChatView:OpenOtherSubSettingPanel(chatData,pos)
+
+	self.otherSettingChatData = chatData
+	self.otherSettingChatDataNickName = split(self.otherSettingChatData.nickName,ChatDataProxy.inst.vipSplitKey)[1]
+	self.obj_otherSubSettingPanel:SetActive(true)
+
+
+	local v2 = CS.GUIHelper.GetFGuiCameraUIPointByWorldPos(pos)
+	pos = Vector3(v2.x - 50, v2.y + 50, 0);
+	self.tf_otherSubSettingBg.anchoredPosition3D = pos;
+
+	self.tx_otherSettingLv.text = tostring(self.otherSettingChatData.level)
+	self.tx_otherSettingUserName.text = CS.LanguageManager.inst:GetValueByKey(self.otherSettingChatDataNickName)
+
+
+end
+
+function ChatView:onCloseOtherSubSettingPanelBtnClick()
+
+	self:CloseOtherSubSettingPanel()
+
+end
+
+function ChatView:CloseOtherSubSettingPanel()
+
+	self.otherSettingChatData = nil
+	self.otherSettingChatDataNickName = ""
+	self.obj_otherSubSettingPanel:SetActive(false)
+
+end
+
+function ChatView:onOtherSettingLookInfoBtnClick()
+
+	if self.otherSettingChatData == nil then return end
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.String)
+	func(CS_EventControllerInst, CS_GameEventType.SocialEvent.REQUEST_OTHERUSERDATA, self.otherSettingChatData.userId)
+
+	self:CloseOtherSubSettingPanel()
+
+end
+
+function ChatView:onOtherSettingAiteOtherBtnClick()
+
+	if self.otherSettingChatData == nil then return end
+
+	self.inputField.text = self.inputField.text .. "@" .. CS.LanguageManager.inst:GetValueByKey(self.otherSettingChatDataNickName) .. " ";
+
+	self:CloseOtherSubSettingPanel()
+
+end
+
+function ChatView:onOtherSettingLookUnionBtnClick()
+
+	if self.otherSettingChatData == nil then return end
+
+	self:CloseOtherSubSettingPanel()
+
+end
+
+function ChatView:onOtherSettingBlockOtherBtnClick()
+
+	if self.otherSettingChatData == nil then return end
+
+	EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTipsAgainAffirmUI,CS_LanguageManagerInst:GetValueByKey("聊天屏蔽"),CS_LanguageManagerInst:GetValueByKey("您确定要屏蔽{0}吗？您将无法看到{0}的消息，可在设置中清空屏蔽。",CS_LanguageManagerInst:GetValueByKey(self.otherSettingChatDataNickName)),function ()
+
+			EventDispatcher:dispatchEvent(GameEvent.ChatEvent.AddBlockUserId,self.otherSettingChatData.userId)
+
+			self:CloseOtherSubSettingPanel()
+
+		end);
+
+end
+
+function ChatView:sendMsg()
+
+	local str = self.inputField.text;
+	--str =  string.gsub(str," ",self.NonBreakingSpace)
+
+	--if str == "#GM_" then
+	--CS.GMCheatCode.inst.isActivate = true
+	--end
+
+	EventDispatcher:dispatchEvent(GameEvent.ChatEvent.SendChatMsg,str,self.currTable)
+
+	self.inputField.text = "";
+
+end
+
+function ChatView:superListItemRenderer(index,item)
+
+	if (index < self.currChannelList.Count) then
+
+		item.gameObject:SetActive(true);
+		item:SetData({currindex = self.currTable,data = self.currChannelList[index]})
+
+	end
+
+end
+
+function ChatView:superListItemClearRenderer(index,item)
+
+	item:ClearData()
+
+end
+
+function ChatView:MesgeTableChange(type)
+
+	if (self.currTable == type) then
+		return
+	end
+
+	self.toggle_world.isOn = (type == 0)
+	self.toggle_union.isOn = (type == 2)
+	self.toggle_sys.isOn = (type == 3)
+
+	CS.AudioManager.inst:PlaySound(11);
+	self.currTable = type;
+	CS.SaveManager.inst:SaveInt("chatCurrTable", self.currTable);
+
+	self:UpdateView(ChatDataProxy.inst:GetChatList(self.currTable))
+	--EventController.inst.TriggerEvent(GameEventType.ChatSysEvent.CHAT_CHANNEL_CHANGE, currTable);
+
+end
+
+function ChatView:UpdateView(list)
+
+	if list == nil or list.Count <= 0 then
+
+		self.tf_noneMsg.gameObject:SetActive(true);
+		self.superView.totalItemCount = 0;
+
+	else
+
+		self.tf_noneMsg.gameObject:SetActive(false);
+		self.currChannelList = list;
+		self.superView.totalItemCount = self.currChannelList.Count;
+
+	end
+
+
+	if self.currTable == 3 then
+
+		self.inputField.transform.parent.gameObject:SetActive(false);
+		local rectTransform = self.superView:GetComponent("RectTransform");
+		rectTransform.sizeDelta = Vector2(rectTransform.sizeDelta.x, -216);
+		local raceRect = self.obj_raceLamp:GetComponent("RectTransform");
+
+		if (raceRect ~= nil) then
+
+			if CS.FGUI.inst.isLandscape then
+
+				raceRect.anchoredPosition = Vector2(raceRect.anchoredPosition.x, -349);
+
+			else
+
+				raceRect.anchoredPosition = Vector2(raceRect.anchoredPosition.x, -290);
+			end
+
+		end
+
+	else
+
+		self.inputField.transform.parent.gameObject:SetActive(true);
+		local rectTransform = self.superView:GetComponent("RectTransform");
+		rectTransform.sizeDelta = Vector2(rectTransform.sizeDelta.x, -330);
+		local raceRect = self.obj_raceLamp:GetComponent("RectTransform");
+
+		if (raceRect ~= nil) then
+
+			if CS.FGUI.inst.isLandscape then
+
+				raceRect.anchoredPosition = Vector2(raceRect.anchoredPosition.x, -453);
+
+			else
+
+				raceRect.anchoredPosition = Vector2(raceRect.anchoredPosition.x, -394);
+			end
+
+		end
+
+	end
+
+
+	if CS_ChatDataProxyInst.newChatType ~= -1 then
+
+		if (CS_ChatDataProxyInst.newChatType == 0 and self.currTable ~= 0) then
+			self.obj_worldRedPoint:SetActive(true);
+		end
+
+		if (CS_ChatDataProxyInst.newChatType == 1 and self.currTable ~= 2) then
+			self.obj_unionRedPoint:SetActive(true);
+		end
+
+		if (CS_ChatDataProxyInst.newChatType == 2 and self.currTable ~= 3) then
+			self.obj_sysRedPoint:SetActive(true);
+		end
+
+		if (self.isInitToggle) then
+			CS_ChatDataProxyInst.newChatType = -1;
+		end
+
+	end
+
+
+end
+
+function ChatView:showRaceLampText()
+
+	local width = self.tx_raceLamp.preferredWidth
+	local endX = -(380 + width)
+
+	self.obj_raceLamp:SetActive(true);
+	self.rectTf_raceLamp:DOLocalMoveX(endX,width / 60):From(400 + 100):SetEase(CS.DG.Tweening.Ease.Linear):OnComplete(function ()
+
+			if self.contentObject == nil then
+				return
+			end
+
+			self.obj_raceLamp:SetActive(false)
+
+		end)
+
+end
+
+function ChatView:superList_emojiItemRenderer(index,item)
+
+	local btnList = item.transform:GetComponent(CS_type_BtnList).buttonList
+
+	item.gameObject:SetActive(true)
+
+	for i = 0, self.subEmojiLineCount - 1 do
+
+		local itemIndex = index * self.subEmojiLineCount + i
+
+		if 	itemIndex < #self.allShowEmojiCfgs then
+
+			btnList[i].gameObject:SetActive(true)
+
+			btnList[i].gameObject:GetComponent(CS_type_LuaListItem):SetData(self.allShowEmojiCfgs[itemIndex + 1])
+
+		else
+
+			btnList[i].gameObject:SetActive(false)
+
+		end
+
+	end
+
+end
+
+function ChatView:SetEmojiListItemTotalCount(count)
+
+	if count < 0 then
+		count = 0
+	end
+
+	self.listItemCount = count
+
+	local num = math.floor(count / self.subEmojiLineCount)
+
+	if count % self.subEmojiLineCount > 0 then
+		num = num + 1
+	end
+
+	self.superList_emoji.totalItemCount = num
+
+end
+
+function ChatView:onHide()
+
+	CS.DG.Tweening.DOTween.Kill(self.rectTf_raceLamp)
+	self.obj_raceLamp:SetActive(false)
+
+	self.superView:clearData()
+	ChatDataProxy.inst:ClearChatHeadPool()
+
+end
+

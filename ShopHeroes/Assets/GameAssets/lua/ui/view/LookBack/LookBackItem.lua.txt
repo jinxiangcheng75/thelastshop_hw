@@ -1,0 +1,78 @@
+local contentText
+
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+function InitComp()
+	contentText = self:GetObjByName("contentText"):GetComponent("Text")
+end
+
+function SetData(_data)
+	local data = _data
+	if(data.content == nil) then contentText.gameObject:SetActive(false) return end
+	local info = split(data.content,"|")
+
+	if(info ~= nil)then
+		if(#info > 0)then
+			local contentType = tonumber(info[1])
+			--print("输出输出",contentType)
+			if(contentType == 1)then
+				contentText.text = CS_LanguageManagerInst:GetValueByKey("<color=#00effe>{0}</color>加入公会", CS_LanguageManagerInst:GetValueByKey(data.nickName))
+			elseif contentType == 2 then
+				contentText.text = CS_LanguageManagerInst:GetValueByKey("<color=#00effe>{0}</color>退出公会", CS_LanguageManagerInst:GetValueByKey(data.nickName))
+			elseif contentType == 3 then
+				if(#info > 2)then
+					if(info[2] == CS.UserDataProxy.inst.playerData.userUid) then
+						contentText.text = CS_LanguageManagerInst:GetValueByKey("<color=#00effe>{0}</color>帮助了我", CS_LanguageManagerInst:GetValueByKey(data.nickName))
+					else
+						contentText.text = CS_LanguageManagerInst:GetValueByKey("<color=#00effe>{0}</color>帮助了<color=#00effe>{1}</color>", CS_LanguageManagerInst:GetValueByKey(data.nickName), CS_LanguageManagerInst:GetValueByKey(info[3]))
+					end
+				else
+					contentText.gameObject:SetActive(false)
+				end
+			elseif contentType == 4 then
+				if(#info > 2)then
+					local buildId = tonumber(info[2])
+					local buildCfg = CS.BuildingConfigManager.inst:GetConfig(buildId)
+					if(buildCfg ~= nil) then
+						contentText.text = CS_LanguageManagerInst:GetValueByKey("<color=#00effe>{0}</color>投资了<color=#8bf865>{1}</color>{2}新币", CS_LanguageManagerInst:GetValueByKey(data.nickName), CS_LanguageManagerInst:GetValueByKey(buildCfg.name), info[3])
+					else
+						contentText.gameObject:SetActive(false)
+					end
+				else
+					contentText.gameObject:SetActive(false)
+				end
+			elseif contentType == 5 then
+				if(#info > 2) then
+					local equipId = tonumber(info[2])
+					local equipCfg = CS.EquipConfigManager.inst:GetEquipQualityConfig(equipId)
+					if(equipCfg ~= nil) then
+						local qualityColrStr = CS.StaticConstants.qualityColor[equipCfg.quality - 1]
+						contentText.text = CS_LanguageManagerInst:GetValueByKey("<color=#00effe>{0}</color>向黑市商人售出{1}装备获得{2}新币", CS_LanguageManagerInst:GetValueByKey(data.nickName), "<color=#"..qualityColrStr .. ">" ..CS_LanguageManagerInst:GetValueByKey(equipCfg.name).."</color>", info[3])
+					else
+						contentText.gameObject:SetActive(false)
+					end
+				else
+					contentText.gameObject:SetActive(false)
+				end
+			elseif contentType == 6 then
+				if(#info > 1) then
+					local equipDrawingId = tonumber(info[2])
+					local equipCfg = CS.EquipConfigManager.inst:GetEquipDrawingsCfg(equipDrawingId)
+					if(equipCfg ~= nil)then
+						contentText.text = CS_LanguageManagerInst:GetValueByKey("<color=#00effe>{0}</color>精通了<color=#8bf865>{1}</color>图纸", CS_LanguageManagerInst:GetValueByKey(data.nickName), CS_LanguageManagerInst:GetValueByKey(equipCfg.name))
+					else
+						contentText.gameObject:SetActive(false)
+					end
+				else
+					contentText.gameObject:SetActive(false)
+				end
+			end
+		end
+	end
+
+	--print("输出 啦啦啦",data.level,"      ",data.nickName,"      ",data.content)
+	if(data.level == 9999)then
+		contentText.color = CS.GUIHelper.GetColorByColorHex("#FFDB60")
+		--contentText.fontStyle = CS.UnityEngine.FontStyle.Bold
+	end
+end

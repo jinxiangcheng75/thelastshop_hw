@@ -1,0 +1,115 @@
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+
+--CityUI_dlc 实际逻辑在lua侧
+
+local CityUI_dlc = class()
+
+function CityUI_dlc:ctor()
+
+	self.isInitComp = false
+
+end
+
+function CityUI_dlc:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaBehaviour)
+
+	self.redPoint_mall = self.contentPane:GetObjByName("redPoint_mall")
+	self.btn_mall = self.contentPane:GetButton("btn_mall")
+
+	self.isInitComp = true
+
+end
+
+function CityUI_dlc:init(obj)
+
+	self:initComp(obj)
+	self:addListeners()
+
+	self.btn_mall:ButtonClickTween(
+		function ()
+			EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallUI,0)
+		end
+	)
+
+	self:refreshRedPoints()
+end
+
+function CityUI_dlc:addListeners()
+
+	EventDispatcher:addEvent(
+		GameEvent.CityUIEvent.cityUI_refreshRedPoints,
+		self,
+		self.refreshRedPoints
+	)
+end
+
+function CityUI_dlc:removeListeners()
+
+	EventDispatcher:removeEvent(
+		GameEvent.CityUIEvent.cityUI_refreshRedPoints,
+		self,
+		self.refreshRedPoints
+	)
+end
+
+function CityUI_dlc:refreshRedPoints()
+
+	if not self.isInitComp then
+		return
+	end
+	
+	self.redPoint_mall:SetActive(self:getMallRedPointFlag())
+
+end
+
+function CityUI_dlc:getMallRedPointFlag()
+
+	--目前只有每日礼包有红点
+	local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(149)
+	if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+		return false
+	end
+
+	return DailyRewardDataProxy.inst:HasReward()
+
+end
+
+function CityUI_dlc:clear()
+
+	self.isInitComp = false
+	self:removeListeners()
+
+end
+
+-----------LuaBehaviour---------------------------------------------------------------------------------------------------------------------------------------
+
+local cityUI_dlc
+
+function awake()
+
+	cityUI_dlc = CityUI_dlc.new()
+	cityUI_dlc:init(self.gameObject)
+
+end
+
+function onEnable()
+
+end
+
+function ondestroy()
+
+	if cityUI_dlc ~= nil then
+		cityUI_dlc:clear()
+		cityUI_dlc = nil
+	end
+
+end

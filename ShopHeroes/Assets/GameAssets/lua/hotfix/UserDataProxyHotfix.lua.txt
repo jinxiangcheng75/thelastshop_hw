@@ -1,0 +1,70 @@
+
+-- UserDataProxyHotfix C#已经同步逻辑 新包需要
+
+require("utils/XLuaUtils")
+local util = require("xlua/util")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local function GetIndoorFurnitureCount(shopData)
+
+	local count = 0
+	
+	for i = 0, shopData.shelfList.Count - 1 do
+		
+		local shopDesignItem = shopData.shelfList[i]
+		if shopDesignItem.state ~= 3 then
+			count =  count + 1
+		end
+		
+	end
+	
+	
+	for i = 0, shopData.resBasketList.Count - 1 do
+
+		local shopDesignItem = shopData.resBasketList[i]
+		if shopDesignItem.state ~= 3 then
+			count =  count + 1
+		end
+
+	end
+	
+	
+	for i = 0, shopData.storageBoxList.Count - 1 do
+
+		local shopDesignItem = shopData.storageBoxList[i]
+		if shopDesignItem.state ~= 3 then
+			count =  count + 1
+		end
+
+	end
+
+	return count
+
+end
+
+xlua.private_accessible(CS.IndoorData)
+util.hotfix_ex(
+	CS.UserDataProxy,
+	"updateFurnitureData",
+	function(self, data)
+
+		self:updateFurnitureData(data)
+		self.shopData.indoorFurnitureCount = GetIndoorFurnitureCount(self.shopData)
+		
+	end
+)
+
+util.hotfix_ex(
+	CS.UserDataProxy,
+	"InitIndoorData",
+	function(self, data)
+
+		self:InitIndoorData(data)
+		self.shopData.indoorFurnitureCount = GetIndoorFurnitureCount(self.shopData)
+
+	end
+)
+

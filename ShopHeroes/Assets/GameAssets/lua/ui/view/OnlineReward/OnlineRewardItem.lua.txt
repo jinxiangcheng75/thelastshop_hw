@@ -1,0 +1,98 @@
+local icon
+local descText
+local selfBtn
+
+local csLanguageManagerInst = CS.LanguageManager.inst
+local csGameTimerInst = CS.GameTimer.inst
+local csTimeUtils = CS.TimeUtils
+
+local csItemConfigManagerInst = CS.ItemconfigManager.inst
+local csItemType = CS.ItemType
+local csEquipConfigManagerInst = CS.EquipConfigManager.inst
+
+local csColor = CS.UnityEngine.Color
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local data
+local timerId = nil
+
+function InitComp()
+	icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	descText = self:GetObjByName("descText"):GetComponent("Text")
+	selfBtn = self:GetComponent("Button")
+
+	selfBtn:ButtonClickTween(function ()
+			EventDispatcher:dispatchEvent(GameEvent.OnlineRewardEvent.ShowUI_OnlineInfo,data)
+		end
+	)
+end
+
+function SetData(_data)
+	data = _data
+	self.gameObject:SetActive(true)
+	if(timerId ~= nil)then
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = nil
+	end
+
+	local itemCfg = csItemConfigManagerInst:GetConfig(data.itemId)
+
+	if (itemCfg == nil) then
+		local eqcfg = csEquipConfigManagerInst:GetEquipInfoConfig(data.itemId)
+		icon:SetSprite(eqcfg.equipDrawingsConfig.atlas, eqcfg.equipDrawingsConfig.icon,
+			CS.StaticConstants.qualityColor[eqcfg.equipQualityConfig.quality - 1])
+	else
+		if (csItemType.__CastFrom(itemCfg.type) == csItemType.EquipmentDrawing) then
+			local equipCfg = csEquipConfigManagerInst:GetEquipDrawingsCfg(itemCfg.effect)
+			icon:SetSprite(equipCfg.atlas, equipCfg.icon)
+		else
+			icon:SetSprite(itemCfg.atlas, itemCfg.icon)
+		end
+	end
+	if(data.state == 0)then
+		if(data.remainTime > 0)then
+			descText.color = CS.GUIHelper.GetColorByColorHex("#ffffff")
+			descText.text = csTimeUtils.timeSpan3Str(data.remainTime)
+		else
+			descText.color = CS.GUIHelper.GetColorByColorHex("#64ff18")
+			descText.text = csLanguageManagerInst:GetValueByKey("领取")
+		end
+		timerId = csGameTimerInst:AddTimer(1,function()
+				if(self == nil) then
+					csGameTimerInst:RemoveTimer(timerId)
+					timerId = nil
+					return
+				end
+				if(data.remainTime > 0)then
+					descText.color = CS.GUIHelper.GetColorByColorHex("#ffffff")
+					descText.text = csTimeUtils.timeSpan3Str(data.remainTime)
+				else
+					descText.color = CS.GUIHelper.GetColorByColorHex("#64ff18")
+					descText.text = csLanguageManagerInst:GetValueByKey("领取")
+					csGameTimerInst:RemoveTimer(timerId)
+					timerId = nil
+				end
+			end)
+
+	elseif data.state == 1 then
+		descText.color = CS.GUIHelper.GetColorByColorHex("#64ff18")
+		descText.text = csLanguageManagerInst:GetValueByKey("领取")
+	elseif data.state == 2 then
+		--descText.color = CS.GUIHelper.GetColorByColorHex("#fec018")
+		descText.color = csColor.white
+		descText.text = csLanguageManagerInst:GetValueByKey("明日领取")
+	end
+end
+
+function ClearData()
+	self.gameObject:SetActive(false)
+	if(timerId ~= nil)then
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = nil
+	end
+end
+
+function onDestroy()
+	ClearData()
+end

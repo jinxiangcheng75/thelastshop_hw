@@ -1,0 +1,42 @@
+--XLuaUtils
+--require xlua > v2.1.12
+
+require("xlua/util")
+
+
+function get_csharp_list(csType)
+	local list = CS.System.Collections.Generic.List(csType)
+	return list()
+end
+
+function get_csharp_dict(csKeyType, csValueType)
+	local dict = CS.System.Collections.Generic.Dictionary(csKeyType, csValueType)
+	return dict()
+end
+
+function get_csharp_stack(csKeyType)
+	local stack = CS.System.Collections.Generic.Stack(csKeyType)
+	return stack()
+end
+
+function get_csharp_array(csType,csLen)
+	local array = CS.System.Array.CreateInstance(typeof(csType),csLen)
+	return array
+end
+
+function CSharpListToLuaTable(CSharpList)
+	
+	--将C#的List转成Lua的Table
+	local list = {}
+	if CSharpList then
+		local index = 1
+		local iter = CSharpList:GetEnumerator()
+		while iter:MoveNext() do
+			local v = iter.Current
+			list[index] = v
+			index = index + 1
+		end
+	end
+	return list
+	
+end

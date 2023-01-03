@@ -1,0 +1,135 @@
+-- ActivityPointSystem
+
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("utils/XLuaUtils")
+
+require("ui/view/Activity/Point/ActivityPointUIView")
+require("ui/view/Activity/Point/ActivityPointMallInfoUIView")
+
+local EventDispatcher = require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+ActivityPointSystem = class(BaseSystem)
+ActivityPointSystem.super = BaseSystem
+
+function ActivityPointSystem:ctor()
+
+end
+
+function ActivityPointSystem:OnInit()
+
+end
+
+function ActivityPointSystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.OpenUI_ActivityPoint_MainUI,self,self.openActivityPointMainUI)
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.OpenUI_ActivityPoint_MallInfoUI,self,self.openActivityPointGoodInfoUI)
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.HideUI_ActivityPoint_MallInfoUI,self,self.hideActivityPointGoodInfoUI)
+	
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_MainUI,self,self.refreshActivityPointMainUI)
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_MainAllUI,self,self.refreshActivityPointAllMainUI)
+	
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.Request_ActivityPoint_CheckData,self,self.requestActivityPointCheck)
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.Request_ActivityPoint_Reward,self,self.requestActivityPointReward)
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.Request_ActivityPoint_Exchange,self,self.requestActivityPointExchange)
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.Request_PointActivity_CheckExchange,self,self.requestActivityPointExchangeCheck)
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.Request_PointActivity_CheckExchange2,self,self.requestActivityPointExchange2Check)
+	EventDispatcher:addEvent(GameEvent.ActivityPointEvent.Request_Pay_PointActivityPurchase,self,self.requestActivityPointPurchaseCheck)
+
+
+end
+
+function ActivityPointSystem:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.OpenUI_ActivityPoint_MainUI,self.openActivityPointMainUI)
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.OpenUI_ActivityPoint_MallInfoUI,self.openActivityPointGoodInfoUI)
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.HideUI_ActivityPoint_MallInfoUI,self.hideActivityPointGoodInfoUI)
+	
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_MainUI,self.refreshActivityPointMainUI)
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_MainAllUI,self.refreshActivityPointAllMainUI)
+	
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.Request_ActivityPoint_CheckData,self.requestActivityPointCheck)
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.Request_ActivityPoint_Reward,self.requestActivityPointReward)
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.Request_ActivityPoint_Exchange,self.requestActivityPointExchange)
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.Request_PointActivity_CheckExchange,self,self.requestActivityPointExchangeCheck)
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.Request_PointActivity_CheckExchange2,self,self.requestActivityPointExchange2Check)
+	EventDispatcher:removeEvent(GameEvent.ActivityPointEvent.Request_Pay_PointActivityPurchase,self,self.requestActivityPointPurchaseCheck)
+
+
+end
+
+function ActivityPointSystem:requestActivityPointCheck()
+	local rep = MsgType.Request_PointActivity_CheckData:New()
+	rep:Send()
+end
+
+function ActivityPointSystem:requestActivityPointExchangeCheck()
+	local rep = MsgType.Request_PointActivity_CheckExchange:New()
+	rep:Send()
+end
+
+function ActivityPointSystem:requestActivityPointExchange2Check()
+	local rep = MsgType.Request_PointActivity_CheckExchange2:New()
+	rep:Send()
+end
+
+function ActivityPointSystem:requestActivityPointPurchaseCheck()
+	local rep = MsgType.Request_Pay_PointActivityPurchase:New()
+	rep:Send()
+end
+
+function ActivityPointSystem:requestActivityPointReward(taskId)
+	local rep = MsgType.Request_PointActivity_Reward:New()
+	rep.taskId = taskId
+	rep:Send()
+end
+
+function ActivityPointSystem:requestActivityPointExchange(index,useExchangeId)
+	local rep = MsgType.Request_PointActivity_Exchange:New()
+	rep.id = index
+	rep.itemId = useExchangeId
+	rep:Send()
+end
+
+function ActivityPointSystem:refreshActivityPointMainUI(index)
+	local activityPointUIView = GUIManager.inst:GetWindow(Constants.ViewName.ActivityPointUIView, false)
+	if(activityPointUIView ~= nil and activityPointUIView.isShowing)then
+		activityPointUIView:Refresh(index)
+	end
+end
+
+function ActivityPointSystem:refreshActivityPointAllMainUI()
+	local activityPointUIView = GUIManager.inst:GetWindow(Constants.ViewName.ActivityPointUIView, false)
+	if(activityPointUIView ~= nil and activityPointUIView.isShowing)then
+		activityPointUIView:RefreshAll()
+	end
+end
+
+function ActivityPointSystem:hideActivityPointGoodInfoUI()
+	GUIManager.inst:HideView(Constants.ViewName.ActivityPointMallInfoUIView)
+end
+
+function ActivityPointSystem:openActivityPointMainUI(activityPointType,needScrollToTop)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.ActivityPointUIView,
+		function(view)
+			view:ShowByActivityPointType(activityPointType,needScrollToTop)
+		end
+	)
+end
+
+function ActivityPointSystem:openActivityPointGoodInfoUI(data,fromType)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.ActivityPointMallInfoUIView,
+		function(view)
+			view:SetData(data,fromType)
+		end
+	)
+end
+
+----------------------------------------------------------------------

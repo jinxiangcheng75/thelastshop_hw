@@ -1,0 +1,86 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csCharacterManagerInst = CS.CharacterManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local csEGender = CS.EGender
+local csVector3 = CS.UnityEngine.Vector3
+local csSpineUtils = CS.SpineUtils
+
+local goldenCityPrepareAwardItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	goldenCityPrepareAwardItem_dlc = GoldenCityPrepareAwardItem_dlc.new()
+	goldenCityPrepareAwardItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if goldenCityPrepareAwardItem_dlc~=nil then
+		goldenCityPrepareAwardItem_dlc:Clear()
+		goldenCityPrepareAwardItem_dlc = nil
+	end
+end
+
+function SetData(_data)
+	if goldenCityPrepareAwardItem_dlc~=nil then
+		goldenCityPrepareAwardItem_dlc:SetData(_data)
+	end
+end
+
+GoldenCityPrepareAwardItem_dlc = class()
+
+function GoldenCityPrepareAwardItem_dlc:ctor()
+
+end
+
+function GoldenCityPrepareAwardItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+
+	self.data = nil
+end
+
+function GoldenCityPrepareAwardItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.icon = self.contentPane:GetObjByName("icon"):GetComponent("GUIIcon")
+	self.valText = self.contentPane:GetObjByName("valText"):GetComponent("Text")
+end
+
+function GoldenCityPrepareAwardItem_dlc:SetData(_data)
+	
+	if(_data == nil) then return end
+
+	self.data = _data
+
+	local itemCfg = CS.ItemconfigManager.inst:GetConfig(self.data.itemId)
+
+	if(itemCfg ~= nil)then
+		self.icon.enabled = true
+		self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+	else
+		self.icon.enabled = false
+	end
+	
+	self.valText.text = self.data.valStr
+	
+end
+
+function GoldenCityPrepareAwardItem_dlc:Clear()
+
+	self:removeListeners()
+
+end
+
+function GoldenCityPrepareAwardItem_dlc:addListeners()
+
+end
+
+function GoldenCityPrepareAwardItem_dlc:removeListeners()
+
+end

@@ -1,0 +1,75 @@
+require("class")
+
+
+local StateMachine = class()
+
+function StateMachine:ctor()
+	
+	self.curState = nil
+	self.lastState = nil
+	self.stateDic = {}
+	
+end
+
+function StateMachine:Init(states)
+	
+	for i = 1, #states do
+		self:AddState(states[i])
+	end
+	
+end
+
+function StateMachine:AddState(state)
+	
+	if self.stateDic[state:getStateType()] == nil then
+		self.stateDic[state:getStateType()] = state
+	else
+		print("重复key值的状态");
+	end
+	
+end
+
+function StateMachine:DelState(stateType)
+	
+	if self.stateDic[stateType] == nil then
+		self.stateDic[stateType] = nil
+	end
+	
+end
+
+function StateMachine:SetState(stateType,info)
+	
+	if self.stateDic[stateType] ~= nil then
+		
+		if self.lastState ~= nil then
+			self.lastState:onExit()
+		end
+		
+		self.curState = self.stateDic[stateType]
+		self.curState:onEnter(info)
+		
+		self.lastState = self.curState
+		
+	end
+	
+end
+
+function StateMachine:GetCurState()
+	
+	if self.curState ~= nil then
+		return self.curState:getStateType()
+	end
+	
+	return -1
+	
+end
+
+function StateMachine:OnUpdate()
+	
+	if self.curState ~= nil then
+		self.curState:onUpdate()
+	end
+	
+end
+
+return StateMachine

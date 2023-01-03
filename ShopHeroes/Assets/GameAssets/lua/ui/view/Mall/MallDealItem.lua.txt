@@ -1,0 +1,69 @@
+local selfBtn
+local nameText
+local icon
+local numText
+local originalPriceText
+local showPriceText
+local grayImg
+local gouImg
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local EventDispatcher = require("event/EventDispatcher")
+
+local data
+
+function InitComp()
+	selfBtn = self.gameObject:GetComponent("Button")
+	nameText = self:GetObjByName("dealItemName"):GetComponent("Text")
+	icon = self:GetObjByName("dealItemIcon"):GetComponent("GUIIcon")
+	numText = self:GetObjByName("dealItemNum"):GetComponent("Text")
+	originalPriceText = self:GetObjByName("dealItemOriginalPrice"):GetComponent("Text")
+	showPriceText = self:GetObjByName("dealItemShowPrice"):GetComponent("Text")
+	grayImg = self:GetObjByName("gray"):GetComponent("Image")
+	gouImg = self:GetObjByName("gouImg"):GetComponent("Image")
+
+	selfBtn:ButtonClickTween(
+		function()
+			if data == nil then
+				return
+			end
+			-- 展示商品界面
+			if (data.buyCount < data.buyCountLimit) then
+				EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_DealInfoUI, data)
+			end
+		end
+	)
+end
+
+function SetData(_data)
+	data = _data
+
+	nameText.text = cs_LanguageManagerInst:GetValueByKey(data.name)
+
+	if (data.atlasIcon ~= "-1" and data.icon1 ~= "-1") then
+		icon:SetSprite(data.atlasIcon, data.icon1)
+	end
+
+	local salePriceStr = CS.GamePay.inst:GetProductPrice(data.payProduct.productId)
+	local splitIndex = 1
+	for i = 1, #salePriceStr do
+		if(tonumber(string.sub(salePriceStr,i,i)) ~= nil)then
+			splitIndex = i
+			break
+		end
+	end
+	local monetaryUnit = string.sub(salePriceStr,1,splitIndex - 1)
+	local salePrice = tonumber(string.sub(salePriceStr,splitIndex,-1))
+	--local originalPrice = monetaryUnit .. (salePrice * data.originalPrice / 100)
+	local originalPrice = "0"
+	if salePrice ~= nil then
+		originalPrice = monetaryUnit .. (salePrice * data.originalPrice / 100)
+	end
+
+	originalPriceText.text = cs_LanguageManagerInst:GetValueByKey("价值{0}",originalPrice) 
+	print("这个特惠礼包的价格是" .. salePriceStr)
+	showPriceText.text = salePriceStr
+	numText.text = tostring(data.itemList[1].count)
+	grayImg.enabled = data.buyCount >= data.buyCountLimit
+	gouImg.enabled = data.buyCount >= data.buyCountLimit
+end

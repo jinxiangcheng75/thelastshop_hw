@@ -1,0 +1,221 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/Role/RoleExchangeUIView")
+require("ui/view/Role/RoleAddNewUIView")
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+RoleExchangeSystem = class(BaseSystem)
+RoleExchangeSystem.super = BaseSystem
+
+local roleExchangeUIView
+local roleAddNewUIView
+
+function RoleExchangeSystem:ctor()
+end
+
+function RoleExchangeSystem:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.RoleExchange.ShowUI_RoleExchange,self,self.openRoleExchangeUI)
+	EventDispatcherInis:addEvent(GameEvent.RoleExchange.HideUI_RoleExchange,self,self.hideRoleExchangeUI)
+	EventDispatcherInis:addEvent(GameEvent.RoleExchange.RefreshUI_RoleExchange,self,self.refreshHeroExchangeUI)
+	EventDispatcherInis:addEvent(GameEvent.RoleExchange.ShowUI_RoleAddNew,self,self.openRoleAddNewUI)
+	EventDispatcherInis:addEvent(GameEvent.RoleExchange.ShowUI_RoleAtt,self,self.openRoleAttUI)
+end
+
+function RoleExchangeSystem:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.RoleExchange.ShowUI_RoleExchange,self.openRoleExchangeUI)
+	EventDispatcherInis:removeEvent(GameEvent.RoleExchange.HideUI_RoleExchange,self.hideRoleExchangeUI)
+	EventDispatcherInis:removeEvent(GameEvent.RoleExchange.RefreshUI_RoleExchange,self.refreshHeroExchangeUI)
+	EventDispatcherInis:removeEvent(GameEvent.RoleExchange.ShowUI_RoleAddNew,self.openRoleAddNewUI)
+	EventDispatcherInis:removeEvent(GameEvent.RoleExchange.ShowUI_RoleAtt,self.openRoleAttUI)
+end
+
+function RoleExchangeSystem:OnInit()
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Hero_WorkerChange_Cmd,
+		function(resp)
+			print("Response_Hero_WorkerChange_Cmd success", resp)
+			self:GetWorkerChangeData(resp)
+		end,
+		function(code)
+			print("Response_Hero_WorkerChange_Cmd fail --- code", code)
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Explore_End_Cmd,
+		function(resp)
+			print("Response_Explore_End_Cmd success", resp)
+			self:GetExploreEndData(resp)
+		end,
+		function(code)
+			print("Response_Explore_End_Cmd fail --- code", code)
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Explore_Refresh_Cmd,
+		function(resp)
+			print("Response_Explore_Refresh_Cmd success", resp)
+			self:GetExploreSlotRefreshData(resp)
+		end,
+		function(code)
+			print("Response_Explore_Refresh_Cmd fail --- code", code)
+		end
+	)
+
+
+end
+
+function RoleExchangeSystem:openRoleAttUI(heroUid)
+	
+end
+
+function RoleExchangeSystem:openRoleAddNewUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RoleAddNewUIView,
+		function(view)
+			roleAddNewUIView = view
+		end
+	)
+end
+
+function RoleExchangeSystem:refreshHeroExchangeUI()
+	roleExchangeUIView = GUIManager.inst:GetWindow(Constants.ViewName.RoleExchangeUIView, false)
+	if(roleExchangeUIView ~= nil and roleExchangeUIView.isShowing)then
+		roleExchangeUIView:SetUIData()
+	end
+end
+
+function RoleExchangeSystem:openRoleExchangeUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RoleExchangeUIView,
+		function(view)
+			roleExchangeUIView = view
+			roleExchangeUIView:SetUIData()
+		end
+	)
+end
+
+function RoleExchangeSystem:hideRoleExchangeUI()
+	GUIManager.inst:HideView(Constants.ViewName.RoleExchangeUIView)
+end
+
+function RoleExchangeSystem:GetWorkerChangeData(respData)
+
+
+	local data = MsgType.Response_Hero_WorkerChange:New(respData)
+
+	if data.errorCode == 13001 then
+
+		local workerData = CS.RoleDataProxy.inst:GetWorker(data.worker.workerId);
+
+		if workerData ~= nil then
+
+			if CS.UserDataProxy.inst.playerData.level < workerData.config.level then
+				EventDispatcherInis:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("需要店主达到{0}级",tostring(workerData.config.level)),"FF2828")
+			else
+
+				if workerData.config.get_type == 5 then
+
+					local buildingCfg = CS.BuildingConfigManager.inst:GetConfig(workerData.config.build_id)
+					EventDispatcherInis:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("需要{0}达到{1}级",CS_LanguageManagerInst:GetValueByKey(buildingCfg.name),tostring(workerData.config.build_level_id)),"FF2828")
+
+				elseif workerData.config.get_type == 6 then
+
+					EventDispatcherInis:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("需要等待礼包活动开启"),"FF2828")
+
+				end
+
+			end
+
+		end
+
+	end
+
+end
+
+xlua.private_accessible(CS.ExploreDataProxy)
+
+function RoleExchangeSystem:GetExploreEndData(respData)
+
+
+	local contentObj = CS.JsonMapper.ToObject(respData)
+	local data = CS.Response_Explore_End()
+	data:Decode(contentObj)
+
+
+	if(data.errorCode ~= 0)then return end
+
+	CS.ExploreDataProxy.inst.heroInfos:Clear()
+	CS.ExploreDataProxy.inst.currExploreData = data
+	
+	CS.ExploreDataProxy.inst.slotType = CS.ExploreDataProxy.inst.currExploreData.exploreSlot.slotType
+
+	csEventControllerInst:TriggerEvent(csGameEventType.RoleEvent.ROLEINFO_HIDEUI)
+	csEventControllerInst:TriggerEvent(csGameEventType.RoleEvent.ROLE_HIDEUI)
+
+	local tempData = CS.ExploreDataProxy.inst:GetMakeSlot(data.exploreSlot.slotId)
+	if(tempData ~= nil)then
+		tempData:setData(data.exploreSlot)
+	end
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua4")
+	local func = funcGeneric(CS.System.Int32, CS.System.Int32,CS.System.String,CS.CombatReport)
+	func(
+		csEventControllerInst,
+		csGameEventType.CombatEvent.COMBAT_SETANDINTOCOMBAT,
+		data.exploreId,1,"",data.combatReport
+	)
+
+	if(data.exploreSlot.slotType == 0 or data.exploreSlot.slotType == 1)then
+		CS.ExploreDataProxy.inst.exploreGroupData =  CS.ExploreGroupData()
+		local lastData = CS.ExploreDataProxy.inst:GetGroupDataByGroupId(data.exploreGroupData.groupId)
+		CS.ExploreDataProxy.inst.exploreGroupData.level = lastData.groupData.level
+		CS.ExploreDataProxy.inst.exploreGroupData.exp = lastData.groupData.exp
+		CS.ExploreDataProxy.inst.exploreGroupData.groupId = lastData.groupData.groupId
+		CS.ExploreDataProxy.inst:AddExploreData(data.exploreGroupData)
+	end
+	
+	for i = 0, data.heroInfo.Count - 1 do
+		local index = i
+		local item = data.heroInfo[index]
+		local roleData =  CS.RoleHeroData()
+		local lastRoleData = CS.RoleDataProxy.inst:GetHeroDataByUid(item.heroUid)
+		roleData.level = lastRoleData.level
+		roleData.exp = lastRoleData.exp
+		roleData.uid = lastRoleData.uid
+		roleData.fightingNum = lastRoleData.fightingNum
+		roleData.config = lastRoleData.config
+		CS.ExploreDataProxy.inst.heroInfos:Add(roleData)
+		CS.RoleDataProxy.inst:AddHeroData(item)
+	end
+	--CS.ExploreDataProxy.inst:GetExploreEndData(data)
+
+	EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.HideUI_GoldenCityMain)
+end
+
+function RoleExchangeSystem:GetExploreSlotRefreshData(respData)
+
+
+	local contentObj = CS.JsonMapper.ToObject(respData)
+	local data = CS.Response_Explore_Refresh()
+	data:Decode(contentObj)
+
+	CS.ExploreDataProxy.inst:GetExploreSlotRefreshData(data)
+	if(data.exploreSlotList.slotType == 3)then
+		EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_Adventure,data.exploreSlotList.slotId)
+	end
+	EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_MainUI)
+	EventDispatcherInis:dispatchEvent(
+		GameEvent.GoldenCityEvent.RefreshRedPoint_Activity_GoldenCity_ScoreCanReward,
+		GoldenCityDataProxy.inst:GetScoreReallyCanRewardCount() > 0
+	)
+end

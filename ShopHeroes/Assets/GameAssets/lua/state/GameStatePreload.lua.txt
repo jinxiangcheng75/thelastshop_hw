@@ -1,0 +1,111 @@
+--GameStatePreload
+
+require("class")
+require("event/GameEvent")
+require("asset/AssetHandler")
+
+local AddressableManager = require("asset/AddressableManager")
+local EventDispatcher = require("event/EventDispatcher")
+local BaseState = require("state/BaseState")
+local coroutine_cs = require("coroutine_cs")
+
+local csAtlasAssetHandlerInst = CS.AtlasAssetHandler.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csManagerBinder = CS.ManagerBinder
+local cskGameState = CS.kGameState
+local GameStatePreload = class(BaseState)
+
+local isLoadGameCsv = false
+
+function GameStatePreload:onEnter(transition)
+	print("enter GameStatePreload")
+	csManagerBinder.inst.mGameState = cskGameState.Preload
+
+	--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_LOADINGUI)
+
+	self:onUpdateComplete()
+end
+
+function GameStatePreload:onUpdateComplete()
+	--notify update complete
+	print("onUpdateComplete")
+	--VersionAssetHandler:handle(GameStatePreload.onConfigLoaded)
+	GameStatePreload.onConfigLoaded()
+	CS.ManagerBinder.inst.stateIsChanging = false
+end
+
+function GameStatePreload:onConfigLoaded()
+	print("onConfigLoaded")
+	if (csManagerBinder.inst.isReStart == true) then
+		--GameStatePreload:ReloadCSV()
+		csManagerBinder.inst:ReLoadCfgManagerAsync(
+			function()
+				GameStatePreload:initConfigs()
+			end
+		)
+	else
+		csManagerBinder.inst:InitCfgManagerAsync(
+			function()
+				GameStatePreload:initConfigs()
+			end
+		)
+	end
+end
+
+function GameStatePreload:initConfigs()
+	isLoadGameCsv = true
+
+	-- Lua Configs
+	--TestNewConfigManager:InitCSVConfig()
+	ManagerBinder.inst:initConfigs()
+	CS.WordFilter.inst:InitCSV()
+	print("GameStatePreload:InitCSVConfig end")
+	--CS.CSVParser.ClearCaches()
+
+	EventDispatcher:dispatchEvent(GameEvent.Asset.Start_System)
+
+	GameStatePreload:delayChangeState()
+	--test
+	-- local item = CS.ItemconfigManager.inst:GetConfig(20001)
+	-- print("item.name:",item.name)
+end
+
+-- function GameStatePreload:loadScene()
+--     print("GameStatePreload:loadScene")
+--     coroutine_cs.start(function ()
+--         local aop = CS.ManagerBinder.inst.mSceneMgr:loadScene("00Welcome")
+--         coroutine.yield(aop)
+--         if(aop.Status == 1)then
+--             GameStatePreload:delayChangeState()
+--         end
+--     end)
+--     CS.Managerbinder.inst.mSceneMgr:loadScene("00Welcome")
+-- end
+
+function GameStatePreload:delayChangeState()
+	print("GameStatePreload:delayChangeState")
+	coroutine_cs.start(
+		function()
+			local str = CS.LanguageManager.inst:GetValueByKey("进入壁垒...")
+
+			CS.FGUI.inst:updateProglressBar(str, 1, 0.2)
+			coroutine_cs.wait(0.3)
+			EventDispatcher:dispatchEvent(
+				GameEvent.State.Change_State,
+				{
+					state = kGameState.Login,
+					loading = false
+				}
+			)
+		end
+	)
+end
+
+function GameStatePreload:onExit()
+	-- hide ui
+	print("exit GameStatePreload")
+	csEventControllerInst:TriggerEvent(csGameEventType.HIDEUI_LOADINGUI)
+end
+
+return GameStatePreload

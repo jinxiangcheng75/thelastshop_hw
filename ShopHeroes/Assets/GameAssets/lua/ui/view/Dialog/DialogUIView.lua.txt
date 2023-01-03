@@ -1,0 +1,234 @@
+--DialogUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+local luaClass_PetBoothItem =  require("ui/view/Pet/PetBoothItem")
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_GameTimerInst = CS.GameTimer.inst
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_FieldConfigManagerInst = CS.FieldConfigManager.inst
+local CS_CharacterModelConfigManagerInst = CS.CharacterModelConfigManager.inst
+
+local Vector3 = CS.UnityEngine.Vector3
+
+
+DialogUIView = class(ViewBase)
+
+function DialogUIView:ctor()
+	self.viewID = Constants.ViewName.DialogUIView
+	DialogUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "top"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.noSetting
+end
+------------------------------------------------
+
+
+function DialogUIView:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.obj_tips = contentPane:GetObjByName("obj_tips")
+	self.tf_tipsModelPos = contentPane:GetObjByName("tf_tipsModelPos").transform
+	self.tx_tipsContent = contentPane:GetText("tx_tipsContent")
+
+	self.fullDialog = contentPane:GetObjByName("fullDialog")
+	self.dialogNextBtn = contentPane:GetButton("guideNextTalk")
+	self.modelPos = contentPane:GetObjByName("modelPos")
+	self.dialogName = contentPane:GetText("name")
+	self.dialogContent = contentPane:GetText("content")
+	self.img_next = contentPane:GetImage("img_nextBtn")
+
+	self.obj_bgMask = contentPane:GetObjByName("obj_bgMask")
+
+	self.tf_maskTarget = contentPane:GetObjByName("obj_maskTarget"):GetComponent("RectTransform")
+	self.fingerCtrl = contentPane:GetComponent(typeof(CS.GuideTriggerFinger))
+	self.maskCtrl = contentPane:GetComponent(typeof(CS.GuideTriggerMask))
+
+	self.obj_BG = contentPane:GetObjByName("obj_BG")
+
+end
+
+
+function DialogUIView:onInit()
+
+	self:initComp()
+
+	self.tipsDressUpSystem = nil
+	self.dialogDressUpSystem = nil
+	self.dialogIndex = 1
+	self.contents = nil
+	self.callback = nil
+
+	self.idleSpName = "idle_sp_1"
+	self.idleName = "idle_1"
+
+	self.dialogNextBtn.onClick:AddListener(
+		function ()
+			self:onDialogNextBtnClick()
+		end)
+
+end
+
+
+function DialogUIView:SetTipsData(content,modelId)
+
+	self.obj_tips:SetActive(true)
+	self.fullDialog:SetActive(false)
+	self.obj_bgMask:SetActive(false)
+
+	self.tx_tipsContent.text = CS_LanguageManagerInst:GetValueByKey(content)
+
+	local modelCfg = CS_CharacterModelConfigManagerInst:GetConfig(modelId);
+
+	if(self.tipsDressUpSystem == nil)then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByModel")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		func(CS_CharacterManagerInst,modelId,0.14,true,function (system)
+				self.tipsDressUpSystem = system
+				system.transform:SetParent(self.tf_tipsModelPos)
+				system.transform.localScale = Vector3.one * 0.5
+				system.transform.localPosition = Vector3.up * 95
+
+				self.tipsDressUpSystem:Play(self.idleSpName,false,1,0,function ()
+						self.tipsDressUpSystem:Play(self.idleName,true,1,0,nil)
+					end)
+
+			end,nil)
+	else
+		CS_CharacterManagerInst:ReSetCharacterByModel(self.tipsDressUpSystem,modelId,true,nil)
+		self.tipsDressUpSystem:Play(self.idleSpName,false,1,0,function ()
+				self.tipsDressUpSystem:Play(self.idleName,true,1,0,nil)
+			end)
+	end
+
+end
+
+function DialogUIView:SetData(content,modelId,callback)
+
+	self.obj_tips:SetActive(false)
+	self.fullDialog:SetActive(true)
+	self.obj_bgMask:SetActive(true)
+
+	self.callback = callback
+	local modelCfg = CS_CharacterModelConfigManagerInst:GetConfig(modelId);
+
+	self.dialogName.text = CS_LanguageManagerInst:GetValueByKey(modelCfg.name)
+
+	
+	
+	if(self.dialogDressUpSystem == nil)then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByModel")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		func(CS_CharacterManagerInst,modelId,0.14,true,function (system)
+				self.dialogDressUpSystem = system
+				system.transform:SetParent(self.modelPos.transform)
+				system.transform.localScale = Vector3.one * 1.3
+				system.transform.localPosition = Vector3.zero
+
+				self.dialogDressUpSystem:Play(self.idleSpName,false,1,0,function ()
+						self.dialogDressUpSystem:Play(self.idleName,true,1,0,nil)
+					end)
+
+			end,nil)
+	else
+		CS_CharacterManagerInst:ReSetCharacterByModel(self.dialogDressUpSystem,modelId,true,nil)
+		self.dialogDressUpSystem:Play(self.idleSpName,false,1,0,function ()
+				self.dialogDressUpSystem:Play(self.idleName,true,1,0,nil)
+			end)
+	end
+
+	self.dialogIndex = 1
+
+	if type(content) == "string" then
+		self.contents = {}
+		self.contents[1] = content
+	elseif type(content) == "table" then
+		self.contents = content
+	end
+
+	self:nextDialog()
+
+end
+
+
+function DialogUIView:showMask()
+	self.obj_bgMask:SetActive(false)
+	self.maskCtrl.enabled = true
+	self.maskCtrl:ShowGMask(self.tf_maskTarget)
+end
+
+function DialogUIView:hideMask()
+	self.maskCtrl.enabled = false
+	self.obj_bgMask:SetActive(true)
+end
+
+function DialogUIView:nextDialog()
+
+	if self.dialogIndex > #self.contents then
+
+		self.obj_bgMask:SetActive(false)
+		self.fullDialog:SetActive(false)
+
+		if self.callback ~= nil then
+			self.callback()
+			self.callback = nil
+		end
+	else
+		self.dialogContent.text = ""
+		self.dialogContent:DOText(CS_LanguageManagerInst:GetValueByKey(self.contents[self.dialogIndex]),0.5)
+		self.img_next.enabled = self.dialogIndex ~= #self.contents
+		self.dialogIndex = self.dialogIndex + 1
+	end
+
+
+
+end
+
+
+function DialogUIView:onDialogNextBtnClick()
+
+	self:nextDialog()
+
+end
+
+
+function DialogUIView:ShowFinger(targetTf,offset)
+	self.fingerCtrl:ShowFinger(targetTf,offset)
+end
+
+function DialogUIView:HideFinger()
+	self.fingerCtrl:HideFinger()
+end
+
+function DialogUIView:Clear()
+
+	self.fullDialog:SetActive(false)
+	self.obj_bgMask:SetActive(false)
+	self.obj_tips:SetActive(false)
+	self:HideFinger()
+	self:hideMask()
+
+end
+
+
+function DialogUIView:onHide()
+
+	print("DialogUIView onHide")
+
+end
+
+function  DialogUIView:onShowed()
+	print("DialogUIView onShowed")
+end

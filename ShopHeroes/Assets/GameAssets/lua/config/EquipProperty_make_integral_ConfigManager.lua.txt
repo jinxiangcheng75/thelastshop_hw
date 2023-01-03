@@ -1,0 +1,105 @@
+-- EquipProperty_make_integral_ConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+
+EquipProperty_make_integral_Config =
+class(
+	{
+		id,
+		make_integral
+	}
+)
+
+
+EquipProperty_make_integral_ConfigManager = class()
+--EquipProperty_make_integral_ConfigManager.cfgDict = {}
+local csv_name = "equip_property"
+
+function EquipProperty_make_integral_ConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	self.wdpList = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+
+	local cfgs = CSVParser:parseClass(csv, 3, EquipProperty_make_integral_Config)
+	EquipProperty_make_integral_ConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("EquipProperty_make_integral_ConfigManager  错误")
+	end
+end
+
+function EquipProperty_make_integral_ConfigManager:processConfigs(cfgs)
+
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		c.make_integral = tonumber(c.make_integral)
+		self.cfgDict[tonumber(c.id)] = c
+	end
+
+end
+
+
+function EquipProperty_make_integral_ConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end
+
+function EquipProperty_make_integral_ConfigManager:GetEquipMakeIntegralByEquipDrawingId(equipDrawingId)
+	local config = EquipProperty_make_integral_ConfigManager:GetConfig(equipDrawingId)
+	return config == nil and 0  or config.make_integral
+end
+
+function EquipProperty_make_integral_ConfigManager:GetEquipFighting(cfg,talentCfg)
+
+	local fightingSum = 0
+
+	local properties = {}
+	local percent = 1
+
+	local equipDrawingCfg = cfg.equipDrawingsConfig
+	cfg = cfg.equipQualityConfig
+
+	if(talentCfg ~= nil)then
+		percent = talentCfg:GetValsByEquipType(equipDrawingCfg.type, equipDrawingCfg.sub_type)
+	end
+
+	properties[#properties + 1] = cfg.hp_basic
+	properties[#properties + 1] = cfg.atk_basic
+	properties[#properties + 1] = cfg.def_basic
+	properties[#properties + 1] = cfg.spd_basic
+	properties[#properties + 1] = cfg.acc_basic
+	properties[#properties + 1] = cfg.dodge_basic
+	properties[#properties + 1] = cfg.cri_basic
+	properties[#properties + 1] = cfg.tough_basic
+	properties[#properties + 1] = cfg.piercing_dmg
+	properties[#properties + 1] = cfg.burn_dmg
+	properties[#properties + 1] = cfg.ment_dmg
+	properties[#properties + 1] = cfg.electricity_dmg
+	properties[#properties + 1] = cfg.radiation_dmg
+	properties[#properties + 1] = cfg.piercing_res
+	properties[#properties + 1] = cfg.burn_res
+	properties[#properties + 1] = cfg.ment_res
+	properties[#properties + 1] = cfg.electricity_res
+	properties[#properties + 1] = cfg.radiation_res
+
+	local needSetWdpList = false
+	if(#self.wdpList <= 0)then
+		needSetWdpList = true
+	end
+
+	for i = 1, #properties do
+		local index = i
+		if(needSetWdpList)then
+			self.wdpList[#self.wdpList + 1] = CS_WorldParConfigManagerInst:GetConfig(200 + index - 1).parameters
+		end
+		if(properties[index] > 0)then
+			fightingSum = fightingSum + (properties[index] * percent) * self.wdpList[i]
+		end
+	end
+
+	return fightingSum
+
+end

@@ -1,0 +1,72 @@
+
+-- ChatEmojiConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local CS_CSVParser = CS.CSVParser
+
+ChatEmojiConfig =
+class({
+		id = 1,
+		atlas = "",
+		icon = "",
+		isShow = true,
+		type = 0, -- 0 常规用户  1  VIP用户
+	})
+
+ChatEmojiConfigManager = class()
+--ChatEmojiConfigManager.cfgDict = {}
+local csv_name = "chatEmoji"
+
+function ChatEmojiConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = CS_CSVParser.GetCSV(csv_name)
+
+	local cfgs = CSVParser:parseClass(csv, 3, ChatEmojiConfig)
+	ChatEmojiConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("ChatEmojiConfigManager  错误")
+	end
+end
+
+function ChatEmojiConfigManager:processConfigs(cfgs)
+
+	for i=1, #cfgs do
+
+		local c = cfgs[i]
+
+		c.id = tonumber(c.id)
+		c.isShow = tonumber(c.isShow) == 1
+		c.type = tonumber(c.type)
+
+		self.cfgDict[tonumber(c.id)] = c
+
+	end
+
+end
+
+function ChatEmojiConfigManager:GetAllShowConfig()
+
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+
+		if v.isShow then
+			tempList[index] = v
+			index = index + 1
+		end
+
+	end
+
+	table.sort(tempList,function (a,b)
+			return a.id < b.id
+		end)
+
+	return tempList
+
+end
+
+function ChatEmojiConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end

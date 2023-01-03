@@ -1,0 +1,208 @@
+--GiftSevenUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+
+local CS_GameObject = CS.UnityEngine.GameObject
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local csGUIHelper = CS.GUIHelper
+
+local Vector3 = CS.UnityEngine.Vector3
+
+GiftSevenUIView = class(ViewBase)
+
+function GiftSevenUIView:ctor()
+	self.viewID = Constants.ViewName.GiftSevenUIView
+	GiftSevenUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	--self.isShowResPanel = true
+	--self.topResPanelType = CS.TopPlayerShowType.noSetting
+end
+
+function GiftSevenUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.roleTf =  contentPane:GetObjByName("roleTf").transform
+	self.loginDayText =  contentPane:GetText("loginDayText")
+	self.GiftSevenItem =  contentPane:GetObjByName("GiftSevenItem"):GetComponent("LuaListItem")
+	self.dayDescText =  contentPane:GetText("dayDescText")
+	self.buyBtnPriceText =  contentPane:GetText("buyBtnPriceText")
+	self.scrollView =  contentPane:GetObjByName("scrollView"):GetComponent(CS_type_superList)
+	self.doBtn =  contentPane:GetButton("doBtn")
+	self.closeBtn =  contentPane:GetButton("closeBtn")
+end
+
+
+function GiftSevenUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.doBtn:ButtonClickTween(
+		function ()
+			if(GiftSevenDataProxy.inst.isRecharge)then
+				if(GiftSevenDataProxy.inst.isReward)then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+					func(
+						CS_EventControllerInst,
+						CS_GameEventType.SHOWUI_TEXTMSGTIP,
+						CS_LanguageManagerInst:GetValueByKey("今日奖励已领取"),
+						csGUIHelper.GetColorByColorHex("FF2828")
+					)
+				else
+					-- 协议领奖
+					EventDispatcher:dispatchEvent(GameEvent.GiftSevenEvent.Request_AmountReward)
+				end
+			else
+				local giftId = 10001
+				if(CS.WorldParConfigManager.inst:GetConfig(8308) ~= nil)then
+					giftId = CS.WorldParConfigManager.inst:GetConfig(8308).parameters
+				end
+				EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.CSCallLua_ShowGiftDeatilUI, giftId)
+				--EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallUI,3)
+			end
+		end
+	)
+
+	self.scrollView.itemRenderer = function(index,item)
+		self:ListItemRenderer(index,item)
+	end
+
+	self.listItemCount = 0
+	self.graphicCharacter = nil
+	self.dataList = {}
+end
+
+function GiftSevenUIView:ListItemRenderer(index,item)
+	local prefabItem = item
+	if(index >= self.listItemCount)then
+		prefabItem.gameObject:SetActive(false)
+	end
+
+	if(index < self.listItemCount)then
+		prefabItem.gameObject:SetActive(true)
+		self.dataList[index + 1].itemType = 2
+		prefabItem:SetData(self.dataList[index + 1])
+	end
+end
+
+function  GiftSevenUIView:onShowed()
+	print("GiftSevenUIView onShowed")
+
+	local list = GiftSevenConfigManager:GetAllConfig()
+
+	if(list == nil or #list <= 0) then return end
+
+	for i = 1, #list do
+		local data = {}
+		local item = MsgType.OneRewardItem:New()
+		item.itemType = list[i].prop_type
+		item.itemId = list[i].prop_id
+		item.count = list[i].prop_quantity
+		data.item = item
+		data.cfg = list[i]
+		self.dataList[i] = data
+	end
+
+	self:SetUIData()
+	self:SetListItemTotalCount(#self.dataList)
+	self.scrollView:scrollByItemIndex(GiftSevenDataProxy.inst.day - 1)
+end
+
+function GiftSevenUIView:SetListItemTotalCount(count)
+	self.listItemCount = count
+	if(count < 0)then
+		self.listItemCount = 0
+	end
+
+	self.scrollView.totalItemCount = count
+end
+
+function GiftSevenUIView:RefreshUIData()
+	self:SetUIData()
+	self.scrollView:scrollByItemIndex(GiftSevenDataProxy.inst.day - 1)
+	self.scrollView:refresh()
+end
+
+function GiftSevenUIView:SetUIData()
+	local curDayData = self.dataList[GiftSevenDataProxy.inst.day]
+
+	if(curDayData == nil)then
+		print("输出 giftSeven curData is nil")
+		return
+	end
+	self.loginDayText.text = CS_LanguageManagerInst:GetValueByKey("登录 第 <Color=#FFB413>{0}</Color> 天",tostring(GiftSevenDataProxy.inst.day))
+	self.dayDescText.text = CS_LanguageManagerInst:GetValueByKey(curDayData.cfg.prop_dec)
+
+	if(GiftSevenDataProxy.inst.isRecharge)then
+		if(GiftSevenDataProxy.inst.isReward)then
+			self.buyBtnPriceText.text = CS_LanguageManagerInst:GetValueByKey("已领取")
+			CS.GUIHelper.SetUIGray(self.doBtn.transform,true)
+		else
+			self.buyBtnPriceText.text = CS_LanguageManagerInst:GetValueByKey("领取")
+			CS.GUIHelper.SetUIGray(self.doBtn.transform,false)
+		end
+	else
+		self.buyBtnPriceText.text = CS_LanguageManagerInst:GetValueByKey("前往充值")
+	end
+
+	curDayData.itemType = 1
+	self.GiftSevenItem:SetData(curDayData)
+	self:SetDressUpGraphic(curDayData.cfg.roleImg_icon)
+end
+
+function GiftSevenUIView:SetDressUpGraphic(roleImgIcon)
+	if self.graphicCharacter == nil then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		func(CS_CharacterManagerInst,roleImgIcon,nil,CS.EGender.Male,0.14,false,function (system)
+				self.graphicCharacter = system
+				system.transform:SetParent(self.roleTf)
+				system.transform.localScale = Vector3.one * 0.8
+				system.transform.localPosition = Vector3.zero
+
+				self.graphicCharacter:Play("idle",true)
+
+			end,nil)
+	else
+		CS_CharacterManagerInst:ReSetCharacter(self.graphicCharacter,roleImgIcon,nil,CS.EGender.Male,false)
+		self.graphicCharacter:Play("idle",true)
+		self.graphicCharacter.transform.localScale = Vector3.one * 0.8
+	end
+end
+
+function GiftSevenUIView:onHide()
+	print("GiftSevenUIView onHide")
+end
+
+function GiftSevenUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function GiftSevenUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function GiftSevenUIView:closeBtnClick()
+	self:hide()
+end
+
+------------------------------------------------

@@ -1,0 +1,99 @@
+local rankBgIcon
+local rankNumText
+local nameText
+local icon
+local allStars = {}
+local luxuryNumText
+local selfBtn
+local bgImage
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local luxuryObj
+
+require("config/LuxuryConfigManager")
+
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+
+local csLanguageManagerInst = CS.LanguageManager.inst
+
+local data
+
+function InitComp()
+	selfBtn = self:GetComponent("Button")
+	icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	rankNumText = self:GetObjByName("rankNum"):GetComponent("Text")
+	nameText = self:GetObjByName("nameText"):GetComponent("Text")
+	rankBgIcon = self:GetObjByName("rankIcon"):GetComponent("GUIIcon")
+	luxuryNumText = self:GetObjByName("luxuryNum"):GetComponent("Text")
+	luxuryObj = self:GetObjByName("Image")
+	bgImage = self:GetObjByName("normalBg"):GetComponent("Image")
+
+	allStars[1] = self:GetObjByName("star1"):GetComponent("GUIIcon")
+	allStars[2] = self:GetObjByName("star2"):GetComponent("GUIIcon")
+	allStars[3] = self:GetObjByName("star3"):GetComponent("GUIIcon")
+	allStars[4] = self:GetObjByName("star4"):GetComponent("GUIIcon")
+	allStars[5] = self:GetObjByName("star5"):GetComponent("GUIIcon")
+
+	selfBtn.onClick:AddListener(function ()
+			--EventDispatcher:dispatchEvent(GameEvent.LuxuryEvent.HideUI_LuxuryRank)
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.System.String)
+			func(csEventControllerInst, csGameEventType.SocialEvent.REQUEST_OTHERUSERDATA, data.userId)
+		end
+	)
+end
+
+function SetData(_data)
+	data = _data
+	bgImage.enabled = tonumber(data.rank) % 2 == 0
+	rankNumText.text = tostring(data.rank)
+	nameText.text = csLanguageManagerInst:GetValueByKey(data.name)
+	luxuryNumText.text = tostring(data.prosperity)
+
+	if(tonumber(data.rank) == 1)then
+		rankBgIcon.iconImage.enabled = true
+		rankBgIcon:SetSprite("luxury_atlas","jiaju_paiming1")
+	elseif tonumber(data.rank) == 2 then
+		rankBgIcon.iconImage.enabled = true
+		rankBgIcon:SetSprite("luxury_atlas","jiaju_paiming2")
+	elseif tonumber(data.rank) == 3 then
+		rankBgIcon.iconImage.enabled = true
+		rankBgIcon:SetSprite("luxury_atlas","jiaju_paiming3")
+	else
+		rankBgIcon.iconImage.enabled = false
+	end
+
+	local configData = LuxuryConfigManager:GetConfigByLuxuryNum(data.prosperity)
+
+	if(configData ~= nil)then
+		--luxuryObj:SetActive(true)
+		icon:SetSprite(configData.atlas,configData.icon)
+
+		for i = 1, #allStars do
+			if(i <= tonumber(configData.stars))then
+				allStars[i]:SetSprite("luxury_atlas","yingxiong_xingcheng")
+			else
+				allStars[i]:SetSprite("luxury_atlas","yingxiong_xingcheng1")
+			end
+		end
+	else
+		--luxuryObj:SetActive(false)
+		local tempConfigData = LuxuryConfigData:new()
+		configData = LuxuryConfigManager:GetConfig(1)
+		tempConfigData.atlas = configData.atlas
+		tempConfigData.icon = configData.icon
+		tempConfigData.stars = 0
+		
+		icon:SetSprite(tempConfigData.atlas,tempConfigData.icon)
+
+		for i = 1, #allStars do
+			if(i <= tonumber(tempConfigData.stars))then
+				allStars[i]:SetSprite("luxury_atlas","yingxiong_xingcheng")
+			else
+				allStars[i]:SetSprite("luxury_atlas","yingxiong_xingcheng1")
+			end
+		end
+	end
+end

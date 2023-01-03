@@ -1,0 +1,152 @@
+---------------------------------------------------------------------
+
+require("class")
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_ItemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_PayInst = CS.GamePay.inst
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+--WorkerGameExchangeItem
+
+WorkerGameExchangeItem = class()
+----
+
+function WorkerGameExchangeItem:ctor()
+end
+
+function WorkerGameExchangeItem:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.btn = self.transform:GetComponent("Button")
+	self.equipObj = self.contentPane:GetObjByName("obj_equip")
+	self.equipLvTx = self.contentPane:GetObjByName("tx_equipLv"):GetComponent("Text")
+	self.equipIcon = self.contentPane:GetObjByName("icon_equip"):GetComponent(CS_type_GUIIcon)
+
+	self.dressObj = self.contentPane:GetObjByName("obj_dress")
+	self.dressIcon = self.contentPane:GetObjByName("icon_dress"):GetComponent(CS_type_GUIIcon)
+	self.scoreTx = self.contentPane:GetObjByName("tx_score"):GetComponent("Text")
+	self.nameTx = self.contentPane:GetObjByName("tx_name"):GetComponent("Text")
+
+	self.obj_exchanged = self.contentPane:GetObjByName("obj_exchanged")
+
+	self.luxuryImage = self.contentPane:GetObjByName("luxuryNumImg"):GetComponent("Image")
+	self.luxuryNumText = self.contentPane:GetObjByName("luxuryNumText"):GetComponent("Text")
+
+
+end
+
+function WorkerGameExchangeItem:init(obj)
+	self:initComp(obj)
+
+	self.btn:ButtonClickTween(
+		function ()
+			self:onBtnClick()
+		end)
+
+end
+
+function WorkerGameExchangeItem:SetData(exchangeData)
+
+	self.data = exchangeData
+
+	local itemCfg = CS_ItemConfigManagerInst:GetConfig(exchangeData.itemId)
+	
+	self.luxuryImage.enabled = false
+	self.luxuryNumText.text = ""
+
+	if exchangeData.itemType == 16 then --图纸
+
+		local equipDrawingCfg = CS_EquipConfigManagerInst:GetEquipDrawingsCfg(itemCfg.effect)
+
+		self.equipObj:SetActive(true)
+		self.dressObj:SetActive(false)
+
+		self.equipIcon:SetSprite(equipDrawingCfg.atlas,equipDrawingCfg.icon)
+		self.equipLvTx.text = tostring(equipDrawingCfg.level)
+
+	elseif exchangeData.itemType == 40 or exchangeData.itemType == 41 then --家具 服饰
+
+		self.equipObj:SetActive(false)
+		self.dressObj:SetActive(true)
+
+		if(exchangeData.itemType == 40)then
+			self.luxuryImage.enabled = true
+			
+			local furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(tonumber(itemCfg.effect))
+			
+			if furnitureCfg ~= nil then
+
+				local luxury = 0
+
+				if furnitureCfg.type_1 == 1 then --墙壁
+
+					local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS_UserDataProxyInst.shopData.shopLevel)
+
+					luxury = math.ceil((cfg.size_x / 2 + cfg.size_y / 2 ) * furnitureCfg.luxury)
+
+				elseif furnitureCfg.type_1 == 2 then --地板
+
+					local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS_UserDataProxyInst.shopData.shopLevel)
+
+					luxury = math.ceil((cfg.size_x / 2) * (cfg.size_y / 2) * furnitureCfg.luxury)
+
+				else
+					luxury = furnitureCfg.luxury
+				end
+
+				self.luxuryNumText.text = tostring(luxury)
+
+			end
+			
+		else
+			self.luxuryImage.enabled = false
+			self.luxuryNumText.text = ""
+		end
+
+		self.dressIcon:SetSprite(itemCfg.atlas, itemCfg.icon)
+
+	end
+
+	self.scoreTx.text = tostring(exchangeData.cost)
+	self.nameTx.text = CS_LanguageManagerInst:GetValueByKey(itemCfg.name)
+
+	--todo
+	if exchangeData.state == MsgType.EOperatingActivityExchangeState.None then --正常状态
+		self.obj_exchanged:SetActive(false)
+	elseif exchangeData.state == MsgType.EOperatingActivityExchangeState.Exchanged then --兑换完毕状态
+		self.obj_exchanged:SetActive(true)
+	end
+
+end
+
+function WorkerGameExchangeItem:onBtnClick()
+
+	if self.data.state == MsgType.EOperatingActivityExchangeState.Exchanged then --兑换完毕状态
+		return
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGame_ExchangeItemDesUI,self.data)
+
+end
+
+return WorkerGameExchangeItem

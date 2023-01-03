@@ -1,0 +1,200 @@
+-- RuinsSystem
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/Ruins/RuinsTipUIView")
+require("ui/view/Ruins/RuinsMainUIView")
+require("ui/view/Ruins/RuinsPrepareUIView")
+require("ui/view/Ruins/RuinsFinishUIView")
+
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csGUIHelper = CS.GUIHelper
+
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_TimeUtils = CS.TimeUtils
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+
+RuinsSystem = class(BaseSystem)
+RuinsSystem.super = BaseSystem
+
+local ruinsTipUI
+local ruinsMainUI
+local ruinsPrepareUI
+local ruinsFinishUI
+
+function RuinsSystem:ctor()
+
+end
+
+function RuinsSystem:AddListeners()
+
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.OpenUI_RuinsTipUI,self,self.openRuinsTipUI)
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.OpenUI_RuinsMainUI,self,self.openRuinsMainUI)
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.HideUI_RuinsMainUI,self,self.hideMainUI)
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.OpenUI_RuinsPrepareUI,self,self.openRuinsPrepareUI)
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.HideUI_RuinsPrepareUI,self,self.hidePrepareUI)
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.OpenUI_RuinsFinishUI,self,self.openRuinsFinishUI)
+	
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.Request_RuinsData,self,self.requestRuinsData)
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.Request_RuinsBattle,self,self.requestRuinsBattle)
+	
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.ClickEvent_House,self,self.clickRuinsHouse)
+	
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.Ruins_SortAllHero,self,self.sortHeroList)
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.Ruins_RemoveHeroCom,self,self.removeHeroCom)
+	EventDispatcherInis:addEvent(GameEvent.RuinsEvent.Ruins_AddHeroCom,self,self.addHeroCom)
+
+end
+
+function RuinsSystem:RemoveListeners()
+
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.OpenUI_RuinsTipUI,self.openRuinsTipUI)
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.OpenUI_RuinsMainUI,self.openRuinsMainUI)
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.HideUI_RuinsMainUI,self.hideMainUI)
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.OpenUI_RuinsPrepareUI,self.openRuinsPrepareUI)
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.HideUI_RuinsPrepareUI,self.hidePrepareUI)
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.OpenUI_RuinsFinishUI,self.openRuinsFinishUI)
+	
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.Request_RuinsData,self.requestRuinsData)
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.Request_RuinsBattle,self.requestRuinsBattle)
+	
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.ClickEvent_House,self.clickRuinsHouse)
+		
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.Ruins_SortAllHero,self.sortHeroList)
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.Ruins_RemoveHeroCom,self.removeHeroCom)
+	EventDispatcherInis:removeEvent(GameEvent.RuinsEvent.Ruins_AddHeroCom,self.addHeroCom)
+
+end
+
+function RuinsSystem:addHeroCom(heroUid)
+	ruinsPrepareUI = GUIManager.inst:GetWindow(Constants.ViewName.RuinsPrepareUIView, false)
+	if(ruinsPrepareUI ~= nil and ruinsPrepareUI.isShowing)then
+		ruinsPrepareUI:AddHeroCom(heroUid)
+	end
+end
+
+function RuinsSystem:removeHeroCom(heroUid, index)
+	ruinsPrepareUI = GUIManager.inst:GetWindow(Constants.ViewName.RuinsPrepareUIView, false)
+	if(ruinsPrepareUI ~= nil and ruinsPrepareUI.isShowing)then
+		ruinsPrepareUI:RemoveHeroCom(heroUid, index)
+	end
+end
+
+function RuinsSystem:sortHeroList()
+	ruinsPrepareUI = GUIManager.inst:GetWindow(Constants.ViewName.RuinsPrepareUIView, false)
+	if(ruinsPrepareUI ~= nil and ruinsPrepareUI.isShowing)then
+		ruinsPrepareUI:SortAllHero()
+	end
+end
+
+function RuinsSystem:clickRuinsHouse(houseId)
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+	if(RuinsDataProxy.inst.curId ~= 9999)then
+		if(RuinsDataProxy.inst.curHouseId < houseId)then
+			func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, cs_LanguageManagerInst:GetValueByKey("未解锁"),csGUIHelper.GetColorByColorHex("FF2828"))
+		elseif RuinsDataProxy.inst.curHouseId > houseId then
+			func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, cs_LanguageManagerInst:GetValueByKey("已通过"),csGUIHelper.GetColorByColorHex("FF2828"))
+		else
+			EventDispatcherInis:dispatchEvent(GameEvent.RuinsEvent.OpenUI_RuinsPrepareUI)
+		end
+	else
+		func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, cs_LanguageManagerInst:GetValueByKey("已全部通关"),csGUIHelper.GetColorByColorHex("FF2828"))
+	end
+end
+
+--function RuinsSystem:ShowDailyTaskTip()
+--csEventControllerInst:TriggerEvent(csGameEventType.TaskEvent.SHOWTIP_DAILYTASK)
+--end
+
+--function RuinsSystem:ShowLookBackPanel()
+--local dateTime = CS_TimeUtils.getDateTimeBySecs(CS_GameTimerInst.serverNow)
+
+--if(CS.UserDataProxy.inst.playerData.unionId == nil or CS.UserDataProxy.inst.playerData.unionId == "") then
+--CS_PlayerPrefs.SetString(
+--CS_AccountDataProxyInst.account ..
+--"_LookBack_" .. tostring(dateTime.Year) .. tostring(dateTime.Month) .. tostring(dateTime.Day),"1"
+--)
+--return
+--end
+
+
+--if CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_LookBack_"..tostring(dateTime.Year)..tostring(dateTime.Month)..tostring(dateTime.Day), "-1") == "-1" then
+--if(CS.ChatDataProxy.inst.sysMsgChannelList.Count > 0)then
+--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+--local func = funcGeneric(CS.queueItem)
+--local queueItem = CS.queueItem(CS.ReceiveInfoUIType.LookBack, "", 0, 0, 0)
+--func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+--end
+--end
+
+--CS_PlayerPrefs.SetString(
+--CS_AccountDataProxyInst.account ..
+--"_LookBack_" .. tostring(dateTime.Year) .. tostring(dateTime.Month) .. tostring(dateTime.Day),"1"
+--)
+--end
+
+function RuinsSystem:openRuinsTipUI(fromType)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RuinsTipUIView,
+		function(view)
+			ruinsTipUI = view
+			ruinsTipUI:ShowUIByType(fromType)
+		end
+	)
+end
+
+function RuinsSystem:openRuinsMainUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RuinsMainUIView,
+		function(view)
+			ruinsMainUI = view
+		end
+	)
+end
+
+function RuinsSystem:openRuinsPrepareUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RuinsPrepareUIView,
+		function(view)
+			ruinsPrepareUI = view
+			ruinsPrepareUI:SetData()
+		end
+	)
+end
+
+function RuinsSystem:openRuinsFinishUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.RuinsFinishUIView,
+		function(view)
+			ruinsFinishUI = view
+		end
+	)
+end
+
+function RuinsSystem:hideMainUI()
+	GUIManager.inst:HideView(Constants.ViewName.RuinsMainUIView)
+end
+
+function RuinsSystem:hidePrepareUI()
+	GUIManager.inst:HideView(Constants.ViewName.RuinsPrepareUIView)
+end
+
+function RuinsSystem:requestRuinsData()
+	local rep = MsgType.Request_Activity_Data:New()
+	rep:Send()
+end
+
+function RuinsSystem:requestRuinsBattle(heroUids)
+	local rep = MsgType.Request_Activity_Battle:New()
+	rep.heroInfoUIds = heroUids
+	rep:Send()
+end

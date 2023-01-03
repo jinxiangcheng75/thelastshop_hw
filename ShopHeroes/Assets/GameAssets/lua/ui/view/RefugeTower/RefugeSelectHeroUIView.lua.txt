@@ -1,0 +1,192 @@
+--RefugeSelectHeroUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local CS_type_luaList = typeof(CS.LuaListItem)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local csGameTimerInst = CS.GameTimer.inst
+
+
+RefugeSelectHeroUIView = class(ViewBase)
+
+function RefugeSelectHeroUIView:ctor()
+	self.viewID = Constants.ViewName.RefugeSelectHeroUIView
+	RefugeSelectHeroUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function RefugeSelectHeroUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.scrollView = contentPane:GetObjByName("allHero"):GetComponent(CS_type_superList)
+	self.emptyText = contentPane:GetText("emptyText")
+	self.bgBtn = contentPane:GetButton("bg")
+
+	self.uiAnimator = contentPane.uiAnimator
+end
+
+function RefugeSelectHeroUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.bgBtn.onClick:AddListener(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.scrollView.itemRenderer = function(index, item)
+		self:ListItemRenderer(index, item)
+	end
+
+	self.fromType = 1
+	self.canAddExpNum = nil
+	self.curItemAddPercent = nil
+	self.isHaveRestHero = nil
+	self.exploreId = nil
+	self.index = nil
+	self.allNotSelectHeroes = {}
+	self.data = nil
+end
+
+function RefugeSelectHeroUIView:DoShowAnimation()
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+end
+
+function RefugeSelectHeroUIView:DoHideAnimation()
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("commonBagUI_hide")
+
+	csGameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end
+	)
+end
+
+function RefugeSelectHeroUIView:ListItemRenderer(index, item)
+	local itemScript = item
+	for i = 0, 2 do
+		local itemIndex = index * 3 + i
+		local smallObj = itemScript.buttonList[i].gameObject
+		if (itemIndex >= self.listItemCount) then
+			smallObj:SetActive(false)
+		else
+			if (itemIndex < self.listItemCount) then
+				smallObj:SetActive(true)
+				local smallItem = smallObj:GetComponent("ExploreSelectHeroItem")
+				if(self.isHaveRestHero and itemIndex == 0)then
+					smallItem:setAllTreatData()
+				else
+					if(self.isHaveRestHero)then
+						itemIndex = itemIndex - 1
+					end
+					smallItem:setData(self.allNotSelectHeroes[itemIndex],
+						function (heroUid)
+							self:AddHeroComplete(heroUid)
+						end
+						, self.canAddExpNum)
+				end
+			else
+				smallObj:SetActive(false)
+			end
+		end
+	end
+end
+
+function RefugeSelectHeroUIView:SetListItemTotalCount(count)
+	self.listItemCount = count
+	if (self.listItemCount < 0) then
+		self.listItemCount = 0
+	end
+	self.isHaveRestHero = CS.RoleDataProxy.inst:GetRestingStateHeroCount().Count > 0
+	if(self.isHaveRestHero)then
+		self.listItemCount = self.listItemCount + 1
+	end
+	local count1 = math.floor(self.listItemCount / 3)
+	if (self.listItemCount % 3 > 0) then
+		count1 = count1 + 1
+	end
+	self.scrollView.totalItemCount = count1
+end
+
+function RefugeSelectHeroUIView:onHide()
+	--print("RefugeSelectHeroUIView onHide")
+end
+
+function  RefugeSelectHeroUIView:onShowed()
+	--print("RefugeSelectHeroUIView onShowed")
+end
+
+function RefugeSelectHeroUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function RefugeSelectHeroUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RefugeSelectHeroUIView:closeBtnClick()
+	self:hide()
+end
+
+function RefugeSelectHeroUIView:SetUIData(_index,_exploreId,itemAddPercent,fromType) -- fromType 1 - 爬塔 2 - 黄金城
+	CS.RoleDataProxy.inst.curRefugeSelectHeroIndex = _index
+	self.index = _index
+	self.curItemAddPercent = itemAddPercent
+	self.exploreId = _exploreId
+	self.fromType = fromType
+	local instanceCfg = CS.ExploreInstanceConfigManager.inst:GetConfig(_exploreId)
+	local AddExpPercent = 1
+	local buff = CS.GlobalBuffDataProxy.inst:GetGlobalBuffData(CS.GlobalBuffType.explore_heroExpUp)
+	if(buff ~= nil)then
+		AddExpPercent = AddExpPercent * (1 + buff.buffInfo.buffParam / 100)
+	end
+	local unionBuffData = CS.UserDataProxy.inst:GetUnionBuffData(CS.EUnionScienceType.ExpSkill)
+	if(unionBuffData ~= nil)then
+		AddExpPercent = AddExpPercent * (1 + unionBuffData.config.add2_num / 100)
+	end
+	self.canAddExpNum = instanceCfg.hero_exp * AddExpPercent * self.curItemAddPercent
+	self.allNotSelectHeroes = CS.RoleDataProxy.inst:GetNotFightingStateHeroList()
+	self.emptyText.enabled = self.allNotSelectHeroes.Count <= 0
+	self:SetListItemTotalCount(self.allNotSelectHeroes.Count)
+end
+
+function RefugeSelectHeroUIView:RefreshUIData()
+	self.allNotSelectHeroes = CS.RoleDataProxy.inst:GetNotFightingStateHeroList()
+	self:SetListItemTotalCount(self.allNotSelectHeroes.Count)
+end
+
+function RefugeSelectHeroUIView:AddHeroComplete(heroUid)
+	self:hide()
+	if(self.fromType == 1)then
+		EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.ShowUI_RefugePrepareUIAddHero,heroUid,self.index)
+	elseif self.fromType == 2 then
+		EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_AddHeroCom,heroUid,self.index)
+	else
+		
+	end
+end
+------------------------------------------------

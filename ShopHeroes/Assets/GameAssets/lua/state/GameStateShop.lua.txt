@@ -1,0 +1,215 @@
+--GameStateShop
+
+require("utils/XLuaUtils")
+
+local BaseState = require("state/BaseState")
+local coroutine_cs = require("coroutine_cs")
+local EventDispatcher = require("event/EventDispatcher")
+
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+--local csSceneManager = CS.UnityEngine.SceneManagement.SceneManager
+local csCityBuildingDataProxy = CS.CityBuildingDataProxy
+local csIndoorMapEditSys = CS.IndoorMapEditSys
+local csIndoorRoleSytem = CS.IndoorRoleSystem
+local csGameTimer = CS.GameTimer
+local csAudioManager = CS.AudioManager
+local csFGUI = CS.FGUI
+local csManagerBinder = CS.ManagerBinder
+local csUnityUtils = CS.UnityUtils
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local csAccountDataProxy = CS.AccountDataProxy
+
+local GameStateShop = class(BaseState)
+
+local startLoadScene = false
+local indoorMapEditSys = nil
+local indoorRoleSys = nil
+
+function GameStateShop:onEnter(transition)
+	print("enter GameStateShop")
+
+	CS.ManagerBinder.inst.mGameState = CS.kGameState.Shop
+
+	--csEventControllerInst:TriggerEvent(csGameEventType.BagEvent.BAG_GET_DATA)
+	--csEventControllerInst:TriggerEvent(csGameEventType.EquipEvent.EQUIP_UPDATEINFO)
+
+	print("try startLoadScene")
+	startLoadScene = false
+	GameStateShop:loadIndoorMap()
+
+	--获取储蓄罐数据
+	--csEventControllerInst:TriggerEvent(csGameEventType.MoneyBoxEvent.MONEYBOX_REQUEST_DATA)
+	--获取角色数据
+	--csEventControllerInst:TriggerEvent(csGameEventType.RoleEvent.REQUEST_ROLEDATA)
+	--获取招募数据
+	--csEventControllerInst:TriggerEvent(csGameEventType.RoleEvent.REQUEST_RECRUITLIST)
+	--获取宝箱数据
+	--csEventControllerInst:TriggerEvent(csGameEventType.TreasureBoxEvent.REQUEST_TREASUREBOXDATA)
+	--csEventControllerInst:TriggerEvent(csGameEventType.ExploreEvent.REQUEST_EXPLOREGROUPDATA)
+	--csEventControllerInst:TriggerEvent(csGameEventType.ExploreEvent.REQUEST_EXPLORESLOTDATA)
+
+	if (CS.UserDataProxy.inst.isInit ~= true) then
+		--	csEventControllerInst:TriggerEvent(csGameEventType.CityBuildingEvent.CITYBUILDING_GET_DATA)
+	end
+	--获取邮件数据
+	--csEventControllerInst:TriggerEvent(csGameEventType.EmailEvent.EMAIL_REQUEST_DATA);
+	--获取成就数据
+	--csEventControllerInst:TriggerEvent(csGameEventType.AcheivementEvent.REQUEST_ACHEIVEMENTCHECK)
+	--获取每日领奖数据
+	--EventDispatcher:dispatchEvent(GameEvent.DailySignEvent.REQUEST_DAILYLIST)
+	--获取每日活跃任务数据
+	--csEventControllerInst:TriggerEvent(csGameEventType.TaskEvent.TASK_GET_DATALIST)
+	--获取商城数据
+	--EventDispatcher:dispatchEvent(GameEvent.MallEvent.REQUEST_MALLLIST)
+	--EventDispatcher:dispatchEvent(GameEvent.MallEvent.REQUEST_GeneralPurchase)
+	--EventDispatcher:dispatchEvent(GameEvent.MallEvent.REQUEST_DailySale)
+
+	--获取转盘数据
+	--if (CS.UserDataProxy.inst.playerData.level >= CS.WorldParConfigManager.inst:GetConfig(100).parameters) then
+		--csEventControllerInst:TriggerEvent(csGameEventType.LotteryEvent.LOTTERY_REQUESTDATA)
+	--end
+
+	--获取公会相关（悬赏 科技 科技buff  悬赏结算）数据
+	if CS_UserDataProxyInst.playerData.hasUnion then
+		--csEventControllerInst:TriggerEvent(csGameEventType.UnionEvent.UNION_REQUEST_MEMBERHELPLIST)
+		--csEventControllerInst:TriggerEvent(csGameEventType.UnionEvent.UNION_REQUEST_TASKLIST)
+		--csEventControllerInst:TriggerEvent(csGameEventType.UnionEvent.UNION_REQUEST_SCIENCELIST)
+		--csEventControllerInst:TriggerEvent(csGameEventType.UnionEvent.UNION_REQUEST_SKILLLIST)
+		csEventControllerInst:TriggerEvent(csGameEventType.UnionEvent.UNION_REQUEST_TASKRESULT) --获取悬赏结算数据 注：不可注 切场景即请求
+	end
+
+	--获取主线任务数据
+	--csEventControllerInst:TriggerEvent(csGameEventType.MainlineTaskEvent.REQUESTMAINLINEDATA)
+
+	--获取兑换英雄数据
+	--csEventControllerInst:TriggerEvent(csGameEventType.RoleEvent.REQUEST_HEROEXCHANGELIST)
+	--if (preloadBgtf:IsNull())then
+
+	--临时 获取巧匠大赛数据
+	--EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_DataCheck)
+	--EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Check)
+	--EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_CheckReward)
+	--EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_CheckExchange)
+	--EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_Pay_OperatingActivityPurchase)
+	
+	CS.PlatformManager.inst:setFloatBtnVisbale(true);
+end
+
+-- function GameStateShop:startLoadScene()
+--     print("GameStateShop:startLoadScene")
+--     coroutine_cs.start(function ()
+--         print("coroutineTest1")
+--         coroutine_cs.wait(1)
+--         print("coroutineTest2")
+--     end)
+-- end
+
+function GameStateShop:loadIndoorMap()
+	print("GameStateShop:loadIndoorMap")
+	coroutine_cs.start(
+		function()
+			if (startLoadScene == false) then
+				startLoadScene = true
+
+				local aop = csManagerBinder.inst.mSceneMgr:loadScene("IndoorScene", "IndoorEnvironment")
+				coroutine.yield(aop)
+				coroutine_cs.wait(0.2)
+				if (indoorMapEditSys == nil) then
+					indoorMapEditSys = csIndoorMapEditSys()
+				end
+
+				indoorMapEditSys:EnterSystem()
+				--coroutine_cs.wait(0.2)
+
+				if (indoorRoleSys == nil) then
+					indoorRoleSys = csIndoorRoleSytem()
+				end
+				indoorRoleSys:EnterSystem()
+
+				if ShopkeeperHandler.inst ~= nil then
+					ShopkeeperHandler.inst:OnEnter()
+				end
+
+				--coroutine_cs.wait(0.2)
+				coroutine_cs.wait(0.2)
+				if
+					CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and
+					CS.GuideDataProxy.inst.CurInfo.isAllOver
+					then
+					GUIManager.inst:OpenViewCS(
+						typeof(CS.MainLineTaskView),
+						function(view)
+							CS.GoOperationManager.inst:setFingerTimeReset(true)
+
+							local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+							local func = funcGeneric(CS.System.Boolean)
+							func(csEventControllerInst, csGameEventType.MainlineTaskEvent.REFRESHTASKDATA, false)
+						end
+					)
+					--EventDispatcher:dispatchEvent(GameEvent.GuideTask.ShowUI_GuideTask)
+				end
+
+				if HasMaxLevelHero then
+					EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowLuaTextTipUI,CS_LanguageManagerInst:GetValueByKey("英雄等级已达上限，需要升级英雄之家！"),CS.GUIHelper.GetColorByColorHex("#ffffff"),"jianzhu_jiuba",1)
+					HasMaxLevelHero = false;
+				end
+				
+				CS.ManagerBinder.inst.stateIsChanging = false
+				EventDispatcher:dispatchEvent(GameEvent.OnSomeOneTaskFinishGameEvent.GoOnCommonTaskFinishProgressAnim)
+
+				--重置英雄红点
+				CS.RoleDataProxy.inst:ReSetHeroRedPoints()
+				
+				local ids = RechargeConfigManager:getProductIdList()
+				CS.GamePay.inst:FindAllProductPriceList(ids)
+				--csAudioManager.inst:PlayMusic(2)
+			end
+			CS.ManagerBinder.inst:GC()
+			coroutine_cs.wait(1)
+			CS.GamePay.inst:checkGameOrde()
+		end
+	)
+end
+
+--function GameStateShop:TestNewUI()
+	--EventDispatcher:dispatchEvent(GameEvent.UnionEvent.ShowUI_UnionAidUIView)
+	--EventDispatcher:dispatchEvent(GameEvent.DailySignEvent.ShowUI_DailySignUI)
+	--EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallUI)
+--end
+
+function GameStateShop:onExit()
+	if (CS.IndoorEnvironmentObjVisibleClr.inst ~= nil) then
+		CS.IndoorEnvironmentObjVisibleClr.inst:setVisible(false)
+	end
+	print("exit GameStateShop")
+	startLoadScene = false
+
+	if (indoorMapEditSys ~= nil) then
+		indoorMapEditSys:ExitSystem()
+	end
+
+	if (indoorRoleSys ~= nil) then
+		indoorRoleSys:ExitSystem()
+	end
+
+
+	if ShopkeeperHandler.inst ~= nil then
+		ShopkeeperHandler.inst:OnExit()
+	end
+
+	CS.Spine.Unity.AttachmentTools.AtlasUtilities.ClearCache();
+	
+	GUIManager.inst:HideViewCS(typeof(CS.MenuUIView))
+	GUIManager.inst:ClaerResidentView()
+
+	csEventControllerInst:TriggerEvent(csGameEventType.HIDEUI_SHOPSCENE)
+
+	csEventControllerInst:TriggerEvent(csGameEventType.MainlineTaskEvent.HIDEMAINLINEUI)
+	EventDispatcher:dispatchEvent(GameEvent.GuideTask.HideUI_GuideTask)
+	CS.RoleDataProxy.inst:ClearHeroGraphicDressCache()
+	
+end
+
+return GameStateShop

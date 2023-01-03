@@ -1,0 +1,28 @@
+--TestNewDataProxy
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("config/TestNewConfig")
+local EventDispatcher = require("event/EventDispatcher")
+
+local TestNewData = {}
+TestNewData.a = 1
+TestNewData.b = 1.1
+TestNewData.c = "abc"
+
+TestNewDataProxy = class(BaseDataProxy)
+
+TestNewDataProxy.inst = TestNewDataProxy:new()
+
+function TestNewDataProxy:Init()
+	--local cfg = TestNewConfigManager:GetConfig(0)
+	-- print("TestNewDataProxy:Init cfg id:", cfg.id, " a:", cfg.a, " b:", cfg.b, " c:", cfg.c)
+end
+
+function TestNewDataProxy:Clear()
+end
+
+function TestNewDataProxy:GetData()
+	return TestNewData
+end

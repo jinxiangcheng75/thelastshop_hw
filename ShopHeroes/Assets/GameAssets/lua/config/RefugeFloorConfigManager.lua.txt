@@ -1,0 +1,75 @@
+-- RefugeFloorConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+RefugeFloorConfigData =
+class(
+	{
+		id,
+		shelter_id,
+		floor_index,
+		floor_type,
+		floor_name,
+		atlas,
+		icon,
+		dec,
+		instance_id,
+		reward1_id,
+		reward1_num,
+		reward2_id,
+		reward2_num,
+	}
+)
+
+RefugeFloorConfigManager = class()
+--RefugeFloorConfigManager.cfgDict = {}
+local csv_name = "activity_shelter_floor"
+
+function RefugeFloorConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("RefugeFloorConfigManager:InitCSVConfig csv:", csv)
+	local cfgs = CSVParser:parseClass(csv, 3, RefugeFloorConfigData)
+	RefugeFloorConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("RefugeFloorConfigManager  错误")
+	end
+end
+
+function RefugeFloorConfigManager:processConfigs(cfgs)
+	--print("RefugeFloorConfigManager:processConfigs ", cfgs, " len:", #cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		--print("RefugeFloorConfigManager c i:", i," c:", c, " idtype:", type(c.level))
+		self.cfgDict[tonumber(c.id)] = c
+	end
+	print("RefugeFloorConfigManager:processConfigs completed")
+end
+
+function RefugeFloorConfigManager:GetAllConfigs()
+	local tempList = {}
+	local index = 1
+	for i, v in ipairs(self.cfgDict) do
+		tempList[index] = v
+		index = index + 1
+	end
+
+	return tempList
+end
+
+function RefugeFloorConfigManager:GetConfig(id)
+	return self.cfgDict[id]
+end
+
+function RefugeFloorConfigManager:GetConfigByInstanceId(id)
+	for i, v in ipairs(self.cfgDict) do
+		if(tonumber(v.instance_id) == tonumber(id))then
+			return v
+		end
+	end
+
+	return  nil
+end

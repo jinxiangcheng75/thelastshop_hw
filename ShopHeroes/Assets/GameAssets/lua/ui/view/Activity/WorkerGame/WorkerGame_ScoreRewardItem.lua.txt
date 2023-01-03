@@ -1,0 +1,178 @@
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local Vector2 = CS.UnityEngine.Vector2
+
+-- WorkerGame_ScoreRewardItem
+
+
+local slider_score
+local obj_scoreLvBg_cur
+local img_scoreIcon_cur
+local tx_scoreLv_cur
+local obj_scoreLvBg_last
+local img_scoreIcon_last
+local tx_scoreLv_last
+local obj_imgBg
+local tx_scoreNum
+local tf_score_tipsBg
+local tx_curScore
+local tx_notEnough
+
+local rewardItems
+
+local data
+
+local notEnoughTween
+
+function InitComp()
+
+	slider_score = self:GetObjByName("slider_score"):GetComponent("Slider")
+	obj_scoreLvBg_cur = self:GetObjByName("obj_scoreLvBg_cur")
+	img_scoreIcon_cur = self:GetObjByName("img_scoreIcon_cur"):GetComponent("Image")
+	tx_scoreLv_cur = self:GetObjByName("tx_scoreLv_cur"):GetComponent("Text")
+	obj_scoreLvBg_last = self:GetObjByName("obj_scoreLvBg_last")
+	img_scoreIcon_last = self:GetObjByName("img_scoreIcon_last"):GetComponent("Image")
+	tx_scoreLv_last = self:GetObjByName("tx_scoreLv_last"):GetComponent("Text")
+	obj_imgBg = self:GetObjByName("obj_imgBg")
+	tx_scoreNum = self:GetObjByName("tx_scoreNum"):GetComponent("Text")
+	tf_score_tipsBg = self:GetObjByName("tf_score_tipsBg"):GetComponent("RectTransform")
+	tx_curScore = self:GetObjByName("tx_curScore"):GetComponent("Text")
+	tx_notEnough = self:GetObjByName("tx_notEnough"):GetComponent("Text")
+
+
+	rewardItems = {}
+	local objList = obj_imgBg:GetComponent(CS_type_ObjList).objList
+	for i = 0, objList.Count - 1 do
+
+		rewardItems[#rewardItems + 1] = objList[i]:GetComponent(CS_type_LuaListItem)
+
+	end
+
+end
+
+function SetData(index)
+
+	local allNum = #Activity_WorkerGameProxy.inst.scoreRewardList
+	
+	local isLandscape = CS.FGUI.inst.isLandscape --是否为横屏
+
+	tf_score_tipsBg.gameObject:SetActive(false)
+
+
+	if (index == allNum + 1) or (index == 0) then	 --最后一个 最下面  开头一个 最上面
+
+		obj_scoreLvBg_cur:SetActive(false)
+		obj_scoreLvBg_last:SetActive(false)
+		obj_imgBg:SetActive(false)
+		slider_score.gameObject:SetActive(false)
+
+
+	else --常规逻辑
+
+		obj_scoreLvBg_cur:SetActive(true)
+		obj_imgBg:SetActive(true)
+		slider_score.gameObject:SetActive(true)
+		img_scoreIcon_cur.enabled = false
+
+		obj_scoreLvBg_last:SetActive(true)
+
+		local curIndex = isLandscape and index or allNum - index + 1
+
+		if curIndex == 1 then
+			img_scoreIcon_last.enabled = true
+			tx_scoreLv_last.text = ""
+		else
+			img_scoreIcon_last.enabled = false
+			tx_scoreLv_last.text = tostring(curIndex - 1)
+
+		end
+
+
+		local lastLvData = Activity_WorkerGameProxy.inst.scoreRewardList[curIndex - 1]
+		local curLvData = Activity_WorkerGameProxy.inst.scoreRewardList[curIndex]
+		local lastLvNeedPoint = lastLvData == nil and 0 or lastLvData.needPoint
+
+		tx_scoreNum.text = tostring(curLvData.needPoint)
+
+		if tonumber(curLvData.needPoint) < Activity_WorkerGameProxy.inst.scorePoint then
+
+			slider_score.value = 1
+
+		elseif tonumber(curLvData.needPoint) >= Activity_WorkerGameProxy.inst.scorePoint and tonumber(lastLvNeedPoint) < Activity_WorkerGameProxy.inst.scorePoint then
+
+			slider_score.value = (Activity_WorkerGameProxy.inst.scorePoint - tonumber(lastLvNeedPoint)) / (tonumber(curLvData.needPoint) - tonumber(lastLvNeedPoint))
+
+			tf_score_tipsBg.gameObject:SetActive(true)
+
+			local x,y
+
+			if isLandscape then
+
+				if tonumber(curLvData.needPoint) == Activity_WorkerGameProxy.inst.scorePoint then
+					x = 390
+				else
+					x = slider_score.value * 434 - tf_score_tipsBg.rect.width / 2
+				end
+
+				if 	slider_score.value > 0.9 or slider_score.value < 0.06 then
+					y = -60
+				else
+					y = -30
+				end
+
+				
+			else
+
+				if tonumber(curLvData.needPoint) == Activity_WorkerGameProxy.inst.scorePoint then
+					y = 228
+				else
+					y = slider_score.value * 210 - tf_score_tipsBg.rect.height / 2
+				end
+
+				if 	slider_score.value > 0.9 or slider_score.value < 0.06 then
+					x = -64
+				else
+					x = -32
+				end
+
+			end
+
+			tf_score_tipsBg.anchoredPosition = Vector2(x,y)
+			tx_curScore.text = Activity_WorkerGameProxy.inst.scorePoint
+
+		else
+
+			slider_score.value = 0
+
+		end
+
+		for i = 1, #rewardItems do
+
+			rewardItems[i]:SetData({groupId = curIndex,data = Activity_WorkerGameProxy.inst:GetScoreRewardData(curIndex,i),userNeedPoint = curLvData.userNeedPoint,notEnoughCallback = NotEnoughCallback})
+
+		end
+
+		tx_scoreLv_cur.text = tostring(curIndex)
+
+	end
+
+
+end
+
+function NotEnoughCallback(userNeedPoint)
+	
+	tx_notEnough.text = CS_LanguageManagerInst:GetValueByKey("需要个人积分").."\n"..tostring(Activity_WorkerGameProxy.inst.scorePoint_self).."/"..tostring(userNeedPoint)
+	
+	if notEnoughTween ~= nil then
+		notEnoughTween:Kill()
+		notEnoughTween = nil
+	end
+	
+	notEnoughTween = tx_notEnough:DOFade(0,1):From(2)
+	
+end
+

@@ -1,0 +1,43 @@
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local selfBtn
+local icon
+
+local cfg
+
+
+--ChatEmojiItem
+
+function InitComp()
+
+	selfBtn = self:GetButton("btn_emoji")
+	icon = self:GetGUIIcon("icon_emoji")
+
+	selfBtn.onClick:AddListener(function ()
+			onSelfBtnClick()
+		end)
+
+end
+
+function SetData(config)
+
+	cfg = config
+
+	--TODO  cfg.type   区分普通表情和vip表情
+
+	icon:SetSprite(cfg.atlas,cfg.icon)
+
+end
+
+function onSelfBtnClick()
+
+	if cfg ~= nil then
+
+		local currTable = CS.SaveManager.inst:GetInt("chatCurrTable");
+		EventDispatcher:dispatchEvent(GameEvent.ChatEvent.SendChatMsg, ChatDataProxy.inst.emojiKey .. cfg.id, currTable)
+		EventDispatcher:dispatchEvent(GameEvent.ChatEvent.CloseEmojiSubPanel)
+
+	end
+
+end

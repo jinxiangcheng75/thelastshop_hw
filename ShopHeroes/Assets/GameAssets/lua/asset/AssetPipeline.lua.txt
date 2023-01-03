@@ -1,0 +1,173 @@
+--AssetPipeline
+require("utils/LuaUtils")
+require("asset/AssetConst")
+local Queue = require("collection/Queue")
+
+local RetryMax = 3
+
+AssetPipelineConfig = {
+	extractType = kAssetExtractType.Text,
+	requestType = kAssetDownloadType.Web,
+	assetType = nil,
+	decryptType = nil
+}
+
+AssetLoadTask = class({
+		path="",
+		assetType= kAssetType.Channel,
+		pipelineConfig= nil,
+		hash="",
+		savePath="",
+		location = kAssetLocation.Persistent
+	})
+
+--[[
+function AssetLoadTask:ctor(tb)
+if tb == nil then
+return
+end
+self.path = tb or tb.path
+self.assetType = tb.assetType
+self.pipelineConfig = tb.hash
+self.savePath = tb.savePath
+self.location = tb.location
+end
+]]--
+
+AssetLoadGroup = class({
+		id=0,
+		taskList={},
+		loadIndex = 1,
+		retryCount =0,
+		callback = nil,
+	})
+function AssetLoadGroup:clear()
+	self.retryCount = 0
+	self.loadIndex = 1
+	self.taskList = {}
+end
+
+function AssetLoadGroup:getTotal()
+	return #self.taskList
+end
+
+function AssetLoadGroup:getLoaded()
+	return self.loadIndex
+end
+
+function AssetLoadGroup:getTask()
+	if(self.loadIndex >= #self.taskList) then
+		return nil
+	end
+	return self.taskList[self.loadIndex]
+end
+
+function AssetLoadGroup:canRetry()
+	return self.retryCount < RetryMax
+end
+
+function AssetLoadGroup:taskFailed()
+	self.retryCount = self.retryCount + 1
+end
+
+function AssetLoadGroup:taskSuccess()
+	self.loadIndex = self.loadIndex + 1
+	self.retryCount = 0
+end
+
+
+AssetPipeline = class()
+
+function AssetPipeline:ctor()
+	self.mRunning = false
+	self.mGroupQueue = Queue:new()
+	self.mCurGroup = {}
+	self.mDownloadHandlerFactory = {}
+	self.mDownloadHandler = nil
+	self.mAssetHandlerFactory = {}
+	self.mStateHandlers = {
+		self.onLoading,
+		self.onLoadComplete,
+		self.onLoadError
+	}
+end
+
+function AssetPipeline:addGroup(group)
+	self.mGroupQueue.enqueue(group)
+end
+
+function AssetPipeline:execute()
+	self.mRunning = true
+	if(self.mCurGroup == nil) then
+		self:loadNextGroup()
+	end
+end
+
+function AssetPipeline:loadNextGroup()
+	if(#self.mGroupQueue == 0) then
+		self:onAllLoaded()
+		return
+	end
+	self.mCurGroup = self.mGroupQueue.dequeue()
+	self:loadNextTask()
+end
+
+function AssetPipeline:loadNextTask()
+	local task = self.mCurGroup:getTask()
+	if(task == nil) then
+		self:loadNextGroup()
+	end
+	self.mDownloadHandler = self.mDownloadHandlerFactory:getHandelr(kAssetDownloadType.Web)
+	local path = Constants.Net.AssetHost + task.path
+	self.mDownloadHandler.load(path, 0)
+
+end
+
+function AssetPipeline:onLoadingUpdate()
+	local state = self.mDownloadHandler:checkState()
+	local handler = self.mStateHandlers[state]
+	if(handler ~= nil) then
+		handler()
+	end
+end
+
+function AssetPipeline:onLoading()
+	--event percent
+	--AssetLoadEvent.LOAD_PROGRESS,
+	--mDownloadHandler.progress, mCurGroup.getLoaded(), mCurGroup.getTotal());
+end
+
+function AssetPipeline:onLoadComplete()
+	local task = self.mCurGroup:getTask()
+	local data = self.mDownloadHandler.getData()
+	local handler = self.mAssetHandlerFactory.getHandelr(task.pipelineConfig.assetHandlerType)
+	local res = handler.handle(data, task)
+	if res.success then
+		--if(res.loadGroup ~= "null")
+
+		self.mCurGroup:taskSuccess()
+		self:loadNextTask()
+	else
+		self:onLoadError()
+	end
+end
+
+function AssetPipeline:onLoadError()
+	self.mCurGroup.taskFailed()
+	if self.mCurGroup.canRetry() then
+		--self.mCurGroup:upgradeLocation()
+		self:loadNextTask()
+	else
+		self:onLoadTaskFailed()
+	end
+end
+
+function AssetPipeline:onLoadTaskFailed()
+	self.mRunning = false
+	-- event
+end
+
+function AssetPipeline:onAllLoaded()
+	self.mRunning = false
+	-- event
+end

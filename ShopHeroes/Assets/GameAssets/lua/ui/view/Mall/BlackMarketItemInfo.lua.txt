@@ -1,0 +1,137 @@
+--BlackMarketItemInfo
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/MallDataProxy")
+require("utils/XLuaUtils")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local csItemConfigManagerInst = CS.ItemconfigManager.inst
+local csEquipConfigManagerInst = CS.EquipConfigManager.inst
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csItemType = CS.ItemType
+local csGUIHelper = CS.GUIHelper
+local csColor = CS.UnityEngine.Color
+
+local csEVIPPayState = CS.EVIPPayState
+
+local data
+
+BlackMarketItemInfo = class(ViewBase)
+
+function BlackMarketItemInfo:ctor()
+	self.viewID = Constants.ViewName.BlackMarketItemInfo
+	BlackMarketItemInfo.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+
+function BlackMarketItemInfo:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.bgBtn = contentPane:GetButton("CoverBG")
+	self.tuzhiImg = contentPane:GetImage("tuzhiImg")
+	self.icon = contentPane:GetGUIIcon("icon")
+	self.nameText = contentPane:GetText("nameText")
+	self.descText = contentPane:GetText("desText")
+	self.buyBtn = contentPane:GetButton("buyBtn")
+	self.priceText = contentPane:GetText("countTx")
+	self.comfirmImg = contentPane:GetImage("comfirmImg")
+
+	self.comfirmImg.enabled = false
+	self.tuzhiImg.enabled = false
+end
+
+function BlackMarketItemInfo:onInit()
+
+	self:initComp()
+
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.bgBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.buyBtn:ButtonClickTween(
+		function ()
+			if(data == nil) then return end
+			if(csUserDataProxyInst.playerData.gem < data.price)then
+				--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				--local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+				--func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, cs_LanguageManagerInst:GetValueByKey("金条不足"),csGUIHelper.GetColorByColorHex("FF2828"))
+				EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,data.price - csUserDataProxyInst.playerData.gem)
+				return
+			end
+			if(not self.comfirmImg.enabled) then
+				self.comfirmImg.enabled = true
+			else
+				self.comfirmImg.enabled = false
+				-- 购买
+				EventDispatcher:dispatchEvent(GameEvent.MallEvent.REQUEST_MALLGOODSBUY,data.index)
+			end
+		end
+	)
+end
+
+
+function BlackMarketItemInfo:onHide()
+	--print("BlackMarketItemInfo onHide")
+	self.comfirmImg.enabled = false
+end
+
+function  BlackMarketItemInfo:onShowed()
+	--print("BlackMarketItemInfo onShowed")
+end
+
+function BlackMarketItemInfo:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function BlackMarketItemInfo:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function BlackMarketItemInfo:closeBtnClick()
+	self:hide()
+end
+
+function BlackMarketItemInfo:SetData(_data)
+	if(_data == nil) then return end
+	if(csEVIPPayState.__CastFrom(_data.state) == csEVIPPayState.Buy) then self:hide() return end
+	
+	data = _data
+
+	local itemCfg = csItemConfigManagerInst:GetConfig(data.item.itemId)
+	if(itemCfg ~= nil) then
+		--self.tuzhiImg.enabled = false
+		self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+		self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+		self.descText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.desc)
+	else
+		local equipCfg = csEquipConfigManagerInst:GetEquipDrawingsCfg(data.item.itemId)
+		if(equipCfg ~= nil) then
+			--self.tuzhiImg.enabled = true
+			self.icon:SetSprite(equipCfg.equipDrawingsConfig.atlas, equipCfg.equipDrawingsConfig.icon, CS.StaticConstants.qualityColor[equipCfg.equipQualityConfig.quality - 1])
+			self.nameText.text = equipCfg.name
+			self.descText.text = cs_LanguageManagerInst:GetValueByKey(equipCfg.equipDrawingsConfig.desc)
+		end
+	end
+
+	self.priceText.text = data.price
+	--if(csUserDataProxyInst.playerData.gem >= data.price)then
+		--self.priceText.color = csColor.white
+	--else
+		--self.priceText.color = csColor.red
+	--end
+end
+------------------------------------------------

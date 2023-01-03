@@ -1,0 +1,378 @@
+---------------------------------------------------------------------
+
+require("class")
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_PayInst = CS.GamePay.inst
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+--SaleGiftItem
+
+local SaleGiftItem = class()
+----
+
+function SaleGiftItem:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.loopcomp = nil
+	self.vipLoopcomp = nil
+	self.graphicCharacter = nil
+	self.contentPane = obj:GetComponent(CS_type_LuaListItem)
+
+	self.icon_banner = self.contentPane:GetGUIIcon("icon_banner")
+	self.tx_banner = self.contentPane:GetText("tx_banner")
+	self.icon_bg = self.contentPane:GetGUIIcon("icon_bg")
+	self.tf_role = self.contentPane:GetObjByName("tf_role"):GetComponent("RectTransform")
+	self.icon_role = self.contentPane:GetGUIIcon("icon_role")
+
+	self.goods_1Tf = self.contentPane:GetObjByName("goods_1"):GetComponent("RectTransform")
+	self.goods_1Icon = self.contentPane:GetObjByName("goods_1"):GetComponent(CS_type_GUIIcon)
+
+	self.goods_2Tf = self.contentPane:GetObjByName("goods_2"):GetComponent("RectTransform")
+	self.goods_2Icon = self.contentPane:GetObjByName("goods_2"):GetComponent(CS_type_GUIIcon)
+
+	self.accessories = {}
+	local objList = self.contentPane:GetObjByName("goods_1"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList.Count - 1 do
+		self.accessories[#self.accessories + 1] = objList[i].transform:GetComponent(CS_type_LuaListItem)
+	end
+
+	objList = self.contentPane:GetObjByName("goods_2"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList.Count - 1 do
+		self.accessories[#self.accessories + 1] = objList[i].transform:GetComponent(CS_type_LuaListItem)
+	end
+
+	self.tx_LB_title = self.contentPane:GetText("tx_LB_title")
+	self.tx_LB_des = self.contentPane:GetText("tx_LB_des")
+	self.tx_RB_price = self.contentPane:GetText("tx_RB_price")
+	self.rtf_RB_imgRedLine = self.contentPane:GetObjByName("rtf_RB_imgRedLine"):GetComponent("RectTransform")
+	self.btn_RB_buy = self.contentPane:GetButton("btn_RB_buy")
+	self.tx_buyBtnPrice = self.contentPane:GetText("tx_buyBtnPrice")
+
+	self.obj_alreadyBuy = self.contentPane:GetObjByName("obj_alreadyBuy")
+
+	self.obj_dailyGift = self.contentPane:GetObjByName("obj_dailyGift")
+	self.obj_dailyBox = self.contentPane:GetObjByName("obj_dailyBox")
+
+	self.btn_commonDailyGet = self.contentPane:GetButton("btn_commonDailyGet")
+	self.guiicon_commonDailyGet = self.contentPane:GetObjByName("btn_commonDailyGet"):GetComponent(CS_type_GUIIcon)
+	self.obj_commonDailyGet_ADState = self.contentPane:GetObjByName("obj_commonDailyGet_ADState")
+	self.obj_commonDailyGet_FreeState = self.contentPane:GetObjByName("obj_commonDailyGet_FreeState")
+	self.btn_vipDailyGet = self.contentPane:GetButton("btn_vipDailyGet")
+	self.guiicon_vipDailyGet = self.contentPane:GetObjByName("btn_vipDailyGet"):GetComponent(CS_type_GUIIcon)
+	self.obj_vipDailyGet_ADState = self.contentPane:GetObjByName("obj_vipDailyGet_ADState")
+	self.obj_vipDailyGet_FreeState = self.contentPane:GetObjByName("obj_vipDailyGet_FreeState")
+
+	self.commonDailyGetBtnText = self.contentPane:GetText("commonDailyGetBtnText")
+	self.tx_FreeCommonDailyGetBtn = self.contentPane:GetText("tx_FreeCommonDailyGetBtn")
+	self.vipDailyGetBtnText = self.contentPane:GetText("vipDailyGetBtnText")
+	self.tx_FreeVipDailyGetBtn = self.contentPane:GetText("tx_FreeVipDailyGetBtn")
+	self.obj_redPoint_daily = self.contentPane:GetObjByName("obj_redPoint_daily")
+	self.obj_redPoint_vip = self.contentPane:GetObjByName("obj_redPoint_vip")
+
+end
+
+function SaleGiftItem:init(obj)
+	self:initComp(obj)
+	self.timerId = 0
+
+	self.btn_RB_buy:ButtonClickTween(
+		function()
+			self:onBuyBtnClick()
+		end
+	)
+
+	self.btn_commonDailyGet:ButtonClickTween(function ()
+			self:onBtn_commonDailyGetClick()
+		end)
+
+	self.btn_vipDailyGet:ButtonClickTween(function ()
+			self:onBtn_vipDailyGet()
+		end)
+
+end
+
+function SaleGiftItem:SetData(data)
+
+	if data.type == 1 then --每日免费领取
+
+		self.obj_dailyGift:SetActive(false)
+		self.obj_dailyBox:SetActive(true)
+
+		self.icon_banner:SetSprite("mallItem_atlas","shangcheng_piaodai4")
+		self.icon_bg:SetSpriteURL("shangcheng_bjlan")
+		self.tx_banner.text = CS_LanguageManagerInst:GetValueByKey("免费礼包")
+
+		local boxData = DailyRewardDataProxy.inst:GetData()
+
+		self.btn_commonDailyGet.enabled = boxData.dailyBoxState ~= 1
+
+		if boxData.dailyBoxState ~= 1 then
+
+			if boxData.dailyBoxState == 3 then --是广告
+
+				local worldcfg = CS.WorldParConfigManager.inst:GetConfig(181)
+				local lasttime = CS.SaveManager.inst:GetInt("lastADPlayTime")
+				if worldcfg ~= nil and lasttime > 0 then
+					local t = CS.TimeUtils:GetNowSeconds() - lasttime;
+					if t < worldcfg.parameters then
+						self.btn_commonDailyGet.interactable = false;
+						self.commonDailyGetBtnText.text = CS.TimeUtils.timeSpan4Str(worldcfg.parameters - t);
+						self.loopcomp = CS.GameTimer.inst:AddLoopTimerComp(self.commonDailyGetBtnText.gameObject, 1, function()
+								local _t = CS.TimeUtils.GetNowSeconds() - lasttime
+								if (_t >= worldcfg.parameters) then
+									self.btn_commonDailyGet.interactable = true
+									CS.GameTimer.inst:removeLoopTimer(self.loopcomp)
+									self.loopcomp = nil
+									self.commonDailyGetBtnText.text = CS.LanguageManager.inst:GetValueByKey("免费")
+								else
+									self.btn_commonDailyGet.interactable = false;
+									self.commonDailyGetBtnText.text = CS.TimeUtils.timeSpan4Str(worldcfg.parameters - _t)
+								end
+							end)
+					else
+						self.btn_commonDailyGet.interactable = true
+						self.commonDailyGetBtnText.text = CS.LanguageManager.inst:GetValueByKey("免费")
+					end
+				end
+
+			else
+
+				self.btn_commonDailyGet.interactable = true
+				self.commonDailyGetBtnText.text = CS.LanguageManager.inst:GetValueByKey("免费")
+
+			end
+
+			self.guiicon_commonDailyGet:SetSprite("__common_1",boxData.dailyBoxState == 3 and "icon_lan" or "icon_lvse")
+
+		end
+
+		CS.GUIHelper.SetSingleUIGray(self.btn_commonDailyGet.transform,boxData.dailyBoxState == 1)
+		self.obj_commonDailyGet_FreeState:SetActive(boxData.dailyBoxState ~= 3)
+		self.obj_commonDailyGet_ADState:SetActive(boxData.dailyBoxState == 3)
+		self.tx_FreeCommonDailyGetBtn.text = boxData.dailyBoxState == 1 and CS.LanguageManager.inst:GetValueByKey("已领取") or CS.LanguageManager.inst:GetValueByKey("领取")
+		self.obj_redPoint_daily:SetActive(boxData.dailyBoxState ~= 1)
+		
+		if boxData.vipDailyBoxState ~= 1 then
+
+			if boxData.vipDailyBoxState == 3 then --是广告
+
+				local worldcfg = CS.WorldParConfigManager.inst:GetConfig(181)
+				local lasttime = CS.SaveManager.inst:GetInt("lastADPlayTime")
+				if worldcfg ~= nil and lasttime > 0 then
+					local t = CS.TimeUtils:GetNowSeconds() - lasttime;
+					if t < worldcfg.parameters then
+						self.btn_vipDailyGet.interactable = false;
+						self.vipDailyGetBtnText.text = CS.TimeUtils.timeSpan4Str(worldcfg.parameters - t);
+						self.vipLoopcomp = CS.GameTimer.inst:AddLoopTimerComp(self.vipDailyGetBtnText.gameObject, 1, function()
+								local _t = CS.TimeUtils.GetNowSeconds() - lasttime
+								if (_t >= worldcfg.parameters) then
+									self.btn_vipDailyGet.interactable = true
+									CS.GameTimer.inst:removeLoopTimer(self.vipLoopcomp)
+									self.vipLoopcomp = nil
+									self.vipDailyGetBtnText.text = CS.LanguageManager.inst:GetValueByKey("免费")
+								else
+									self.btn_vipDailyGet.interactable = false;
+									self.vipDailyGetBtnText.text = CS.TimeUtils.timeSpan4Str(worldcfg.parameters - _t)
+								end
+							end)
+					else
+						self.btn_vipDailyGet.interactable = true
+						self.vipDailyGetBtnText.text = CS.LanguageManager.inst:GetValueByKey("免费")
+					end
+				end
+			else
+				self.btn_vipDailyGet.interactable = true
+				self.vipDailyGetBtnText.text = CS.LanguageManager.inst:GetValueByKey("免费")
+			end
+
+			self.guiicon_vipDailyGet:SetSprite("__common_1",boxData.vipDailyBoxState == 3 and "icon_lan" or "icon_lvse")
+
+		end
+
+		self.btn_vipDailyGet.enabled = boxData.vipDailyBoxState ~= 1
+		CS.GUIHelper.SetSingleUIGray(self.btn_vipDailyGet.transform,boxData.vipDailyBoxState == 1)
+		self.obj_vipDailyGet_FreeState:SetActive(boxData.vipDailyBoxState ~= 3)
+		self.obj_vipDailyGet_ADState:SetActive(boxData.vipDailyBoxState == 3)
+		self.tx_FreeVipDailyGetBtn.text = boxData.vipDailyBoxState == 1 and CS.LanguageManager.inst:GetValueByKey("已领取") or CS.LanguageManager.inst:GetValueByKey("领取")
+		self.obj_redPoint_vip:SetActive(boxData.vipDailyBoxState ~= 1)
+
+	else
+
+		self.obj_dailyGift:SetActive(true)
+		self.obj_dailyBox:SetActive(false)
+
+		local giftData = data.data
+
+		self.giftData = giftData
+
+		--CS_LanguageManagerInst:GetValueByKey(giftData.tag)
+		self.icon_bg:SetSpriteURL(giftData.pic2)
+		self.icon_banner:SetSprite(giftData.atlasIcon, giftData.icon2)
+		self.tx_banner.text = CS_LanguageManagerInst:GetValueByKey(giftData.name)
+		self.goods_1Icon:SetSprite(giftData.atlasIcon, giftData.icon3)
+		self.goods_2Icon:SetSprite(giftData.atlasIcon, giftData.icon3)
+		self.tx_LB_title.text = CS_LanguageManagerInst:GetValueByKey(giftData.title)
+		self.tx_LB_des.text = CS_LanguageManagerInst:GetValueByKey(giftData.slogan)
+
+		if giftData.roleImgAtlas ~= nil and giftData.roleImgAtlas ~= "" then
+
+			self.icon_role.gameObject:SetActive(true)
+			self.icon_role:SetSprite(giftData.roleImgAtlas, giftData.roleImgIcon)
+
+		else
+
+			self.icon_role.gameObject:SetActive(false)
+
+			if self.graphicCharacter == nil then
+				local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+				local func = funcGeneric(CS.GraphicDressUpSystem)
+				func(CS_CharacterManagerInst,giftData.roleImgIcon,nil,CS.EGender.Male,0.14,false,function (system)
+						self.graphicCharacter = system
+						system.transform:SetParent(self.tf_role)
+						system.transform.localScale = Vector3.one * 0.6
+						system.transform.localPosition = Vector3.zero
+
+						self.graphicCharacter:Play("idle",true)
+
+					end,nil)
+			else
+				CS_CharacterManagerInst:ReSetCharacter(self.graphicCharacter,giftData.roleImgIcon,nil,CS.EGender.Male,false)
+				self.graphicCharacter:Play("idle",true)
+			end
+
+		end
+
+
+		local salePriceStr = CS_PayInst:GetProductPrice(giftData.payProduct.productId)
+		local splitIndex = 1
+		for i = 1, #salePriceStr do
+			if(tonumber(string.sub(salePriceStr,i,i)) ~= nil)then
+				splitIndex = i
+				break
+			end
+		end
+		local monetaryUnit = string.sub(salePriceStr, 1, splitIndex - 1)
+		local salePrice = tonumber(string.sub(salePriceStr, splitIndex, -1))
+		local originalPrice = ""
+		if salePrice ~= nil then
+			originalPrice = monetaryUnit .. math.ceil(salePrice * giftData.originalPrice / 100)
+		end
+
+		self.tx_RB_price.text = originalPrice
+		self.rtf_RB_imgRedLine.sizeDelta = Vector2(math.max(self.tx_RB_price.preferredWidth,115),16)
+		self.tx_buyBtnPrice.text = salePriceStr
+
+		if #giftData.itemList > 3 then
+			--两排
+			self.goods_2Tf.gameObject:SetActive(true)
+
+			self.goods_1Tf.anchoredPosition = Vector2(216, 118)
+			self.goods_2Tf.anchoredPosition = Vector2(216, -30)
+		else
+			--一排
+			self.goods_2Tf.gameObject:SetActive(false)
+			self.goods_1Tf.anchoredPosition = Vector2(216, 60)
+		end
+
+		for i = 1, #self.accessories do
+			if (i <= #giftData.itemList) then
+				self.accessories[i].gameObject:SetActive(true)
+				self.accessories[i]:SetData(giftData.itemList[i])
+			else
+				self.accessories[i].gameObject:SetActive(false)
+			end
+		end
+
+		self.obj_alreadyBuy:SetActive(giftData.buyCount >= giftData.buyCountLimit)
+		self.btn_RB_buy.gameObject:SetActive(giftData.buyCount < giftData.buyCountLimit)
+
+	end
+
+end
+
+function SaleGiftItem:onBuyBtnClick()
+	print("礼包的购买按钮被点击——————")
+
+	CS_PayInst:Pay(
+		self.giftData.payProduct.priceId,
+		self.giftData.payProduct.productId,
+		self.giftData.payProduct.payActivityType,
+		self.giftData.payProduct.payActivityId,
+		function(isSuccess)
+			if (isSuccess) then
+				--print("充值成功")
+			end
+		end
+	)
+end
+
+function SaleGiftItem:onBtn_commonDailyGetClick()
+
+	local boxData = DailyRewardDataProxy.inst:GetData()
+
+	EventDispatcher:dispatchEvent(GameEvent.DailyReward.DailyReward_ReceiveAward,boxData.dailyBoxState)
+
+end
+
+function SaleGiftItem:onBtn_vipDailyGet()
+
+	local boxData = DailyRewardDataProxy.inst:GetData()
+
+	EventDispatcher:dispatchEvent(GameEvent.DailyReward.DailyReward_ReceiveAward,boxData.vipDailyBoxState)
+
+end
+
+function SaleGiftItem:ClearTimer()
+
+	if self.loopcomp then
+		CS.GameTimer.inst:removeLoopTimer(self.loopcomp)
+		self.loopcomp = nil
+	end
+
+	if self.vipLoopcomp then
+		CS.GameTimer.inst:removeLoopTimer(self.vipLoopcomp)
+		self.vipLoopcomp = nil
+	end
+
+end
+
+
+local ctrl_saleGiftItem
+
+function SetData(data)
+
+	if ctrl_saleGiftItem == nil then
+		ctrl_saleGiftItem = SaleGiftItem.new()
+		ctrl_saleGiftItem:init(data.obj)
+	end
+
+	ctrl_saleGiftItem:SetData(data)
+
+end
+
+function onDestroy()
+
+	if ctrl_saleGiftItem ~= nil then
+		ctrl_saleGiftItem:ClearTimer()
+		ctrl_saleGiftItem = nil
+	end
+
+end
+
+return SaleGiftItem

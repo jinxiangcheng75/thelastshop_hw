@@ -1,0 +1,187 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local csVector2 = CS.UnityEngine.Vector2
+local csItemType = CS.ItemType
+
+local CS_PayInst = CS.GamePay.inst
+
+local activityPointGiftItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	activityPointGiftItem_dlc = ActivityPointGiftItem_dlc.new()
+	activityPointGiftItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if activityPointGiftItem_dlc~=nil then
+		activityPointGiftItem_dlc:Clear()
+		activityPointGiftItem_dlc = nil
+	end
+end
+
+function SetData(_data)
+	if activityPointGiftItem_dlc~=nil then
+		activityPointGiftItem_dlc:SetData(_data)
+	end
+end
+
+function onDisable()
+	if activityPointGiftItem_dlc~=nil then
+		activityPointGiftItem_dlc:ClearData()
+	end
+end
+
+ActivityPointGiftItem_dlc = class()
+
+function ActivityPointGiftItem_dlc:ctor()
+
+end
+
+function ActivityPointGiftItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+
+	self.data = nil
+end
+
+function ActivityPointGiftItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.bgIcon = self.contentPane:GetObjByName("bgIcon"):GetComponent("GUIIcon")
+	self.lastPrice = self.contentPane:GetObjByName("lastPrice"):GetComponent("Text")
+	self.buyBtn = self.contentPane:GetObjByName("buyBtn"):GetComponent("Button")
+	self.curPrice = self.contentPane:GetObjByName("curPrice"):GetComponent("Text")
+	self.goods_1BgIcon = self.contentPane:GetObjByName("goods_1"):GetComponent("GUIIcon")
+	self.goods_2BgIcon = self.contentPane:GetObjByName("goods_2"):GetComponent("GUIIcon")
+	self.remainText = self.contentPane:GetObjByName("remainText"):GetComponent("Text")
+	self.gray = self.contentPane:GetObjByName("gray"):GetComponent("Image")
+	self.limitText = self.contentPane:GetObjByName("limitText"):GetComponent("Text")
+
+	self.goods_1 = self.contentPane:GetObjByName("goods_1"):GetComponent("ObjList")
+	self.goods_2 = self.contentPane:GetObjByName("goods_2"):GetComponent("ObjList")
+	self.allGoods = {}
+	for i = 0, self.goods_1.objList.Count - 1 do
+		self.allGoods[#self.allGoods + 1] = self.goods_1.objList[i]:GetComponent("LuaListItem")
+	end
+	for i = 0, self.goods_2.objList.Count - 1 do
+		self.allGoods[#self.allGoods + 1] = self.goods_2.objList[i]:GetComponent("LuaListItem")
+	end
+
+	self.buyBtn.onClick:AddListener(function ()
+			self:BuyGoodClick()
+		end)
+
+end
+
+function ActivityPointGiftItem_dlc:SetData(_data)
+	if(_data == nil)then return end
+
+	self.data = _data
+
+	local salePriceStr = CS_PayInst:GetProductPrice(self.data.payProduct.productId)
+	local splitIndex = 1
+	for i = 1, #salePriceStr do
+		if(tonumber(string.sub(salePriceStr,i,i)) ~= nil)then
+			splitIndex = i
+			break
+		end
+	end
+
+	local monetaryUnit = string.sub(salePriceStr, 1, splitIndex - 1)
+	local salePrice = tonumber(string.sub(salePriceStr, splitIndex, -1))
+	local originalPrice = ""
+	if salePrice ~= nil then
+		--originalPrice = monetaryUnit .. math.ceil(salePrice * self.data.value / 10000)
+		originalPrice = monetaryUnit .. math.floor(self.data.value / 100)
+	end
+
+	if(self.data.buyCountLimit <= self.data.buyCount)then
+		self.gray.enabled = true
+		self.remainText.color = csGUIHelper.GetColorByColorHex("FF6464")
+		self.remainText.text = cs_LanguageManagerInst:GetValueByKey("已售罄")
+		--csGUIHelper.SetUIGray(self.buyBtn.transform,true)
+		self.buyBtn.gameObject:SetActive(false)
+		self.limitText.enabled = true
+	else
+		self.gray.enabled = false
+		self.remainText.color = csGUIHelper.GetColorByColorHex("1DFF00")
+		self.remainText.text = cs_LanguageManagerInst:GetValueByKey("剩余{0}次",tostring(self.data.buyCountLimit - self.data.buyCount))
+		--csGUIHelper.SetUIGray(self.buyBtn.transform,false)
+		self.buyBtn.gameObject:SetActive(true)
+		self.limitText.enabled = false
+	end
+	self.lastPrice.text = originalPrice
+	self.curPrice.text = salePriceStr
+
+	if(self.data.pic2 ~= nil and self.data.pic2 ~= "")then
+		self.bgIcon.iconImage.enabled = true
+		self.bgIcon:SetSpriteURL(self.data.pic2)
+	else
+		self.bgIcon.iconImage.enabled = false
+	end
+
+	self.goods_1BgIcon:SetSprite(self.data.pic1Atlas,self.data.pic1)
+	self.goods_2BgIcon:SetSprite(self.data.pic1Atlas,self.data.pic1)
+
+	self:SetGoodData()
+end
+
+function ActivityPointGiftItem_dlc:SetGoodData()
+
+	if(#self.data.itemList > 3)then
+		self.goods_2.gameObject:SetActive(true)
+	else
+		self.goods_2.gameObject:SetActive(false)
+	end
+
+	for i = 1, #self.allGoods do
+		local index = i
+
+		if(index <= #self.data.itemList)then
+			self.allGoods[index].gameObject:SetActive(true)
+			self.allGoods[index]:SetData(self.data.itemList[index])
+		else
+			self.allGoods[index].gameObject:SetActive(false)
+		end
+	end
+
+end
+
+function ActivityPointGiftItem_dlc:BuyGoodClick()
+	if(self.data == nil) then return end
+	CS_PayInst:Pay(
+		self.data.payProduct.priceId,
+		self.data.payProduct.productId,
+		self.data.payProduct.payActivityType,
+		self.data.payProduct.payActivityId,
+		function(isSuccess)
+			if (isSuccess) then
+				--print("充值成功")
+			end
+		end
+	)
+end
+
+function ActivityPointGiftItem_dlc:Clear()
+
+	self:removeListeners()
+end
+
+function ActivityPointGiftItem_dlc:ClearData()
+
+end
+
+function ActivityPointGiftItem_dlc:addListeners()
+
+end
+
+function ActivityPointGiftItem_dlc:removeListeners()
+
+end

@@ -1,0 +1,39 @@
+--GameStateSplash
+
+local BaseState = require("state/BaseState")
+local coroutine_cs = require("coroutine_cs")
+local EventDispatcher = require("event/EventDispatcher")
+
+local GameStateSplash = class(BaseState)
+local coroutineCor
+function GameStateSplash:onEnter(transiton)
+	print("enter GameStateSplash")
+	CS.ManagerBinder.inst.mGameState = CS.kGameState.Splash
+	coroutineCor =
+		coroutine_cs.start(
+		function()
+			--CS.FGUI.inst.startvideotf.gameObject:SetActive(true)
+			--CS.FGUI.inst.videoMusic:Play()
+			--coroutine_cs.wait(1)
+			--	CS.FGUI.inst:StartExcessAnimation(false, false, nil)
+			local str = CS.LanguageManager.inst:GetValueByKey("进入壁垒...")
+
+			CS.FGUI.inst:updateProglressBar(str, 0.9, 0.3)
+			coroutine_cs.wait(0.2)
+			EventDispatcher:dispatchEvent(
+				GameEvent.State.Change_State,
+				{
+					state = kGameState.Preload,
+					loading = false
+				}
+			)
+			CS.ManagerBinder.inst.stateIsChanging = false
+		end
+	)
+end
+
+function GameStateSplash:onExit()
+	coroutine_cs.stop(coroutineCor)
+end
+
+return GameStateSplash

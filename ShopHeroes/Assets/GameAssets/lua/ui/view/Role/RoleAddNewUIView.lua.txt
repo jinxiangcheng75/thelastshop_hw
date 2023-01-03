@@ -1,0 +1,83 @@
+---------------------------------------------------------------------
+-- ShopHeroes (C) CompanyName, All Rights Reserved
+-- Created by: AuthorName
+--RoleAddNewUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+
+local csRoleDataProxyInst = CS.RoleDataProxy.inst
+
+RoleAddNewUIView = class(ViewBase)
+
+function RoleAddNewUIView:ctor()
+	self.viewID = Constants.ViewName.RoleAddNewUIView
+	RoleAddNewUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+
+function RoleAddNewUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.exchangeBtn = contentPane:GetButton("exchangeBtn")
+	self.recruitBtn = contentPane:GetButton("recruitBtn")
+
+	--self.bgBtn = contentPane:GetButton("bg")
+end
+
+function RoleAddNewUIView:onInit()
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function()
+			self:closeBtnClick()
+		end
+	)
+
+	self.exchangeBtn:ButtonClickTween(
+		function()
+			if csRoleDataProxyInst.exchangeIsNew then
+				csRoleDataProxyInst.exchangeIsNew = false
+			end
+			self:closeBtnClick()
+			EventDispatcher:dispatchEvent(GameEvent.RoleExchange.ShowUI_RoleExchange)
+		end
+	)
+
+	self.recruitBtn:ButtonClickTween(
+		function()
+			self:closeBtnClick()
+			CS.RoleDataProxy.inst.enterType = 0
+			csEventControllerInst:TriggerEvent(csGameEventType.RoleEvent.ROLERECRUIT_SHOWUI)
+		end
+	)
+end
+
+function RoleAddNewUIView:onHide()
+	--print("RoleAddNewUIView onHide")
+	CS.AudioManager.inst:PlaySound(9)
+end
+
+function RoleAddNewUIView:onShowed()
+	--print("RoleAddNewUIView onShowed")
+end
+
+function RoleAddNewUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function RoleAddNewUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RoleAddNewUIView:closeBtnClick()
+	self:hide()
+end
+------------------------------------------------

@@ -1,0 +1,411 @@
+--RuinsDataProxy
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGameTimerInst = CS.GameTimer.inst
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csGUIHelper = CS.GUIHelper
+
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_TimeUtils = CS.TimeUtils
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+
+local csCharacterManagerInst = CS.CharacterManager.inst
+local csEGender = CS.EGender
+local csVector3 = CS.UnityEngine.Vector3
+local csSpineUtils = CS.SpineUtils
+
+RuinsDataProxy = class(BaseDataProxy)
+
+RuinsDataProxy.inst = RuinsDataProxy:new()
+
+function RuinsDataProxy:Init()
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Activity_Data_Cmd,
+		function(resp)
+			print("Response_Activity_Data_Cmd success", resp)
+			self:GetActivityData(resp)
+		end,
+		function(code)
+			print("Response_Activity_Data_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Activity_Battle_Cmd,
+		function(resp)
+			print("Response_Activity_Battle_Cmd success", resp)
+			self:GetRuinsBattleData(resp)
+		end,
+		function(code)
+			print("Response_Activity_Battle_Cmd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	self.curId = nil
+
+	self.curRuinsCfg = nil
+	self.curHouseId = nil
+	self.enemyWaveId = nil
+	self.remainTime = nil
+	self.enemyRemainCount = nil
+	self.sumEnemyCount = nil
+	self.allHeroes = {}
+	self.heroHeadPool = {}
+
+	self.endRemainCount = nil
+	self.endId = nil
+
+	self.localUid = -1
+	self.curSum = 0
+	self.localId = 0
+	self.localType = 0
+	self.local_hero_grade = 0
+	self.localCostId = 0
+
+	self.startWave = nil
+
+	self.endHeroUIids = {}
+	self.endReward = {}
+
+	self.isShowPrepare = false
+	
+	self.timerId = nil
+	self.realRemainTime = nil
+end
+
+function RuinsDataProxy:GetRuinsBattleData(respData)
+	local data = MsgType.Response_Activity_Battle:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		if(CS.EErrorCode.__CastFrom(data.errorCode) == CS.EErrorCode.EEC_Activity_ExpeditionError)then
+			EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.HideUI_RuinsPrepareUI)
+			EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.OpenUI_RuinsTipUI,1)
+			return
+		end
+		return
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.HideUI_RuinsPrepareUI)
+	self.endReward = {}
+	self.endHeroUIids = {}
+
+	local sceneName = ""
+	if(self.curRuinsCfg ~= nil)then
+		sceneName = self.curRuinsCfg.scenes
+	end
+
+	--上线前去掉
+	--local path = string.gsub(CS.UnityEngine.Application.dataPath,"/Assets","") .. "/combatReport.txt"
+	--CS.System.IO.File.WriteAllText(path, respData, CS.System.Text.Encoding.UTF8)
+	self.endReward = data.rewardItemList
+	--print("输出",#data.rewardItemList)
+	self.startWave = data.startWaveId
+	self.endId = data.currentStageId
+
+	self.enemyWaveId = data.enemyWaveId
+	self.endRemainCount = data.remainCount
+
+	for i = 1, #data.heroInfo do
+		local index = i
+		self.endHeroUIids[index] = data.heroInfo[i].heroUid
+		self:AddHeroData(data.heroInfo[i])
+	end
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua4")
+	local func = funcGeneric(CS.System.Int32, CS.System.Int32,CS.System.String,CS.CombatReport)
+	func(
+		csEventControllerInst,
+		csGameEventType.CombatEvent.COMBAT_SETANDINTOCOMBAT,
+		0,2,sceneName,data.combatReport
+	)
+
+
+end
+
+function RuinsDataProxy:GetActivityData(respData)
+	local data = MsgType.Response_Activity_Data:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+	
+	self.curId = tonumber(data.currentStageId)
+	self.enemyWaveId = data.enemyWaveId
+	self.remainTime = data.remainTime
+	self.enemyRemainCount = data.enemyRemainCount
+	self.sumEnemyCount = data.enemyRemainHp
+	self.curRuinsCfg = RuinsConfigManager:GetConfig(self.curId)
+	if(self.curRuinsCfg ~= nil)then
+		self.curHouseId = tonumber(self.curRuinsCfg.instance_group)
+	else
+		self.curHouseId = -1
+	end
+
+	if(CS.RuinsMap.inst ~= nil)then
+		CS.RuinsMap.inst:setCurHouse(self.curHouseId)
+		local houseList = CS.RuinsMap.inst.houseList
+		for i = 0, houseList.Count - 1 do
+			if(houseList[i] ~= nil)then
+				houseList[i]:CreatRuinsHUD(self.curHouseId)
+			end
+		end
+	end
+	
+	self:calculateTime()
+
+	for i = 1, #data.heroList do
+		local index = i
+		self:AddHeroData(data.heroList[i])
+	end
+
+	local dateTime = CS_TimeUtils.getDateTimeBySecs(csGameTimerInst.serverNow)
+	CS_PlayerPrefs.SetString(
+		CS_AccountDataProxyInst.account ..
+		"RuinsClone" .. tostring(dateTime.Year) .. tostring(dateTime.Month) .. tostring(dateTime.Day),"1"
+	)
+
+	if(self.isShowPrepare and self.curId ~= 9999)then
+		self.isShowPrepare = false
+		EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.OpenUI_RuinsPrepareUI)
+	else
+		EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.OpenUI_RuinsMainUI)
+	end
+end
+
+function RuinsDataProxy:calculateTime()
+	if (self.timerId ~= nil) then
+		csGameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = nil
+	end
+
+	self.realRemainTime = csGameTimerInst.serverNow + self.remainTime
+
+	if (self.remainTime > 0) then
+		self.timerId =
+		csGameTimerInst:AddTimer(
+			1,
+			function()
+				if (self.remainTime > 0) then
+					self.remainTime = self.realRemainTime - csGameTimerInst.serverNow
+				else
+					self.remainTime = 0
+					csGameTimerInst:RemoveTimer(self.timerId)
+					self.timerId = nil
+				end
+			end
+		)
+	end
+end
+
+function RuinsDataProxy:AddHeroData(heroData)
+	if(heroData == nil) then return end
+
+	if(self.allHeroes[heroData.heroUid] == nil)then
+		local tempData = CS.RoleHeroData()
+		tempData:setData(heroData)
+		self.allHeroes[heroData.heroUid] = tempData
+	else
+		self.allHeroes[heroData.heroUid]:setData(heroData)
+	end
+end
+
+function RuinsDataProxy:GetHeroDataByUid(heroUid)
+	local returnData = nil
+	if(self.allHeroes[heroUid] ~= nil)then
+		returnData = self.allHeroes[heroUid]
+	end
+
+	return returnData
+end
+
+function RuinsDataProxy:GetAllHero()
+	local list = {}
+	local index = 1
+	for k, v in pairs(self.allHeroes) do
+		list[index] = v
+		index = index + 1
+	end
+
+	table.sort(list,function (one,two)
+			if(one.currentState == two.currentState)then
+				if(one.isSelect == two.isSelect) then
+					return one.fightingNum > two.fightingNum
+				else
+					if(one.isSelect == true)then
+						return true
+					else
+						return false
+					end
+				end
+			else
+				return one.currentState < two.currentState
+			end
+		end
+	)
+	return list
+end
+
+function RuinsDataProxy:GetAutoBattleHero(posIndex)
+	self.localUid = -1
+
+	for k, v in pairs(self.allHeroes) do
+		if(v.currentState == 0 and v.isSelect == false)then
+			if(posIndex == 0 or posIndex == 1)then
+				if(self.localUid == -1)then
+					self:SetBigData(v)
+				else
+					if(self.localType == v.config.type)then
+						if(self.local_hero_grade == v.config.hero_grade)then
+							if(self.local_hero_grade == 1)then
+								if(v.fightingNum > self.curSum)then
+									self:SetBigData(v)
+								end
+							else
+								if(self.localCostId == v.config.cost_item1_id)then
+									if(v.fightingNum > self.curSum)then
+										self:SetBigData(v)
+									end
+								else
+									if(v.config.id < self.localId)then
+										self:SetBigData(v)
+									end
+								end
+							end
+						else
+							if(self.local_hero_grade == 1 or v.config.hero_grade == 1)then
+								if(v.config.hero_grade > self.local_hero_grade)then
+									self:SetBigData(v)
+								end
+							else
+								if(self.localCostId == v.config.cost_item1_id)then
+									if(v.config.hero_grade > self.local_hero_grade)then
+										self:SetBigData(v)
+									end
+								else
+									if(v.id < self.localId)then
+										self:SetBigData(v)
+									end
+								end
+							end
+						end
+					else
+						if(v.config.type < self.localType)then
+							self:SetBigData(v)
+						end
+					end
+				end
+			else
+				if(self.localUid == -1)then
+					self:SetBigData(v)
+				else
+					if(v.fightingNum > self.curSum)then
+						self:SetBigData(v)
+					elseif v.fightingNum == self.curSum then
+						if(self.localType ~= v.config.type)then
+							if(v.config.type > self.localType)then
+								self:SetBigData(v)
+							end
+						else
+							if(self.local_hero_grade == v.config.hero_grade)then
+								if(self.localCostId ~= v.config.cost_item1_id)then
+									if(v.config.id < self.localId)then
+										self:SetBigData(v)
+									end
+								end
+							else
+								if(self.local_hero_grade == 1 or v.config.hero_grade == 1)then
+									if(v.config.hero_grade > self.local_hero_grade)then
+										self:SetBigData(v)
+									end
+								else
+									if(self.localCostId == v.config.cost_item1_id)then
+										if(v.config.hero_grade > self.local_hero_grade)then
+											self:SetBigData(v)
+										end
+									else
+										if(v.id < self.localId)then
+											self:SetBigData(v)
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	return self.localUid
+end
+
+function RuinsDataProxy:SetBigData(curData)
+	self.curSum = curData.fightingNum
+	self.localUid = curData.uid
+	self.localId = curData.id
+	self.localType = curData.config.type
+	self.local_hero_grade = curData.config.hero_grade
+	self.localCostId = curData.config.cost_item1_id
+end
+
+function RuinsDataProxy:GetIdleHeroCount()
+	local count = 0
+
+	for k, v in pairs(self.allHeroes) do
+		if(tonumber(v.currentState) == 0)then
+			count = count + 1
+		end
+	end
+
+	return count
+end
+
+function RuinsDataProxy:GetHeadByUid(heroUid)
+	if(self.heroHeadPool[heroUid] ~= nil)then
+		return self.heroHeadPool[heroUid]
+	else
+		return nil
+	end
+end
+
+function RuinsDataProxy:SetAllHeadPool()
+	for k, v in pairs(self.allHeroes) do
+		self:SetSingleHead(v)
+	end
+end
+
+function RuinsDataProxy:ClearAllHeadPool()
+	for k, v in pairs(self.heroHeadPool) do
+		if(v ~= nil)then
+			CS.UnityEngine.Object.Destroy(v.gameObject)
+		end
+	end
+
+	self.heroHeadPool = {}
+end
+
+function RuinsDataProxy:SetSingleHead(data)
+	local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+	local func = funcGeneric(CS.GraphicDressUpSystem)
+	func(csCharacterManagerInst,csCharacterManagerInst:GetPeopleShapeNudeSpinePath(csEGender.__CastFrom(data.gender)),data:GetHeadDressIds(),csEGender.__CastFrom(data.gender),0.35,true,function (system)
+			if(self.heroHeadPool[data.uid] ~= nil)then
+				CS.UnityEngine.Object.Destroy(self.heroHeadPool[data.uid].gameObject)
+			end
+			self.heroHeadPool[data.uid] = system
+			system.transform:SetParent(CS.FGUI.inst.heroGraphicCacheParent)
+			system.transform.localScale = csVector3(1,1,1)
+			system.transform.localPosition = csVector3(0,0,0)
+		end,nil)
+end
+
+function RuinsDataProxy:Clear()
+
+end
+
+function RuinsDataProxy:GetData()
+end

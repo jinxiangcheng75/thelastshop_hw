@@ -1,0 +1,46 @@
+--NetworkPipeline
+
+require("class")
+require("const/Constants")
+local Queue = require("collection/Queue")
+
+NetworkPipeline = class()
+
+local packageQueue = Queue:new(128)
+local hasReceived = false
+
+function NetworkPipeline:ctor()
+
+end
+
+function NetworkPipeline:HandleSend(package)
+	packageQueue:enqueue(package)
+end
+
+function NetworkPipeline:HandleReceive()
+	if(hasReceived == false)then
+		return
+	end
+	local pkg = packageQueue:dequeue()
+	if(pkg == nil)then
+		hasReceived = false
+		return
+	end
+	if(pkg:getStatusCode() ~= NetworkStatusCode.Ok)then
+		--
+	else
+		--
+
+	end
+end
+
+function NetworkPipeline:test()
+	local arr = {1,2,3,4,5}
+	for k, v in ipairs(arr) do
+		if(v > 4) then
+			print(v)
+			goto continue
+		end
+		::continue::
+	end
+end

@@ -1,0 +1,194 @@
+--OnlineInfoUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/DailySignDataProxy")
+require("utils/XLuaUtils")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local GameTimerInst = CS.GameTimer.inst
+local csTimeUtils = CS.TimeUtils
+local EventDispatcher = require("event/EventDispatcher")
+
+local csItemConfigManagerInst = CS.ItemconfigManager.inst
+local csItemType = CS.ItemType
+local csEquipConfigManagerInst = CS.EquipConfigManager.inst
+
+local timerId = nil
+
+local data
+
+OnlineInfoUIView = class(ViewBase)
+
+function OnlineInfoUIView:ctor()
+	self.viewID = Constants.ViewName.OnlineInfoUIView
+	OnlineInfoUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+
+function OnlineInfoUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.topText = contentPane:GetText("titleTx")
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.icon = contentPane:GetGUIIcon("IconImg")
+	self.nameText = contentPane:GetText("nameTx")
+	self.countText = contentPane:GetText("countText")
+	self.descText = contentPane:GetText("descText")
+	self.nextObj = contentPane:GetObjByName("nextObj")
+	self.rewardBtn = contentPane:GetButton("FinishBtn")
+	self.remainObj = contentPane:GetObjByName("remainObj")
+	self.timeText = contentPane:GetText("timeText")
+	self.bgBtn = contentPane:GetButton("bg")
+	self.itemDescText = contentPane:GetText("itemDescText")
+
+	self.uiAnimator = contentPane.uiAnimator
+end
+
+function OnlineInfoUIView:onInit()
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function()
+			self:closeBtnClick()
+		end
+	)
+
+	self.bgBtn.onClick:AddListener(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.rewardBtn:ButtonClickTween(
+		function()
+			if(data.state == 1)then
+				EventDispatcher:dispatchEvent(GameEvent.OnlineRewardEvent.Request_OnlineReward,data.onlineId)
+			end
+		end
+	)
+end
+
+function OnlineInfoUIView:DoShowAnimation()
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0)
+	self.uiAnimator:Update(0)
+	self.uiAnimator:Play("show")
+end
+
+function OnlineInfoUIView:DoHideAnimation()
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	GameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end
+	)
+end
+
+function OnlineInfoUIView:onHide()
+	--print("OnlineInfoUIView onHide")
+	--CS.AudioManager.inst:PlaySound(9)
+	if (timerId ~= nil) then
+		GameTimerInst:RemoveTimer(timerId)
+		timerId = nil
+	end
+end
+
+function OnlineInfoUIView:onShowed()
+
+end
+
+function OnlineInfoUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function OnlineInfoUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function OnlineInfoUIView:closeBtnClick()
+	self:hide()
+end
+
+function OnlineInfoUIView:RefreshData()
+	if(data ~= nil)then
+		data = OnlineRewardDataProxy.inst:GetDataById(data.onlineId)
+		self:SetUIData(data)
+	end
+end
+
+function OnlineInfoUIView:SetUIData(_data)
+	data = _data
+	if(data == nil) then return end
+	self.topText.text = data:GetNameByLanguage()
+	self.countText.text = "x" .. data.itemCount
+
+	self.descText.enabled = data.startTime ~= 0 and data.endTime ~= 0
+	--print("输出了",string.format(tostring(csTimeUtils.getDateTimeBySecs(data.startTime)),"MM/dd HH点"))
+	if(data.startTime ~= 0 and data.endTime ~= 0)then
+		self.descText.text = cs_LanguageManagerInst:GetValueByKey("{0}点",CS.System.String.Format("{0:M/dd HH}",csTimeUtils.getDateTimeBySecs(data.startTime))) .. " ~ " .. cs_LanguageManagerInst:GetValueByKey("{0}点",CS.System.String.Format("{0:M/dd HH}",csTimeUtils.getDateTimeBySecs(data.endTime)))
+	end
+	self.nextObj:SetActive(data.state == 2)
+	self.rewardBtn.gameObject:SetActive(data.state == 1)
+	self.remainObj:SetActive(data.state == 0)
+
+	if(data.state == 0 and data.remainTime > 0)then
+		if(timerId ~= nil)then
+			GameTimerInst:RemoveTimer(timerId)
+			timerId = nil
+		end
+
+		if(data.remainTime > 0)then
+			self.timeText.text = csTimeUtils.timeSpan3Str(data.remainTime)
+		else
+			self.timeText.text = cs_LanguageManagerInst:GetValueByKey("领取")
+		end
+
+		timerId = GameTimerInst:AddTimer(1,
+			function ()
+				if(data.remainTime > 0)then
+					self.timeText.text = csTimeUtils.timeSpan3Str(data.remainTime)
+				else
+					self.timeText.text = cs_LanguageManagerInst:GetValueByKey("领取")
+					GameTimerInst:RemoveTimer(timerId)
+					timerId = nil
+				end
+			end
+		)
+	end
+
+	if(data.state == 2)then
+		self.timeText.text = cs_LanguageManagerInst:GetValueByKey("明日领取")
+	end
+
+	local itemCfg = csItemConfigManagerInst:GetConfig(data.itemId)
+	if (itemCfg == nil) then
+		local eqcfg = csEquipConfigManagerInst:GetEquipInfoConfig(data.itemId)
+		self.icon:SetSprite(eqcfg.equipDrawingsConfig.atlas, eqcfg.equipDrawingsConfig.icon,
+			CS.StaticConstants.qualityColor[eqcfg.equipQualityConfig.quality - 1])
+		self.nameText.text = eqcfg.name
+		self.itemDescText.text = cs_LanguageManagerInst:GetValueByKey(eqcfg.equipDrawingsConfig.desc)
+	else
+		if (csItemType.__CastFrom(itemCfg.type) == csItemType.EquipmentDrawing) then
+			local equipCfg = csEquipConfigManagerInst:GetEquipDrawingsCfg(itemCfg.effect)
+			self.icon:SetSprite(equipCfg.atlas, equipCfg.icon)
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(equipCfg.name)
+			self.itemDescText.text = cs_LanguageManagerInst:GetValueByKey(equipCfg.desc)
+		else
+			self.icon:SetSprite(itemCfg.atlas, itemCfg.icon)
+			self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.name)
+			self.itemDescText.text = cs_LanguageManagerInst:GetValueByKey(itemCfg.desc)
+		end
+	end
+end
+------------------------------------------------

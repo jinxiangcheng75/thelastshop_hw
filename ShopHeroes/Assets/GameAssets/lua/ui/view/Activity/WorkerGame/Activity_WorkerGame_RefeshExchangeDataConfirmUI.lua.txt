@@ -1,0 +1,114 @@
+--Activity_WorkerGame_RefeshExchangeDataConfirmUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+
+Activity_WorkerGame_RefeshExchangeDataConfirmUI = class(ViewBase)
+
+function Activity_WorkerGame_RefeshExchangeDataConfirmUI:ctor()
+	self.viewID = Constants.ViewName.Activity_WorkerGame_RefeshExchangeDataConfirmUI
+	Activity_WorkerGame_RefeshExchangeDataConfirmUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.activity_workerGame
+end
+------------------------------------------------
+
+
+function Activity_WorkerGame_RefeshExchangeDataConfirmUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.btn_mask = contentPane:GetButton("btn_mask");
+	self.btn_close = contentPane:GetButton("btn_close");
+	self.btn_refresh = contentPane:GetButton("btn_refresh");
+	self.tx_needCoin = contentPane:GetText("tx_needCoin")
+
+	self.uiAnimator = contentPane.uiAnimator
+	
+end
+
+
+function Activity_WorkerGame_RefeshExchangeDataConfirmUI:onInit()
+
+	self:initComp()
+
+	self.btn_mask.onClick:AddListener(
+		function ()
+			self:hide()
+		end)
+
+
+	self.btn_close:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+	
+	self.btn_refresh:ButtonClickTween(
+		function ()
+			self:onRefreshBtnClick()
+		end)
+
+end
+
+function Activity_WorkerGame_RefeshExchangeDataConfirmUI:onRefreshBtnClick()
+	
+	local cost = math.ceil(CS_WorldParConfigManagerInst:GetConfig(321).parameters)
+	
+	if Activity_WorkerGameProxy.inst.coin < cost then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("活动币不足"),"FF2828")
+		return
+	end
+	
+	EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_UpdateExchange,1,0)
+	self:hide()
+	
+end
+
+function Activity_WorkerGame_RefeshExchangeDataConfirmUI:onShowed()
+
+	local cost = math.ceil(CS_WorldParConfigManagerInst:GetConfig(321).parameters)
+	
+	self.tx_needCoin.text = tostring(cost);
+	self.tx_needCoin.color = Activity_WorkerGameProxy.inst.coin < cost and CS.GUIHelper.GetColorByColorHex("FF2828") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+	
+end
+
+function Activity_WorkerGame_RefeshExchangeDataConfirmUI:onHide()
+
+end
+
+function Activity_WorkerGame_RefeshExchangeDataConfirmUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function Activity_WorkerGame_RefeshExchangeDataConfirmUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+------------------------------------------------

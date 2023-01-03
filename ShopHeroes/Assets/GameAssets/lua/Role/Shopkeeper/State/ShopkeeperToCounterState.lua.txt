@@ -1,0 +1,107 @@
+
+local Time = CS.UnityEngine.Time
+local Helper = CS.Helper
+local CS_IndoorRoleActionConfigManagerInst = CS.IndoorRoleActionConfigManager.inst
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_AITalkConfigManagerInst = CS.AITalkConfigManager.inst
+
+require("utils/StateBase")
+
+
+local ShopkeeperToCounterState = class(StateBase)
+
+
+function ShopkeeperToCounterState:init(shopkeeper)
+
+	self.shopkeeper = shopkeeper
+	self.isCanMoveToCounter = false
+	self.num = 0
+	self.maxNum = 3
+
+end
+
+
+function ShopkeeperToCounterState:getStateType()
+
+	return MachineShopkeeperState.toCounter
+
+end
+
+function ShopkeeperToCounterState:onEnter(info)
+
+	self.isCanMoveToCounter = false
+
+	self.num = 0
+	self.isCanMoveToCounter = self.shopkeeper:moveToCounter()
+	self.shopkeeper.isCanMoveToCounter = self.isCanMoveToCounter
+	
+end
+
+
+function ShopkeeperToCounterState:onExit()
+
+end
+
+function ShopkeeperToCounterState:onUpdate()
+
+	--柜台在错误位置
+	local result,counter = CS.IndoorMap.inst:GetFurnituresByUid(CS_UserDataProxyInst:GetCounter().uid)
+	if result then
+
+		if not counter.Results then
+
+			self.shopkeeper:stopMove()
+			if not self.shopkeeper:isTalking() then
+				self.shopkeeper:Talk(CS_LanguageManagerInst:GetValueByKey("我走不到柜台啊"))
+			end
+			return
+
+		end
+
+	end
+
+	if not self.shopkeeper:isTalking() and not self.isCanMoveToCounter then
+		self.shopkeeper:Talk(CS_LanguageManagerInst:GetValueByKey("我走不到柜台啊"))
+		return
+	end
+
+	if self.isCanMoveToCounter and not self.shopkeeper:isMoving() then
+		
+		if self.shopkeeper:CheckIsRoundCounter() then
+			
+			if not self.shopkeeper:isTalking() then
+				
+				self.shopkeeper:Talk(CS_LanguageManagerInst:GetValueByKey(CS_AITalkConfigManagerInst:GetSpkeeperRandomTalk(CS.TalkConditionType.shopkeeper_customerCome)))
+				
+			end
+			
+			self.shopkeeper:SetState(MachineShopkeeperState.onCounterRound)
+			
+		else
+			
+			if self.num < self.maxNum then
+				
+				self.num = self.num + 1
+				self.isCanMoveToCounter = self.shopkeeper:moveToCounter()
+				self.shopkeeper.isCanMoveToCounter = self.isCanMoveToCounter
+				
+			else
+				
+				self.shopkeeper:stopMove()
+				if not self.shopkeeper:isTalking() then
+					self.shopkeeper:Talk(CS_LanguageManagerInst:GetValueByKey("我走不到柜台啊"))
+				end
+					
+			end
+			
+		end
+		
+	end
+	
+
+
+end
+
+
+return ShopkeeperToCounterState

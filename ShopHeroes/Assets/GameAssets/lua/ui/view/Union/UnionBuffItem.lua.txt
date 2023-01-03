@@ -1,0 +1,187 @@
+---------------------------------------------------------------------
+
+require("utils/XLuaUtils")
+
+local Vector2 = CS.UnityEngine.Vector2
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_RectTransform = typeof(CS.UnityEngine.RectTransform)
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local EventDispatcher = require("event/EventDispatcher")
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_UnionTaskPopularityConfigManagerInst = CS.UnionTaskPopularityConfigManager.inst
+local csGameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+--UnionBuffItem
+
+local selfBtn
+local countdownTx
+local wealIcon
+local nameTx
+local desTx
+local slider
+local fillBgTf
+local timeObj
+local addTimeTx
+local rightBtn
+local scoreTx
+
+----
+
+local data
+local scienceData
+local timerId
+
+function InitComp()
+
+	selfBtn = self.transform:Find("selfBtn"):GetComponent("Button")
+	countdownTx = self.transform:Find("selfBtn/countdownTx"):GetComponent("Text")
+	wealIcon = self.transform:Find("selfBtn/iconBg/icon"):GetComponent(CS_type_GUIIcon)
+	nameTx = self.transform:Find("selfBtn/nameTx"):GetComponent("Text")
+	desTx = self.transform:Find("selfBtn/nameTx/desTx"):GetComponent("Text")
+	slider = self.transform:Find("selfBtn/slider"):GetComponent("Slider")
+	fillBgTf = self.transform:Find("selfBtn/slider/diBg/di"):GetComponent(CS_type_RectTransform)
+	timeObj = self.transform:Find("selfBtn/timeBg").gameObject
+	addTimeTx = self.transform:Find("selfBtn/timeBg/timeTx"):GetComponent("Text")
+	rightBtn = self.transform:Find("selfBtn/rightBtn"):GetComponent("Button")
+	scoreTx = self.transform:Find("selfBtn/rightBtn/scoreTx"):GetComponent("Text")
+
+	selfBtn:ButtonClickTween
+	(
+		function ()
+			selfBtnClick()
+		end
+	)
+
+	rightBtn:ButtonClickTween
+	(
+		function ()
+			rightBtnClick()
+		end
+	)
+
+end
+
+
+function SetData(index)
+
+	data = CS_UserDataProxyInst.UnionBuffDatas[index]
+	scienceData = CS_UserDataProxyInst:getUnionScienceDataByType(data.serverData.type)
+
+	local isLock = true
+	
+	if scienceData ~= nil then
+		isLock = scienceData.serverData.level == 0
+	end
+	
+	--slider.gameObject:SetActive(not isLock)
+	timeObj:SetActive(not isLock)
+	rightBtn.gameObject:SetActive(not isLock)
+
+	wealIcon:SetSprite(data.config.atlas,data.config.icon)
+	nameTx.text = CS_LanguageManagerInst:GetValueByKey(data.config.name)
+	desTx.text = isLock and CS_LanguageManagerInst:GetValueByKey("请先解锁{0}科技",CS_LanguageManagerInst:GetValueByKey(data.config.name)) or CS_LanguageManagerInst:GetValueByKey(data.config.skill_desc,tostring(data.config.add2_num))
+	scoreTx.text = tostring(data.config.need_point)
+	scoreTx.color = CS_UserDataProxyInst.Union_uCoin < data.config.need_point and CS.GUIHelper.GetColorByColorHex("FF2828") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+
+	fillBgTf.anchorMax = Vector2(data.config.now_level / 5.0,1)
+
+	local str = data.remainTime > 0 and "+" or ""
+	addTimeTx.text = str..CS_TimeUtils.timeSpanStrip(data.config.skill_time * 60,false)
+
+
+	setTimer()
+
+end
+
+function selfBtnClick()
+	EventDispatcher:dispatchEvent(GameEvent.UnionEvent.ShowUI_UnionWealUpDetailUI,scienceData)
+end
+
+function rightBtnClick()
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func_2 = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+	
+	if CS_UserDataProxyInst.playerData.memberJob == 0 then
+		func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("只有管理员和公会会长可以购买联盟福利。"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+		return
+	end
+
+	if scienceData.serverData.level == 0 then
+
+		func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("请先解锁对应科技"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+
+	else
+
+		if scoreTx.color == CS.GUIHelper.GetColorByColorHex("FF2828") then
+			func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("联盟积分不足"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+		else
+
+			if data.remainTime > 0 --[[data.serverData.time + data.config.skill_time * 60 > data.config.skill_time * 60 * data.config.now_level ]] then
+				func_2(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("技能已经开启"),CS.GUIHelper.GetColorByColorHex("FF2828"))
+				return
+			end
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+			local func_1 = funcGeneric(CS.System.Int32)
+			
+			func_1(CS_EventControllerInst,CS_GameEventType.UnionEvent.UNION_REQUEST_USESKILL,data.serverData.type)
+		end
+
+	end
+
+end
+
+function clearTimer()
+
+	if timerId ~= 0 then
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = 0
+	end
+
+end
+
+function setTimer()
+
+	clearTimer()
+
+	if 	data.remainTime > 0 then
+		timerMethod()
+		timerId = csGameTimerInst:AddTimer(1,function()
+
+				if data.remainTime > 0 then
+					timerMethod()
+				else
+					clearTimer()
+					countdownTx.text = ""
+					--slider.value = 0
+				end
+
+			end)
+
+	else
+		countdownTx.text = ""
+		--slider.value = 0
+	end
+
+end
+
+function timerMethod()
+	countdownTx.text = CS_TimeUtils.timeSpanStrip(data.remainTime,true)
+	--slider.value = data.remainTime / (data.config.skill_time * 60 * data.config.now_level) * (data.config.now_level / 5.0)
+	--slider.value = data.remainTime / (data.config.skill_time * 60.0)
+end
+
+function onDestroy()
+	
+	clearTimer()
+	
+end

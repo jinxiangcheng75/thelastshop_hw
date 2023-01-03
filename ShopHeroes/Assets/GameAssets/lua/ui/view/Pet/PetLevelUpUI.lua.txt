@@ -1,0 +1,103 @@
+--PetLevelUpUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local Vector3 = CS.UnityEngine.Vector3
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_PetDataProxyInst = CS.PetDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_SpineUtils = CS.SpineUtils
+
+PetLevelUpUI = class(ViewBase)
+
+function PetLevelUpUI:ctor()
+	self.viewID = Constants.ViewName.PetLevelUpUI
+	PetLevelUpUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = false
+end
+------------------------------------------------
+
+
+function PetLevelUpUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.tx_lvTip = contentPane:GetText("tx_lvTip")
+	self.tf_pet = contentPane:GetObjByName("tf_pet").transform
+	self.tx_petLv = contentPane:GetText("tx_petLv")
+	self.tx_energyCount = contentPane:GetText("tx_energyCount")
+	self.btn_countinue = contentPane:GetButton("btn_countinue")
+
+end
+
+
+function PetLevelUpUI:onInit()
+
+	self:initComp()
+	self.dressUpSystem = nil
+
+	self.btn_countinue:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+end
+
+
+function PetLevelUpUI:onHide()
+	print("PetLevelUpUI onHide")
+end
+
+function PetLevelUpUI:onShowed()
+	print("PetLevelUpUI onShowed")
+end
+
+function PetLevelUpUI:SetData(petData)
+
+	if self.dressUpSystem == nil or self.dressUpSystem:IsNull() == true then
+
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByModel")
+		local func = funcGeneric(CS.DressUpSystem)
+
+		func(CS_CharacterManagerInst,petData.petCfg.model,1.4,true,function (system)
+				self.dressUpSystem = system
+				system:SetUIPosition(self.tf_pet,self._uiCanvas.sortingLayerName,self._uiCanvas.sortingOrder + 1,1.8)
+				system:Play("idle",true)
+				system:SetDirection(CS.RoleDirectionType.Left);
+			end)
+
+	else
+		CS_CharacterManagerInst:ReSetCharacterByModel(self.dressUpSystem,petData.petCfg.model)
+		self.dressUpSystem:SetUIPosition(self.tf_pet,self._uiCanvas.sortingLayerName,self._uiCanvas.sortingOrder + 1,1.8)
+	end
+
+	
+	self.tx_lvTip.text = CS_LanguageManagerInst:GetValueByKey("{0}的亲密度升到了<color=#ffc822>{1}级</color>！",petData.petInfo.petName,tostring(petData.petInfo.petLevel))
+	self.tx_petLv.text = tostring(petData.petInfo.petLevel)
+	local curConfig = PetUpdateConfigManager:GetConfig(petData.petInfo.petLevel)
+	self.tx_energyCount.text = tostring(curConfig.energy)
+	
+end
+
+
+function PetLevelUpUI:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function PetLevelUpUI:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+------------------------------------------------

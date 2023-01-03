@@ -1,0 +1,196 @@
+--GameStateManager
+
+require("class")
+require("utils/LuaUtils")
+require("utils/XLuaUtils")
+local GameStateSplash = require("state/GameStateSplash")
+local GameStatePreload = require("state/GameStatePreload")
+local GameStateLogin = require("state/GameStateLogin")
+local GameStateCreateRole = require("state/GameStateCreateRole")
+local GameStateLoading = require("state/GameStateLoading")
+local GameStateShop = require("state/GameStateShop")
+local GameStateTown = require("state/GameStateTown")
+local GameStateBattle = require("state/GameStateBattle")
+local GameStateTavern = require("state/GameStateTavern")
+local GameStateUnion = require("state/GameStateUnion")
+local GameStateVisitShop = require("state/GameStateVisitShop")
+local GameStateTBox = require("state/GameStateTBox")
+local GameStateRuins = require("state/GameStateRuins")
+local EventDispatcher = require("event/EventDispatcher")
+local BaseState = require("state/BaseState")
+local cskGameState = CS.kGameState
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+
+print("csk:", cskGameState)
+
+kGameState = {
+	Splash = 0,
+	Preload = 1,
+	Login = 2,
+	Loading = 3,
+	CreatRole = 4,
+	Shop = 5,
+	Town = 6,
+	Tavern = 7,
+	Battle = 8,
+	Union = 9,
+	VisitShop = 10, --拜访店铺
+	TBox = 11,
+	Update = 12,
+	Ruins = 13,
+}
+table_read_only(kGameState)
+
+local GameStateManager = class()
+
+GameStateManager.inst = GameStateManager:new()
+
+local inst = GameStateManager.inst
+
+function GameStateManager:ctor()
+end
+
+local function csGameStateToGameState(csState)
+	print("csState:", csState, " csk:", cskGameState.CreatRole)
+	if (csState == cskGameState.Login) then
+		return kGameState.Login
+	elseif csState == cskGameState.CreatRole then
+		return kGameState.CreatRole
+	elseif csState == cskGameState.Shop then
+		return kGameState.Shop
+	elseif csState == cskGameState.Town then
+		return kGameState.Town
+	elseif csState == cskGameState.Loading then
+		return kGameState.Loading
+	elseif csState == cskGameState.Battle then
+		return kGameState.Battle
+	elseif csState == cskGameState.Tavern then
+		return kGameState.Tavern
+	elseif csState == cskGameState.Union then
+		return kGameState.Union
+	elseif csState == cskGameState.VisitShop then
+		return kGameState.VisitShop
+	elseif csState == cskGameState.TBox then
+		return kGameState.TBox
+	elseif csState == cskGameState.Update then
+		return kGameState.Update
+	elseif csState == cskGameState.Ruins then
+		return kGameState.Ruins
+	end
+end
+
+function GameStateManager:onChangeState(transition)
+	print("[State]changeState : ", transition)
+	self:ChangeState(transition)
+end
+
+function GameStateManager:onCSChangeState(transition)
+	print("[State]CSChangeState : ", transition)
+	print("[State]CSChangeState : ", transition.state)
+	--print("[State]CSChangeState : ", tonumber(transition.state))
+	local lstate = csGameStateToGameState(transition.state)
+	local tran = {
+		state = lstate,
+		loading = transition.loading
+	}
+	print("[state] transformed state:", tran.state)
+	self:ChangeState(tran)
+end
+
+function GameStateManager:init()
+	self.mStates = {}
+	self.mCurState = nil
+	self.mLastState = nil
+	self.mCurrState = kGameState.Splash
+	EventDispatcher:addEvent(GameEvent.State.Change_State, self, self.onChangeState)
+	EventDispatcher:addEvent(GameEvent.CSEvent.Change_State, self, self.onCSChangeState)
+	EventDispatcher:addEvent(GameEvent.State.ChangeLastState, self, self.GOTOLastState)
+
+	self:AddState(kGameState.Splash, GameStateSplash:new())
+	self:AddState(kGameState.Preload, GameStatePreload:new())
+	self:AddState(kGameState.Login, GameStateLogin:new())
+	self:AddState(kGameState.CreatRole, GameStateCreateRole:new())
+	self:AddState(kGameState.Loading, GameStateLoading:new())
+	self:AddState(kGameState.Shop, GameStateShop:new())
+	self:AddState(kGameState.Town, GameStateTown:new())
+	self:AddState(kGameState.Tavern, GameStateTavern:new())
+	self:AddState(kGameState.Battle, GameStateBattle:new())
+	self:AddState(kGameState.Union, GameStateUnion:new())
+	self:AddState(kGameState.TBox, GameStateTBox:new())
+	self:AddState(kGameState.VisitShop, GameStateVisitShop:new())
+	self:AddState(kGameState.Ruins, GameStateRuins:new())
+end
+
+function GameStateManager:AddState(state, handler)
+	self.mStates[state] = handler
+end
+
+function GameStateManager:RemoveState(state)
+	self.mStates[state] = nil
+end
+
+function GameStateManager:ChangeState(transition)
+	--print("[State]changeState : ", transition)
+	--print("[State] changeState loading:", transition.loading)
+	if (self.mCurState ~= nil) then
+		CS.ManagerBinder.inst.stateIsChanging = true
+		CS.D2DragCamera.inst.onsceneChange = true
+
+		if self.mCurrState ~= nil then
+			self.mLastState = self.mCurrState
+		end
+		self.mCurrState = transition.state
+
+		if self.mLastState == kGameState.CreatRole and self.mCurrState == kGameState.Shop then
+
+			CS.FGUI.inst:SetLoopJumpLoadingAnim(true)
+			self.mCurState:onExit()
+			CS.ManagerBinder.inst.Asset:clear()
+			self:EnterNextState(transition, self.mStates[transition.state])
+			return
+
+		else
+
+			if transition.loading == true then
+				CS.FGUI.inst:StartExcessAnimation(
+					true,
+					false,
+					function()
+						self.mCurState:onExit()
+						CS.ManagerBinder.inst.Asset:clear()
+						self:EnterNextState(transition, self.mStates[transition.state])
+					end
+				)
+				return
+			end
+
+		end
+
+		self.mCurState:onExit()
+	end
+	
+	self:EnterNextState(transition, self.mStates[transition.state])
+	--GC?
+end
+
+function GameStateManager:EnterNextState(transition, nextState)
+	print("[State] changeState no loading")
+	self.mCurState = nextState
+	print("[State] nextState:", nextState)
+	CS.AtlasAssetHandler.inst:ReleaseAtlasList()
+	nextState:onEnter(transition)
+end
+
+function GameStateManager:GOTOLastState()
+	if (self.mLastState ~= nil) then
+		self:onChangeState(
+			{
+				state = self.mLastState,
+				loading = true
+			}
+		)
+	end
+end
+
+return GameStateManager.inst

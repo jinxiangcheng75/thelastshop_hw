@@ -1,0 +1,165 @@
+--MallDealInfoUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/MallDataProxy")
+require("utils/XLuaUtils")
+local CS_type_luaList = typeof(CS.LuaListItem)
+local CS_type_ObjList = typeof(CS.ObjList)
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csTimeUtils = CS.TimeUtils
+local EventDispatcher = require("event/EventDispatcher")
+local csItemConfigManagerInst = CS.ItemconfigManager.inst
+local csEquipConfigManagerInst = CS.EquipConfigManager.inst
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csItemType = CS.ItemType
+local csGUIHelper = CS.GUIHelper
+local csPayInst = CS.GamePay.inst
+
+local data
+
+MallDealInfoUIView = class(ViewBase)
+
+function MallDealInfoUIView:ctor()
+	self.viewID = Constants.ViewName.MallDealInfoUIView
+	MallDealInfoUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+
+function MallDealInfoUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.nameText = contentPane:GetText("nameText")
+	--self.moreGood = contentPane:GetObjByName("moreGood")
+	self.priceText = contentPane:GetText("priceText")
+	self.buyBtn = contentPane:GetButton("buyBtn")
+	self.buyBtnPriceText = contentPane:GetText("buyBtnPriceText")
+	self.smallTitle = contentPane:GetText("smallTitle")
+	self.btmBigText = contentPane:GetText("btmBigText")
+	self.btmSmallText = contentPane:GetText("btmSmallText")
+	self.bgIcon = contentPane:GetGUIIcon("bgIcon")
+	self.roleImgIcon = contentPane:GetGUIIcon("roleImgIcon")
+	self.nameBg = contentPane:GetGUIIcon("nameBg")
+	self.goods_1 = contentPane:GetGUIIcon("goods_1")
+	self.goods_1_bgIcon = contentPane:GetGUIIcon("goods_1_bg")
+	self.goods_2 = contentPane:GetGUIIcon("goods_2")
+	self.goods_2_bgIcon = contentPane:GetGUIIcon("goods_2_bg")
+
+	self.allDealGoods = {}
+	local localDealGoodsList = self.goods_1.gameObject:GetComponent(CS_type_ObjList).objList
+	for i = 1, localDealGoodsList.Count do
+		self.allDealGoods[i] = localDealGoodsList[i - 1]:GetComponent(CS_type_luaList)
+	end
+	local localDealGoodsList2 = self.goods_2.gameObject:GetComponent(CS_type_ObjList).objList
+	for i = 1, localDealGoodsList2.Count do
+		self.allDealGoods[localDealGoodsList.Count + i] = localDealGoodsList2[i - 1]:GetComponent(CS_type_luaList)
+	end
+end
+
+function MallDealInfoUIView:onInit()
+
+	self:initComp()
+
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end
+	)
+
+	self.buyBtn:ButtonClickTween(
+		function ()
+			csPayInst:Pay(data.payProduct.priceId,data.payProduct.productId,data.payProduct.payActivityType,data.payProduct.payActivityId,function (isSuccess)
+					if(isSuccess)then
+						--print("充值成功")
+						--EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallBuyVipOtherComUI,data.)
+					end
+				end
+			)
+		end
+	)
+end
+
+
+function MallDealInfoUIView:onHide()
+	--print("MallDealInfoUIView onHide")
+end
+
+function  MallDealInfoUIView:onShowed()
+	--print("MallDealInfoUIView onShowed")
+end
+
+function MallDealInfoUIView:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function MallDealInfoUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function MallDealInfoUIView:closeBtnClick()
+	self:hide()
+end
+
+function MallDealInfoUIView:SetData(itemData)
+	data = itemData
+	self.nameText.text = cs_LanguageManagerInst:GetValueByKey(itemData.name)
+	self.smallTitle.text = cs_LanguageManagerInst:GetValueByKey(itemData.tag)
+	self.btmBigText.text = cs_LanguageManagerInst:GetValueByKey(itemData.title)
+	self.btmSmallText.text = cs_LanguageManagerInst:GetValueByKey(itemData.slogan)
+
+	local salePriceStr = csPayInst:GetProductPrice(itemData.payProduct.productId)
+	local splitIndex = 1
+	for i = 1, #salePriceStr do
+		if(tonumber(string.sub(salePriceStr,i,i)) ~= nil)then
+			splitIndex = i
+			break
+		end
+	end
+	local monetaryUnit = string.sub(salePriceStr,1,splitIndex - 1)
+	local salePrice = tonumber(string.sub(salePriceStr,splitIndex,-1))
+	print("这个价格的符号是",monetaryUnit,"价格是",salePrice)
+	local originalPrice = ""
+	if(salePrice ~= nil)then
+		originalPrice = monetaryUnit .. (salePrice * itemData.originalPrice / 100)
+	end
+	self.priceText.text = cs_LanguageManagerInst:GetValueByKey("价值{0}",originalPrice)
+	self.buyBtnPriceText.text = salePriceStr
+
+	if(itemData.pic1 ~= "-1" and itemData.pic2 ~= "-1")then
+		self.bgIcon:SetSprite(itemData.pic1,itemData.pic2)
+	end
+
+	self.roleImgIcon:SetSprite(itemData.roleImgAtlas,itemData.roleImgIcon)
+
+	if(itemData.atlasIcon ~= "-1" and itemData.icon2 ~= "-1")then
+		self.nameBg:SetSprite(itemData.atlasIcon,itemData.icon2)
+	end
+
+	if(itemData.atlasIcon ~= "-1" and itemData.icon3 ~= "-1")then
+		self.goods_1:SetSprite(itemData.atlasIcon,itemData.icon3)
+		self.goods_1_bgIcon:SetSprite(itemData.atlasIcon,itemData.icon3)
+		self.goods_2:SetSprite(itemData.atlasIcon,itemData.icon3)
+		self.goods_2_bgIcon:SetSprite(itemData.atlasIcon,itemData.icon3)
+	end
+
+	self.goods_2.gameObject:SetActive(#itemData.itemList > 3)
+
+	self:SetAllItemData()
+end
+
+function MallDealInfoUIView:SetAllItemData()
+	for i = 1, #self.allDealGoods do
+		if(i <= #data.itemList)then
+			self.allDealGoods[i].gameObject:SetActive(true)
+			self.allDealGoods[i]:SetData(data.itemList[i])
+		else
+			self.allDealGoods[i].gameObject:SetActive(false)
+		end
+	end
+end
+------------------------------------------------

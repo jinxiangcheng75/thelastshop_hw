@@ -1,0 +1,58 @@
+
+-- GemMonthCardSystem
+
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("utils/XLuaUtils")
+
+require("ui/view/Welfare/WelfareUI")
+require("ui/view/Welfare/SevenDayBuyPassUI")
+
+local EventDispatcher= require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+GemMonthCardSystem = class(BaseSystem)
+GemMonthCardSystem.super = BaseSystem
+
+function GemMonthCardSystem:ctor()
+	
+end
+
+function GemMonthCardSystem:OnInit()
+	
+end
+
+function GemMonthCardSystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.GemMonthEvent.Request_GemMonthCardData,self,self.requestGemMonthCardData)
+	EventDispatcher:addEvent(GameEvent.GemMonthEvent.Request_GemMonthCardReward,self,self.requestGemMonthCardReward)
+
+end
+
+function GemMonthCardSystem:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.GemMonthEvent.Request_GemMonthCardData,self,self.requestGemMonthCardData)
+	EventDispatcher:removeEvent(GameEvent.GemMonthEvent.Request_GemMonthCardReward,self,self.requestGemMonthCardReward)
+	
+end
+
+function GemMonthCardSystem:requestGemMonthCardData()
+	
+	local req = MsgType.Request_Pay_GoldVip:New()
+	req:Send()
+	
+end
+
+function GemMonthCardSystem:requestGemMonthCardReward()
+	
+	local req = MsgType.Request_Pay_GoldVipReward:New()
+	req:Send()
+	
+end
+
+
+----------------------------------------------------------------------

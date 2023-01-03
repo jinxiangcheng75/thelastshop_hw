@@ -1,0 +1,28 @@
+local eventrun = {}
+eventrun.runstate = 0 --当前状态0 -- 等待 1--执行中
+local EventDispatcherInst = require("event/EventDispatcher")
+function awake()
+	EventDispatcherInst:addEvent(GameEvent.EventSystem.Design_Levelup_Event, eventrun, eventrun.Run)
+end
+function start()
+	print("DesignLevelUp_start")
+end
+function update()
+	if eventrun.runstate == 0 then
+		return
+	end
+	--有操作则退出当前事件
+	if
+		(CS.UnityEngine.Input.GetMouseButtonDown(0) or
+			(CS.UnityEngine.Input.touchCount >= 1 and CS.UnityEngine.Input.GetTouch(0).phase == CS.UnityEngine.TouchPhase.Ended))
+	 then
+		GameEventListControl.inst:EventEnd()
+		eventrun.runstate = 0
+	end
+end
+
+function eventrun:Run()
+	self.runstate = 1
+	--执行事件代码
+	CS.EventController.inst:TriggerEvent(CS.GameEventType.ShopDesignEvent.CameraMove_CheckExtendUpOrFurnitureUpEnd)
+end

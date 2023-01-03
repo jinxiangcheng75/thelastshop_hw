@@ -1,0 +1,145 @@
+--TestNewDataProxy
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGameTimerInst = CS.GameTimer.inst
+
+local dailyItemId
+local timerId
+
+local remainTime = 0
+
+DailySignDataProxy = class(BaseDataProxy)
+
+DailySignDataProxy.inst = DailySignDataProxy:new()
+
+function DailySignDataProxy:Init()
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Activity_List_Cmd,
+		function(resp)
+			print("Response_Activity_List success", resp)
+			self:GetDailySignListData(resp)
+		end,
+		function(code)
+			print("Response_Activity_List fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Activity_DailyGiftReward_Cmd,
+		function(resp)
+			print("Response_Activity_DailyGiftReward success", resp)
+			self:GetDailyRewardData(resp)
+		end,
+		function(code)
+			print("Response_Activity_DailyGiftReward fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"领取签到奖励失败!")
+		end
+	)
+
+	self.isShowDailySignRedPoint = false
+end
+
+function DailySignDataProxy:GetDailySignListData(respData)
+	local data = MsgType.Response_Activity_List:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+	self:SetDailyData(data.dailyGift)
+	if (data.dailyGift.nextTime > 0) then
+		self.isShowDailySignRedPoint = false
+	else
+		self.isShowDailySignRedPoint = true
+	end
+	--self.dailyData = data.dailyGift
+	EventDispatcher:dispatchEvent(GameEvent.DailySignEvent.RefreshUI_DailySignUI)
+end
+
+function DailySignDataProxy:GetDailyRewardData(respData)
+	local data = MsgType.Response_Activity_DailyGiftReward:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self:SetDailyData(data.dailyGift)
+
+	if (#data.itemList > 1) then
+		--csEventControllerInst:TriggerEvent_Lua1(csGameEventType.ReceiveEvent.NEWITEM_MSG,awardItem)
+		local tempList = {}
+		for i = 1, #data.itemList do
+			local tempCommonRewardData = CS.CommonRewardData(data.itemList[i].itemId, data.itemList[i].count, 0,data.itemList[i].itemType)
+			tempList[i] = tempCommonRewardData
+		end
+		local awardItem = CS.Award_AboutCommon()
+		awardItem.type = CS.ReceiveInfoUIType.CommonReward
+		awardItem.allRewardList = tempList
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.Award_AboutCommon)
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, awardItem)
+	else
+		--csEventControllerInst:TriggerEvent_Lua1(csGameEventType.ReceiveEvent.NEWITEM_MSG,queueItem)
+		if(#data.itemList > 0)then
+			local cfg = CS.ItemconfigManager.inst:GetConfig(data.itemList[1].itemId)
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.queueItem)
+			if (cfg ~= nil) then
+				local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", 0, data.itemList[1].itemId, data.itemList[1].count)
+
+				func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+			else
+				local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", data.itemList[1].itemId, 0, data.itemList[1].count)
+
+				func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+			end
+		end
+	end
+
+	if (data.dailyGift.nextTime > 0) then
+		self.isShowDailySignRedPoint = false
+	else
+		self.isShowDailySignRedPoint = true
+	end
+
+	CS.AudioManager.inst:PlaySound(115)
+	EventDispatcher:dispatchEvent(GameEvent.DailySignEvent.RefreshUI_DailySignUI)
+end
+
+function DailySignDataProxy:SetDailyData(decodeData)
+	self.dailyData = decodeData
+
+	if (timerId ~= nil) then
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = nil
+	end
+
+	remainTime = csGameTimerInst.serverNow + self.dailyData.nextTime
+
+	if (self.dailyData.nextTime > 0) then
+		timerId =
+		csGameTimerInst:AddTimer(
+			1,
+			function()
+				if (self.dailyData.nextTime > 0) then
+					self.dailyData.nextTime = remainTime - csGameTimerInst.serverNow
+				else
+					EventDispatcher:dispatchEvent(GameEvent.DailySignEvent.REQUEST_DAILYLIST)
+					csGameTimerInst:RemoveTimer(timerId)
+					timerId = nil
+				end
+			end
+		)
+	end
+end
+
+function DailySignDataProxy:Clear()
+end
+
+function DailySignDataProxy:GetData()
+end

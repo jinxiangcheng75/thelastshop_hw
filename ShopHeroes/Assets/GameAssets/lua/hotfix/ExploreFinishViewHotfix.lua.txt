@@ -1,0 +1,318 @@
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local Vector3 = CS.UnityEngine.Vector3
+local Vector2 = CS.UnityEngine.Vector2
+local EventDispatcher = require("event/EventDispatcher")
+
+xlua.private_accessible(CS.ExploreFinishView)
+xlua.hotfix(
+	CS.ExploreFinishView,
+	"RemoveHeroCount",
+	function(self)
+
+		self.levelUpHeroCount = self.levelUpHeroCount - 1
+		self.contentPane.exploreLevelText.color = CS.GUIHelper.GetColorByColorHex("#CA788D")
+		if (self.levelUpHeroCount <= 0) then
+			self.contentPane.gameObject:SetActive(true)
+			if (CS.ExploreDataProxy.inst.slotType == 0 or CS.ExploreDataProxy.inst.slotType == 1) then
+				self.contentPane.exploreLevelText.gameObject:GetComponent("RectTransform").anchoredPosition = Vector2(-334,28)
+				self.contentPane.exploreLevelText.alignment = CS.UnityEngine.TextAnchor.MiddleRight
+				self:setExploreData()
+			elseif CS.ExploreDataProxy.inst.slotType == 2 then
+				self:ExploreLevelUpComplete()
+			elseif CS.ExploreDataProxy.inst.slotType == 3 then
+				self.contentPane.exploreObj:SetActive(true)
+
+				self.contentPane.exploreLevelText.text = ""
+				self.contentPane.exploreLevelText.color = CS.UnityEngine.Color.white
+				self.contentPane.exploreLevelText.gameObject:GetComponent("RectTransform").anchoredPosition = Vector2(0,28)
+				self.contentPane.exploreLevelText.alignment = CS.UnityEngine.TextAnchor.MiddleCenter
+
+				self.contentPane.nextUpImg.enabled = false
+
+				if(GoldenCityDataProxy.inst.bossExploreIsAllOver)then
+
+					local goldenCityCfg = GoldenCityConfigManager:GetLastBossConfig()
+					if(goldenCityCfg ~= nil)then
+						local instanceCfg = CS.ExploreInstanceConfigManager.inst:GetConfig(goldenCityCfg.instance_id)
+						if(instanceCfg ~= nil)then
+							self.contentPane.exploreNameText.text = CS.LanguageManager.inst:GetValueByKey(instanceCfg.instance_name)
+						end
+
+						local keyItemCfg = CS.ItemconfigManager.inst:GetConfig(goldenCityCfg.ic_id)
+						if(keyItemCfg ~= nil)then
+							self.contentPane.nextIcon:SetSprite(keyItemCfg.atlas,keyItemCfg.icon)
+							self.contentPane.exploreIcon:SetSprite(keyItemCfg.atlas,keyItemCfg.icon)
+						end
+
+						self.contentPane.exploreExpSlider.maxValue = 1
+						self.contentPane.exploreExpSlider.value = 1
+						self.contentPane.exploreLevelText.text = "max"
+					end
+				else
+
+					local goldenCityCfg = GoldenCityDataProxy.inst.bossExploreCfg
+
+					if(goldenCityCfg ~= nil)then
+						local instanceCfg = CS.ExploreInstanceConfigManager.inst:GetConfig(goldenCityCfg.instance_id)
+						if(instanceCfg ~= nil)then
+							self.contentPane.exploreNameText.text = CS.LanguageManager.inst:GetValueByKey(instanceCfg.instance_name)
+						end
+
+						local keyItemCfg = CS.ItemconfigManager.inst:GetConfig(goldenCityCfg.ic_id)
+						if(keyItemCfg ~= nil)then
+							self.contentPane.nextIcon:SetSprite(keyItemCfg.atlas,keyItemCfg.icon)
+							self.contentPane.exploreIcon:SetSprite(keyItemCfg.atlas,keyItemCfg.icon)
+						end
+
+						self.contentPane.exploreExpSlider.maxValue = goldenCityCfg.unlock_num
+						self.contentPane.exploreExpSlider.value = GoldenCityDataProxy.inst.lastExploreProcess
+						self.contentPane.exploreExpSlider:DOValue(GoldenCityDataProxy.inst.bossExploreProcess,1.5).From(GoldenCityDataProxy.inst.lastExploreProcess)
+						--self.contentPane.exploreExpSlider.value = GoldenCityDataProxy.inst.bossExploreProcess
+						self.contentPane.exploreLevelText.text = GoldenCityDataProxy.inst.bossExploreProcess .. "/" .. goldenCityCfg.unlock_num
+						--print("Response_OperatingActivity2 输出",goldenCityCfg.unlock_num,"     ",GoldenCityDataProxy.inst.bossExploreProcess)
+					end
+
+				end
+
+				CS.GameTimer.inst:AddTimer(1.5,1,function ()
+						self.contentPane.exploreObj:SetActive(false)
+						self:ExploreLevelUpComplete()
+					end)
+
+			end
+		end
+
+	end
+)
+
+
+xlua.hotfix(
+	CS.ExploreFinishView,
+	"setExploreSuccessFinishData",
+	function(self, bagResources,slotId,exploreId)
+
+		self.isSuccess = true
+		self:GetBeforeChangeData()
+		self.contentPane.finishBgIcon:SetSprite("__common_1", "shoudao_piaodai")
+		self.contentPane.allBtn:SetActive(false)
+		if (CS.K_Vip_State.__CastFrom(CS.UserDataProxy.inst.playerData.vipState) == CS.K_Vip_State.Vip) then
+			self.contentPane.collectBtn.gameObject:SetActive(false)
+		else
+			self.contentPane.collectBtn.gameObject:SetActive(true)
+		end
+
+		self.exploreId = exploreId
+		self.slotId = slotId
+		self.getItemList = bagResources
+		self.contentPane.successObj:SetActive(true)
+		self.contentPane.loseObj:SetActive(false)
+		self.contentPane.finishResultText.text = cs_LanguageManagerInst:GetValueByKey("冒险完成!")
+
+		local cfg = CS.ExploreInstanceConfigManager.inst:GetConfig(exploreId)
+		if (CS.ExploreDataProxy.inst.slotType == 0 or CS.ExploreDataProxy.inst.slotType == 1) then
+			self.contentPane.exploreNameAndDiffText.text = cs_LanguageManagerInst:GetValueByKey(cfg.instance_name) .. " <Color=" .. CS.StaticConstants.diffColor[cfg.difficulty - 1] .. ">" .. cs_LanguageManagerInst:GetValueByKey(CS.StaticConstants.diffType[cfg.difficulty - 1]) .. "</Color>"
+		elseif CS.ExploreDataProxy.inst.slotType == 2 then
+			self.contentPane.exploreNameAndDiffText.text = cs_LanguageManagerInst:GetValueByKey(cfg.instance_name)
+		elseif CS.ExploreDataProxy.inst.slotType == 3 then
+			self.contentPane.exploreNameAndDiffText.text = ""
+		end
+		self:setHeroData()
+
+	end
+)
+
+xlua.hotfix(
+	CS.ExploreFinishView,
+	"setExploreLoseFinishData",
+	function(self, exploreId)
+
+		self.isSuccess = false
+		self.contentPane.finishBgIcon:SetSprite("__common_1", "shoudao_shibai")
+		self:GetBeforeChangeData()
+		self.contentPane.successObj:SetActive(false)
+		self.contentPane.loseObj:SetActive(true)
+		self.exploreId = exploreId
+		self.contentPane.finishResultText.text = cs_LanguageManagerInst:GetValueByKey("冒险失败")
+		local cfg = CS.ExploreInstanceConfigManager.inst:GetConfig(exploreId)
+		if (CS.ExploreDataProxy.inst.slotType == 0 or CS.ExploreDataProxy.inst.slotType == 1) then
+			self.contentPane.exploreNameAndDiffText.text = cs_LanguageManagerInst:GetValueByKey(cfg.instance_name) .. " " .. cs_LanguageManagerInst:GetValueByKey(CS.StaticConstants.diffType[cfg.difficulty - 1])
+		elseif CS.ExploreDataProxy.inst.slotType == 2 then
+			self.contentPane.exploreNameAndDiffText.text = cs_LanguageManagerInst:GetValueByKey(cfg.instance_name)
+		elseif CS.ExploreDataProxy.inst.slotType == 3 then
+			self.contentPane.exploreNameAndDiffText.text = ""
+		end
+
+		self:setHeroData()
+
+	end
+)
+
+xlua.hotfix(
+	CS.ExploreFinishView,
+	"setAwardData",
+	function(self)
+
+		self.contentPane.awardsObj:SetActive(true)
+		self.contentPane.exploreObj:SetActive(false)
+
+		for i = 0, self.contentPane.awards.Count - 1 do
+			local index = i
+
+			if (index < self.getItemList.Count) then
+
+				self.contentPane.awards[index].gameObject:SetActive(true)
+				self.contentPane.awards[index].transform.localScale = Vector3(0, 0, 0)
+				local isvip = false
+				if(index == self.getItemList.Count - 1 and CS.ExploreDataProxy.inst.slotType ~= 3)then
+					isvip = true
+				end
+				self.contentPane.awards[index]:setData(self.getItemList[index], isvip, index)
+
+			else
+				self.contentPane.awards[index].gameObject:SetActive(false)
+			end
+		end
+
+		CS.GameTimer.inst:AddTimer(0.5 + 0.1 * self.getItemList.Count,1,function ()
+				for i = 0, self.getItemList.Count - 1 do
+					local index = i
+					if(self ~= nil and self.contentPane ~= nil)then
+						self.contentPane.awards[index]:RecoveryData()
+					end
+				end
+			end)
+
+		CS.GameTimer.inst:AddTimer(0.2 + 0.1 * self.getItemList.Count + 0.4,1,function ()
+				self.contentPane.allBtn:SetActive(true)
+				if(CS.ExploreDataProxy.inst.slotType ~= 3)then
+					self.contentPane.collectAllBtn.gameObject:SetActive(true)
+				else
+					if(CS.K_Vip_State.__CastFrom(CS.UserDataProxy.inst.playerData.vipState) == CS.K_Vip_State.Vip)then
+						self.contentPane.collectBtn.gameObject:SetActive(true)
+					end
+					self.contentPane.collectAllBtn.gameObject:SetActive(false)
+				end
+			end)
+
+	end
+)
+
+xlua.hotfix(
+	CS.ExploreFinishView,
+	"JudgeAllHeroesIsComplete",
+	function(self)
+
+		if (self.levelUpHeroCount <= 0) then
+			self.contentPane.exploreLevelText.color = CS.GUIHelper.GetColorByColorHex("#CA788D")
+			self.contentPane.gameObject:SetActive(true)
+			if (self.isSuccess) then
+
+				if (CS.ExploreDataProxy.inst.slotType == 0 or CS.ExploreDataProxy.inst.slotType == 1) then
+					self.contentPane.exploreLevelText.gameObject:GetComponent("RectTransform").anchoredPosition = Vector2(-334,28)
+					self.contentPane.exploreLevelText.alignment = CS.UnityEngine.TextAnchor.MiddleRight
+					self:setExploreData()
+				elseif CS.ExploreDataProxy.inst.slotType == 2 then
+					self:ExploreLevelUpComplete()
+				elseif CS.ExploreDataProxy.inst.slotType == 3 then
+					self.contentPane.exploreObj:SetActive(true)
+
+					self.contentPane.exploreLevelText.color = CS.UnityEngine.Color.white
+					self.contentPane.exploreLevelText.text = ""
+					self.contentPane.exploreLevelText.gameObject:GetComponent("RectTransform").anchoredPosition = Vector2(0,28)
+					self.contentPane.exploreLevelText.alignment = CS.UnityEngine.TextAnchor.MiddleCenter
+
+					self.contentPane.nextUpImg.enabled = false
+
+					if(GoldenCityDataProxy.inst.bossExploreIsAllOver)then
+
+						local goldenCityCfg = GoldenCityConfigManager:GetLastBossConfig()
+						if(goldenCityCfg ~= nil)then
+							local instanceCfg = CS.ExploreInstanceConfigManager.inst:GetConfig(goldenCityCfg.instance_id)
+							if(instanceCfg ~= nil)then
+								self.contentPane.exploreNameText.text = CS.LanguageManager.inst:GetValueByKey(instanceCfg.instance_name)
+							end
+
+							local keyItemCfg = CS.ItemconfigManager.inst:GetConfig(goldenCityCfg.ic_id)
+							if(keyItemCfg ~= nil)then
+								self.contentPane.nextIcon:SetSprite(keyItemCfg.atlas,keyItemCfg.icon)
+								self.contentPane.exploreIcon:SetSprite(keyItemCfg.atlas,keyItemCfg.icon)
+							end
+
+							self.contentPane.exploreExpSlider.maxValue = 1
+							self.contentPane.exploreExpSlider.value = 1
+							self.contentPane.exploreLevelText.text = "max"
+						end
+					else
+
+						local goldenCityCfg = GoldenCityDataProxy.inst.bossExploreCfg
+
+						if(goldenCityCfg ~= nil)then
+							local instanceCfg = CS.ExploreInstanceConfigManager.inst:GetConfig(goldenCityCfg.instance_id)
+							if(instanceCfg ~= nil)then
+								self.contentPane.exploreNameText.text = CS.LanguageManager.inst:GetValueByKey(instanceCfg.instance_name)
+							end
+
+							local keyItemCfg = CS.ItemconfigManager.inst:GetConfig(goldenCityCfg.ic_id)
+							if(keyItemCfg ~= nil)then
+								self.contentPane.nextIcon:SetSprite(keyItemCfg.atlas,keyItemCfg.icon)
+								self.contentPane.exploreIcon:SetSprite(keyItemCfg.atlas,keyItemCfg.icon)
+							end
+
+							self.contentPane.exploreExpSlider.maxValue = goldenCityCfg.unlock_num
+							self.contentPane.exploreExpSlider.value = GoldenCityDataProxy.inst.lastExploreProcess
+							self.contentPane.exploreExpSlider:DOValue(GoldenCityDataProxy.inst.bossExploreProcess,1.5).From(GoldenCityDataProxy.inst.lastExploreProcess)
+							--self.contentPane.exploreExpSlider.value = GoldenCityDataProxy.inst.bossExploreProcess
+							self.contentPane.exploreLevelText.text = GoldenCityDataProxy.inst.bossExploreProcess .. "/" .. goldenCityCfg.unlock_num
+							--print("Response_OperatingActivity2 输出",goldenCityCfg.unlock_num,"     ",GoldenCityDataProxy.inst.bossExploreProcess)
+						end
+
+					end
+
+					CS.GameTimer.inst:AddTimer(1.5,1,function ()
+							self.contentPane.exploreObj:SetActive(false)
+							self:ExploreLevelUpComplete()
+						end)
+				end
+			end
+		else
+			self.contentPane.gameObject:SetActive(false)
+		end
+		self.timerId = 0
+
+	end
+)
+
+xlua.hotfix(
+	CS.ExploreFinishView,
+	"ExitExplore",
+	function(self)
+
+		local cityData = CS.UserDataProxy.inst:GetBuildingData(CS.StaticConstants.heroLvLimitHouseID)
+
+		local hasMaxLevelHero = false
+
+		for i = 0, self.lastHeroInfos.Count - 1 do
+			local heroInfo = self.lastHeroInfos[i]
+			if (cityData ~= nil and heroInfo.level >= cityData.effectVal and CS.heroupgradeconfigManager.inst:GetHeroUpgradeConfig(heroInfo.level + 1) ~= nil) then
+				hasMaxLevelHero = true
+				break
+			end
+		end
+
+
+		if (hasMaxLevelHero) then EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.HasMaxLevelHero) end
+
+		if (CS.ExploreDataProxy.inst.slotType == 0 or CS.ExploreDataProxy.inst.slotType == 1) then
+			EventDispatcher:dispatchEvent(GameEvent.CSEvent.Change_State, CS.StateTransition(CS.kGameState.Town,true))
+		elseif CS.ExploreDataProxy.inst.slotType == 2 then
+			CS.ExploreDataProxy.inst.needShowRefugePanel = true
+			EventDispatcher:dispatchEvent(GameEvent.CSEvent.Change_State, CS.StateTransition(CS.kGameState.Shop,true))
+		elseif CS.ExploreDataProxy.inst.slotType == 3 then
+			GoldenCityDataProxy.inst.isShowGoldenCityUI = true
+			EventDispatcher:dispatchEvent(GameEvent.CSEvent.Change_State, CS.StateTransition(CS.kGameState.Shop,true))
+		end
+
+		self:hide()
+
+	end
+)

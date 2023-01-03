@@ -1,0 +1,64 @@
+-- RechargeConfigManager
+
+require("class")
+require("config/CSVParser")
+
+local csCSVParser = CS.CSVParser
+
+RechargeConfigData =
+class(
+	{
+		id,
+		monetary_unit,
+		money,
+		bullion_1,
+		order_info,
+		ios_order_info,
+		rebate,
+		rebate_type,
+		rebate_ratio,
+		bullion_2,
+		pic_1,
+		pic_2,
+		txt
+	}
+)
+
+RechargeConfigManager = class()
+--RechargeConfigManager.cfgDict = {}
+local csv_name = "price_list"
+
+function RechargeConfigManager:InitCSVConfig()
+	self.cfgDict = {}
+	self.Productids = ""
+	local csv = csCSVParser.GetCSV(csv_name)
+	--print("RechargeConfigManager:InitCSVConfig csv:", csv)
+	local cfgs = CSVParser:parseClass(csv, 3, RechargeConfigData)
+	RechargeConfigManager:processConfigs(cfgs)
+	if csv == nil then
+		print("RechargeConfigManager  错误")
+	end
+end
+
+function RechargeConfigManager:processConfigs(cfgs)
+	--print("RechargeConfigManager:processConfigs ", cfgs, " len:", #cfgs)
+	for i=1, #cfgs do
+		local c = cfgs[i]
+		--print("RechargeConfigManager c i:", i," c:", c, " idtype:", type(c.id) , "id is",c.id)
+		self.cfgDict[tonumber(c.id)] = c
+		if(i==1)then
+			self.Productids = self.Productids .. c.order_info
+		else
+			self.Productids = self.Productids .. "&" .. c.order_info
+		end
+	end
+	--print("RechargeConfigManager:processConfigs completed")
+end
+
+function RechargeConfigManager:GetConfig(id)
+	return RechargeConfigManager.cfgDict[id]
+end
+--获取充值商品id列表 使用'&'分割
+function RechargeConfigManager:getProductIdList()
+	return  self.Productids;
+end

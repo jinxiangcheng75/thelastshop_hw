@@ -1,0 +1,162 @@
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+
+local CS_ItemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_StaticConstants = CS.StaticConstants
+local CS_ItemType = CS.ItemType
+
+local CS_PayInst = CS.GamePay.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_Vector2 = CS.UnityEngine.Vector2
+
+local EventDispatcher = require("event/EventDispatcher")
+
+--WorkerGameCoinGiftItem
+
+
+local tx_giftName
+local tx_coin
+local rectTf_coin
+local icon_gift
+local tx_giftPayCost
+local obj_mask
+local tx_countdown
+
+local button
+local bgIcon
+
+local data
+local timer
+
+function InitComp()
+
+	tx_giftName = self:GetObjByName("tx_giftName"):GetComponent("Text")
+	tx_coin = self:GetObjByName("tx_coin"):GetComponent("Text")
+	rectTf_coin = tx_coin.gameObject:GetComponent("RectTransform")
+	icon_gift = self:GetObjByName("icon_gift"):GetComponent(CS_type_GUIIcon)
+	tx_giftPayCost = self:GetObjByName("tx_giftPayCost"):GetComponent("Text")
+	obj_mask = self:GetObjByName("obj_mask")
+	tx_countdown = self:GetObjByName("tx_countdown"):GetComponent("Text")
+
+	button = self.transform:GetComponent("Button")
+	button:ButtonClickTween(function()
+			onButtonClick()
+		end)
+
+
+	timer = 0
+	
+	bgIcon = self.transform:GetComponent(CS_type_GUIIcon)
+	
+
+end
+
+function SetData(giftData)
+
+	data = giftData
+	clearTimer()
+
+	if 	giftData.freeFlag then
+
+		if Activity_WorkerGameProxy.inst.coinFreeFlag == true then
+
+			tx_giftPayCost.fontSize = 56
+			tx_giftPayCost.text = CS_LanguageManagerInst:GetValueByKey("免费")
+			bgIcon.iconImage.color = CS.GUIHelper.GetColorByColorHex("FFFFFF")
+			obj_mask:SetActive(false)
+
+		else
+
+			tx_giftPayCost.text = ""
+			setTimer()
+			bgIcon.iconImage.color = CS.GUIHelper.GetColorByColorHex("0040FF")
+			obj_mask:SetActive(true)
+
+		end
+
+		icon_gift.iconImage.enabled = false
+		rectTf_coin.anchoredPosition = CS_Vector2(32,10)
+		tx_giftName.text = CS_LanguageManagerInst:GetValueByKey("每日大人礼品")
+		tx_coin.text = tostring(math.ceil(tonumber(CS_WorldParConfigManagerInst:GetConfig(322).parameters)));
+
+	else
+
+		obj_mask:SetActive(false)
+
+		icon_gift.iconImage.enabled = true
+		icon_gift:SetSprite(data.data.pic1,data.data.pic2)
+		rectTf_coin.anchoredPosition = CS_Vector2(116,10)
+
+		tx_giftName.text = CS_LanguageManagerInst:GetValueByKey(data.data.txt);
+		tx_coin.text = tostring(data.data.rewardItem.count)
+
+		tx_giftPayCost.fontSize = 46
+		tx_giftPayCost.text = CS_PayInst:GetProductPrice(data.data.payProduct.productId)
+
+	end
+
+end
+
+function onButtonClick()
+
+	if 	data.freeFlag then
+
+		if Activity_WorkerGameProxy.inst.coinFreeFlag == true then
+
+			EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_DailyCoin)
+
+		end
+
+	else
+
+		CS_PayInst:Pay(
+			data.data.payProduct.priceId,
+			data.data.payProduct.productId,
+			data.data.payProduct.payActivityType,
+			data.data.payProduct.payActivityId,
+			function(isSuccess)
+				if (isSuccess) then
+					--print("充值成功")
+				end
+			end
+		)
+
+	end
+
+end
+
+function setTimer()
+
+	clearTimer()
+	
+	local exchangeRefreshTime = Activity_WorkerGameProxy.inst.exchangeRefreshTime_serverEndTime - CS_GameTimerInst.serverNow
+	tx_countdown.text = CS_LanguageManagerInst:GetValueByKey("下个倒计时")..CS_TimeUtils.timeSpanStrip(exchangeRefreshTime)
+
+	timer = CS_GameTimerInst:AddTimer(1,function()
+
+			local _exchangeRefreshTime = Activity_WorkerGameProxy.inst.exchangeRefreshTime_serverEndTime - CS_GameTimerInst.serverNow
+			tx_countdown.text = CS_LanguageManagerInst:GetValueByKey("下个倒计时")..CS_TimeUtils.timeSpanStrip(_exchangeRefreshTime)
+
+		end)
+
+
+end
+
+function clearTimer()
+
+	if 	timer ~= 0 then
+		CS_GameTimerInst:RemoveTimer(timer)
+		timer = 0
+	end
+
+end
+
+function onDestroy()
+	clearTimer()
+end

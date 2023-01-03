@@ -1,0 +1,300 @@
+-- GuideTaskDataProxy
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+require("config/GuideTaskConfigManager")
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGameTimerInst = CS.GameTimer.inst
+
+GuideTaskDataProxy = class(BaseDataProxy)
+
+GuideTaskDataProxy.inst = GuideTaskDataProxy:new()
+
+function GuideTaskDataProxy:Init()
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_User_GuideTask_Cmd,
+		function(resp)
+			print("Response_User_GuideTask success", resp)
+			self:GetGuideTaskData(resp)
+		end,
+		function(code)
+			print("Response_User_GuideTask fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取待办任务数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_User_GuideTaskChange_Cmd,
+		function(resp)
+			print("Response_User_GuideTaskChange success", resp)
+			self:GetGuideTaskChangeData(resp)
+		end,
+		function(code)
+			print("Response_User_GuideTaskChange fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取待办任务变更数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_User_GuideTaskReward_Cmd,
+		function(resp)
+			print("Response_User_GuideTaskReward success", resp)
+			self:GetGuideTaskRewardData(resp)
+		end,
+		function(code)
+			print("Response_User_GuideTaskReward fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX, "获取待办任务领奖数据失败!")
+		end
+	)
+	
+	self.curWindowName = nil
+end
+
+function GuideTaskDataProxy:GetGuideTaskRewardData(respData)
+	local data = MsgType.Response_User_GuideTaskReward:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.guideTaskFlag = data.guideTaskFlag
+
+	if (#data.rewardList > 1) then
+		-- csEventControllerInst:TriggerEvent_Lua1(csGameEventType.ReceiveEvent.NEWITEM_MSG,awardItem)
+		local tempList = {}
+		for i = 1, #data.rewardList do
+			local tempCommonRewardData = CS.CommonRewardData(data.rewardList[i].itemId, data.rewardList[i].count, 0,data.rewardList[i].itemType)
+			tempList[i] = tempCommonRewardData
+		end
+
+		local awardItem = CS.Award_AboutCommon()
+		awardItem.type = CS.ReceiveInfoUIType.CommonReward
+		awardItem.allRewardList = tempList
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.Award_AboutCommon)
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, awardItem)
+	else
+		-- csEventControllerInst:TriggerEvent_Lua1(csGameEventType.ReceiveEvent.NEWITEM_MSG,queueItem)
+		local cfg = CS.ItemconfigManager.inst:GetConfig(data.rewardList[1].itemId)
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.queueItem)
+		if (cfg ~= nil) then
+			local queueItem =
+				CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", 0, data.rewardList[1].itemId, data.rewardList[1].count)
+
+			func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+		else
+			local queueItem =
+				CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", data.rewardList[1].itemId, 0, data.rewardList[1].count)
+
+			func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+		end
+	end
+
+	if (self.guideTaskFlag ~= 1) then
+		self.curData:SetData(data.taskIndex, data.guideTaskState, data.nowTaskList, data.nowRewardList)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.RefreshUI_EndGuideTask)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.RefreshUI_GuideTaskInfo)
+		CS.PlatformManager.inst:GameHandleEventLog("GuideTaskFinish_" .. CS.UserDataProxy.inst.currMainTaskGroup, "")
+		CS.UserDataProxy.inst.currMainTaskGroup = data.taskIndex
+	else
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.HideUI_GuideTaskInfo)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.HideUI_GuideTask)
+		CS.UserDataProxy.inst.currMainTaskGroup = 9999
+	end
+	csEventControllerInst:TriggerEvent(csGameEventType.UIUnlock.GUIDE_END)
+	EventDispatcher:dispatchEvent(GameEvent.GuideTrigger.CheckGuideTrigger, 4, CS.UserDataProxy.inst.currMainTaskGroup)
+end
+
+function GuideTaskDataProxy:GetGuideTaskChangeData(respData)
+	local data = MsgType.Response_User_GuideTaskChange:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	if (self.curData ~= nil) then
+		self.curData:RefreshTaskData(data.guideTaskState, data.taskList)
+	else
+		self.curData = GuideTaskGroupData:new()
+		self.curData:SetData(data.taskIndex, data.guideTaskState, data.taskList, data.rewardList)
+	end
+
+	-- 刷新界面
+	if (CS.GuideDataProxy.inst.CurInfo.isAllOver) then
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.RefreshUI_GuideTask)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.RefreshUI_GuideTaskInfo)
+	end
+end
+
+function GuideTaskDataProxy:GetGuideTaskData(respData)
+	local data = MsgType.Response_User_GuideTask:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.guideTaskFlag = data.guideTaskFlag
+
+	if (self.guideTaskFlag ~= 1) then
+		if (data.taskList == nil or #data.taskList <= 0) then
+			self.curData = nil
+		else
+			if (self.curData == nil) then
+				self.curData = GuideTaskGroupData:new()
+			end
+
+			self.curData:SetData(data.taskIndex, data.guideTaskState, data.taskList, data.rewardList)
+			--if (CS.GuideDataProxy.inst.CurInfo.isAllOver) then
+				--EventDispatcher:dispatchEvent(GameEvent.GuideTask.ShowUI_GuideTask)
+			--end
+		end
+		CS.UserDataProxy.inst.currMainTaskGroup = data.taskIndex
+	else
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.HideUI_GuideTaskInfo)
+		EventDispatcher:dispatchEvent(GameEvent.GuideTask.HideUI_GuideTask)
+		CS.UserDataProxy.inst.currMainTaskGroup = 9999
+	end
+	csEventControllerInst:TriggerEvent(csGameEventType.UIUnlock.GUIDE_END)
+end
+
+function GuideTaskDataProxy:Clear()
+end
+
+function GuideTaskDataProxy:GetData()
+end
+
+GuideTaskGroupData = class()
+
+function GuideTaskGroupData:SetData(_taskIndex, _guideState, _taskList, _rewardList)
+	self.taskIndex = _taskIndex
+	self.state = _guideState
+	self.allTask = {}
+	self.curIndex = 1
+	for i = 1, #_taskList do
+		local curTask = GuideTaskData:new()
+		curTask:SetData(_taskList[i])
+		if (self.curIndex == i) then
+			if (curTask.state == 2) then
+				self.curIndex = self.curIndex + 1
+			end
+		end
+		self.allTask[i] = curTask
+	end
+	if (self.curIndex > #self.allTask) then
+		self.curIndex = -1
+	end
+	self.name = self.allTask[1].name
+	self.allReward = _rewardList
+	self.changeIndex1 = -1
+	self.changeIndex2 = -1
+	self.changeIndex3 = -1
+end
+
+function GuideTaskGroupData:RefreshTaskData(_guideState, _taskList)
+	self.state = _guideState
+
+	self.changeIndex1 = -1
+	self.changeIndex2 = -1
+	self.changeIndex3 = -1
+
+	for i = 1, #self.allTask do
+		if (self.allTask[i].state == 1 and _taskList[i].taskState == 2) then
+			if (i == 1) then
+				self.changeIndex1 = 1
+			end
+			if (i == 2) then
+				self.changeIndex2 = 1
+			end
+			if (i == 3) then
+				self.changeIndex3 = 1
+			end
+		end
+		self.allTask[i]:SetData(_taskList[i])
+		if (self.curIndex == i) then
+			if (self.allTask[i].state == 2) then
+				self.curIndex = self.curIndex + 1
+			end
+		end
+	end
+	if (self.curIndex > #self.allTask) then
+		self.curIndex = -1
+	end
+end
+
+function GuideTaskGroupData:GetFinishTaskNum()
+	local task1 = 0
+	local task2 = 0
+	local task3 = 0
+	for i = 1, #self.allTask do
+		if (self.allTask[i].state == 2) then
+			if (i == 1) then
+				task1 = 1
+			end
+			if (i == 2) then
+				task2 = 1
+			end
+			if (i == 3) then
+				task3 = 1
+			end
+		end
+	end
+
+	return task1, task2, task3
+end
+
+function GuideTaskGroupData:GetGroupSchedule()
+	local param = 0
+	local limit = #self.allTask
+
+	for i = 1, #self.allTask do
+		if (self.allTask[i].state == 2) then
+			param = param + 1
+		end
+	end
+
+	return param .. "/" .. limit
+end
+
+GuideTaskData = class()
+
+function GuideTaskData:SetData(_data)
+	if (_data == nil) then
+		return
+	end
+	local cfg = GuideTaskConfigManager:GetConfig(_data.taskId)
+	self.name = cfg.group_name
+	self.descSmall = cfg.des
+	self.descBig = cfg.des_2
+	self.atlas = cfg.atlas
+	self.icon = cfg.icon
+	self.awardId = cfg.award_1_id
+	self.awardNum = cfg.award_1_num
+	self.taskGroupId = _data.taskGroupId
+	self.param = _data.taskParam
+	self.limit = _data.taskLimit
+	self.state = _data.taskState
+	self.operationData = CS.OperationData()
+	self.operationData.type = CS.K_Operation_DataType.NoviceTask
+	self.operationData.task_scenes = cfg.task_scenes
+	self.operationData.condition_id = cfg.condition_id
+	if (cfg.dialog ~= nil) then
+		self.operationData.dialog = cfg.dialog
+	end
+	if (cfg.task_guide_1 ~= nil and cfg.task_guide_1 ~= "") then
+		self.operationData.operations:Add(cfg.task_guide_1)
+	end
+	if (cfg.task_guide_2 ~= nil and cfg.task_guide_2 ~= "") then
+		self.operationData.operations:Add(cfg.task_guide_2)
+	end
+	if (cfg.task_guide_3 ~= nil and cfg.task_guide_3 ~= "") then
+		self.operationData.operations:Add(cfg.task_guide_3)
+	end
+	if (cfg.task_guide_4 ~= nil and cfg.task_guide_4 ~= "") then
+		self.operationData.operations:Add(cfg.task_guide_4)
+	end
+	if (cfg.task_guide_5 ~= nil and cfg.task_guide_5 ~= "") then
+		self.operationData.operations:Add(cfg.task_guide_5)
+	end
+end

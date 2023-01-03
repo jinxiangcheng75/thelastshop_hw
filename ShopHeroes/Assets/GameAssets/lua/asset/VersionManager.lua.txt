@@ -1,0 +1,142 @@
+local EventDispatcher = require "lua/event/EventDispatcher"
+local PrefUtils       = require "lua/utils/PrefUtils"
+local AssetEvent = GameEvent.Asset
+--VersionManager
+require("class")
+require("utils/JsonUtils")
+
+local VersionFile = class({
+		baseVer = 0,
+		buildVer = 0,
+		hotfixVer = 0
+	})
+
+local AssetFile = {
+	path = "",
+	type = 1,
+	hash = "",
+}
+
+local VersionManager = class()
+
+VersionManager.inst = VersionManager:new()
+
+function VersionManager:ctor()
+	-- constructor
+	self.mFileList = nil
+	self.remoteVersionFile = nil
+	self:init()
+end
+
+function VersionManager:init()
+	local localVer = VersionFile:new()
+	self.localVersionFile = localVer
+	localVer.baseVer = CS.AssetConfig.BaseVersion
+	localVer.buildVer = CS.AssetConfig.BuildVersion
+	localVer.hotfixVer = PrefUtils:GetString(Constants.PrefKey.HotfixVer, "0")
+end
+
+function VersionManager:RequestVersionFile()
+	--request version.txt
+	local group = AssetLoadGroup:new()
+	group.taskList = {
+		{path="",
+			assetType=kAssetType.Channel,
+			hash = "",
+			savePath = "",
+			pipelineConfig = {},
+			location = kAssetLocation.Remote}
+	}
+	group.callback = self.CheckBaseVersion
+	EventDispatcher:dispatchEvent(AssetEvent.Load_Assets, group)
+end
+
+function VersionManager:LoadFileList()
+	local fileStr = CS.FileUtils.loadTxtFile("")
+	local files = JsonUtils:decode(fileStr)
+
+end
+
+function VersionManager:CheckBaseVersion(verStr)
+	local remoteVer = JsonUtils:decode(verStr)
+	self.remoteVersionFile = remoteVer;
+	if(remoteVer.baseVer > self.baseVer) then
+		self:onBaseVersionFailed()
+	else
+		self:onBaseVersionPass(remoteVer)
+	end
+end
+
+function VersionManager:UnpackAssets()
+	-- unpack first AddressablePack.zip
+end
+
+function VersionManager:onBaseVersionPass(ver)
+	-- goto check hotfix version
+	if(ver.hotfixVer > self.localVersionFile.hotfixVer) then
+		self:onHotfixRequired(ver)
+	else
+		self:onHotfixSkip()
+	end
+end
+
+function VersionManager:onBaseVersionFailed()
+	-- goto app store
+	CS.UnityEngine.Application.OpenURL(Constants.Common.Store_Android)
+end
+
+function VersionManager:onHotfixRequired(ver)
+	-- goto download hotfix list
+	local group = AssetLoadGroup:new()
+	group.callback = self.onHotfixListLoaded
+	group.taskList = {
+		{
+			path= Constants.Asset.HotfixList,
+			assetType=kAssetType.Patch,
+			hash = "",
+			savePath = "",
+			pipelineConfig = {},
+			location = kAssetLocation.Remote
+		}
+	}
+	EventDispatcher:dispatchEvent(AssetEvent.Load_Assets, group)
+end
+
+function VersionManager:onHotfixSkip()
+	-- skip download hotfix files
+	self:CheckVersionComplete()
+end
+
+function VersionManager:onHotfixListLoaded()
+	--
+	self:CompareFileHashes()
+end
+
+function VersionManager:CompareFileHashes()
+
+end
+
+function VersionManager:LoadHotfixFiles(taskList)
+	if(#taskList == 0) then
+		self:CheckVersionComplete()
+		return
+	end
+	local group = AssetLoadGroup:new()
+	group.taskList = taskList
+	group.callback = self.onHotfixFilesLoaded
+	EventDispatcher:dispatchEvent(AssetEvent.Load_Assets, group)
+end
+
+function VersionManager:onHotfixFilesLoaded()
+
+	self:CheckVersionComplete()
+end
+
+function VersionManager:CheckVersionComplete()
+	-- notify other manager
+	self.localVersionFile.hotfixVer = self.remoteVersionFile.hotfixVer
+	PrefUtils.SetString(Constants.PrefKey.HotfixVer, self.localVersionFile.hotfixVer)
+end
+
+--return VersionManager.inst
+

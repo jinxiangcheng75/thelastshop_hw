@@ -1,0 +1,284 @@
+-- GoldenCitySystem
+
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("utils/XLuaUtils")
+
+require("ui/view/GoldenCity/GoldenCityAdventureUIView")
+require("ui/view/GoldenCity/GoldenCityMessUIView")
+require("ui/view/GoldenCity/GoldenCityPrepareUIView")
+require("ui/view/GoldenCity/GoldenCityRewardListUIView")
+require("ui/view/GoldenCity/GoldenCityUIView")
+
+local EventDispatcher= require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+GoldenCitySystem = class(BaseSystem)
+GoldenCitySystem.super = BaseSystem
+
+function GoldenCitySystem:ctor()
+
+end
+
+function GoldenCitySystem:OnInit()
+
+end
+
+function GoldenCitySystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityMain,self,self.openGoldenCityMainUI)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityMess,self,self.openGoldenCityMessUI)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityRewardList,self,self.openGoldenCityRewardListUI)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityPrepare,self,self.openGoldenCityPrepareUI)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityAdventure,self,self.openGoldenCityAdventureUI)
+	
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.HideUI_GoldenCityMain,self,self.hideGoldenCityMainUI)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.HideUI_GoldenCityPrepare,self,self.hideGoldenCityPrepareUI)
+	
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_RankList,self,self.requestGoldenCityRankList)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_DailyReward,self,self.requestGoldenCityDailyReward)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_Reward,self,self.requestGoldenCityReward)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreStart,self,self.requestGoldenCityStart)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_DataCheck,self,self.requestGoldenCityCheckData)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_RewardCheck,self,self.requestGoldenCityCheckReward)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreImmediately,self,self.requestGoldenCityExploreImmediately)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreEnd,self,self.requestGoldenCityExploreEnd)
+	
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_MessRank,self,self.refreshMessRank)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_ScoreReward,self,self.refreshScoreReward)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.RefreshRedPoint_Activity_GoldenCity_ScoreCanReward,self,self.refreshGoldenCityMainRedPoint)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_MainUI,self,self.refreshGoldenCityMainSlotList)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_SortHeroList,self,self.sortHeroList)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_AddHeroCom,self,self.goldenCityPrepareAddHero)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_AddItemCom,self,self.goldenCityPrepareAddItem)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_MainToggle,self,self.refreshGoldenCityMainToggle)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_PrepareResting,self,self.goldenCityPrepareResting)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_Adventure,self,self.refreshGoldenCityAdventure)
+	EventDispatcher:addEvent(GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState,self,self.refrshActivity_GoldenCityState)
+	
+
+end
+
+function GoldenCitySystem:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityMain,self.openGoldenCityMainUI)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityMess,self.openGoldenCityMessUI)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityRewardList,self.openGoldenCityRewardListUI)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityPrepare,self.openGoldenCityPrepareUI)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityAdventure,self.openGoldenCityAdventureUI)
+	
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.HideUI_GoldenCityMain,self.hideGoldenCityMainUI)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.HideUI_GoldenCityPrepare,self.hideGoldenCityPrepareUI)
+	
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_RankList,self.requestGoldenCityRankList)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_DailyReward,self.requestGoldenCityDailyReward)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_Reward,self.requestGoldenCityReward)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreStart,self.requestGoldenCityStart)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_DataCheck,self.requestGoldenCityCheckData)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_RewardCheck,self.requestGoldenCityCheckReward)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreImmediately,self.requestGoldenCityExploreImmediately)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreEnd,self.requestGoldenCityExploreEnd)
+	
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_MessRank,self.refreshMessRank)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_ScoreReward,self.refreshScoreReward)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.RefreshRedPoint_Activity_GoldenCity_ScoreCanReward,self.refreshGoldenCityMainRedPoint)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_MainUI,self.refreshGoldenCityMainSlotList)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_SortHeroList,self.sortHeroList)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_AddHeroCom,self.goldenCityPrepareAddHero)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_AddItemCom,self.goldenCityPrepareAddItem)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_MainToggle,self.refreshGoldenCityMainToggle)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_PrepareResting,self.goldenCityPrepareResting)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.Refresh_GoldenCity_Adventure,self.refreshGoldenCityAdventure)
+	EventDispatcher:removeEvent(GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState,self.refrshActivity_GoldenCityState)
+	
+
+end
+
+function GoldenCitySystem:requestGoldenCityExploreEnd(slotId)
+	local rep = MsgType.Request_OperatingActivity2_ExploreEnd:New()
+	rep.exploreSlotId = slotId
+	rep:Send()
+end
+
+function GoldenCitySystem:requestGoldenCityExploreImmediately(slotId)
+	local rep = MsgType.Request_OperatingActivity2_ExploreImmediately:New()
+	rep.slotId = slotId
+	rep:Send()
+end
+
+function GoldenCitySystem:requestGoldenCityCheckReward()
+	local rep = MsgType.Request_OperatingActivity2_CheckReward:New()
+	rep:Send()
+end
+
+function GoldenCitySystem:requestGoldenCityCheckData()
+	local rep = MsgType.Request_OperatingActivity2_DataCheck:New()
+	rep:Send()
+end
+
+function GoldenCitySystem:requestGoldenCityStart(slotId,exploreId,itemId,heroUids)
+	local rep = MsgType.Request_OperatingActivity2_ExploreStart:New()
+	rep.exploreSlotId = slotId
+	rep.exploreId = exploreId
+	rep.useItemId = itemId
+	rep.heroInfoUIds = heroUids
+	rep:Send()
+end
+
+function GoldenCitySystem:requestGoldenCityRankList()
+	local rep = MsgType.Request_OperatingActivity2_UnionRankList:New()
+	rep:Send()
+end
+
+function GoldenCitySystem:requestGoldenCityDailyReward()
+	local rep = MsgType.Request_OperatingActivity2_DailyReward:New()
+	rep:Send()
+end
+
+function GoldenCitySystem:requestGoldenCityReward(groupId,id)
+	local rep = MsgType.Request_OperatingActivity2_Reward:New()
+	rep.groupId = groupId
+	rep.id = id
+	rep:Send()
+end
+
+function GoldenCitySystem:refrshActivity_GoldenCityState(flag)
+
+	if not flag then --关闭所有打开的界面
+
+		GUIManager.inst:HideView(Constants.ViewName.GoldenCityUIView)
+		GUIManager.inst:HideView(Constants.ViewName.GoldenCityPrepareUIView)
+
+	end
+
+end
+
+function GoldenCitySystem:refreshGoldenCityAdventure(slotId)
+	local goldenCityAdventure = GUIManager.inst:GetWindow(Constants.ViewName.GoldenCityAdventureUIView, false)
+	if(goldenCityAdventure ~= nil and goldenCityAdventure.isShowing)then
+		goldenCityAdventure:SetUIData(slotId)
+	end
+end
+
+function GoldenCitySystem:goldenCityPrepareResting()
+	local goldenCityPrepare = GUIManager.inst:GetWindow(Constants.ViewName.GoldenCityPrepareUIView, false)
+	if(goldenCityPrepare ~= nil and goldenCityPrepare.isShowing)then
+		goldenCityPrepare:RefreshHero()
+	end
+end
+
+function GoldenCitySystem:refreshGoldenCityMainToggle(index)
+	local goldenCityMain = GUIManager.inst:GetWindow(Constants.ViewName.GoldenCityUIView, false)
+	if 	goldenCityMain ~= nil and goldenCityMain.isShowing == true then
+		goldenCityMain:RefreshData(index)
+	end
+end
+
+function GoldenCitySystem:goldenCityPrepareAddItem(itemId)
+	local goldenCityPrepare = GUIManager.inst:GetWindow(Constants.ViewName.GoldenCityPrepareUIView, false)
+	if(goldenCityPrepare ~= nil and goldenCityPrepare.isShowing)then
+		goldenCityPrepare:SelectItemComplete(itemId)
+	end
+end
+
+function GoldenCitySystem:goldenCityPrepareAddHero(heroUid,index)
+	local goldenCityPrepare = GUIManager.inst:GetWindow(Constants.ViewName.GoldenCityPrepareUIView, false)
+	if(goldenCityPrepare ~= nil and goldenCityPrepare.isShowing)then
+		goldenCityPrepare:AddHeroCom(heroUid,index)
+	end
+end
+
+function GoldenCitySystem:sortHeroList()
+	local goldenCityPrepare = GUIManager.inst:GetWindow(Constants.ViewName.GoldenCityPrepareUIView, false)
+	if(goldenCityPrepare ~= nil and goldenCityPrepare.isShowing)then
+		goldenCityPrepare:SortAllHeroList()
+	end
+end
+
+function GoldenCitySystem:refreshGoldenCityMainSlotList()
+	local goldenCityMain = GUIManager.inst:GetWindow(Constants.ViewName.GoldenCityUIView, false)
+	if 	goldenCityMain ~= nil and goldenCityMain.isShowing == true then
+		goldenCityMain:Refresh()
+	end
+end
+
+function GoldenCitySystem:refreshGoldenCityMainRedPoint(flag)
+	local goldenCityMain = GUIManager.inst:GetWindow(Constants.ViewName.GoldenCityUIView, false)
+	if 	goldenCityMain ~= nil and goldenCityMain.isShowing == true then
+		goldenCityMain:refreshRedPoint(flag)
+	end
+end
+
+function GoldenCitySystem:refreshScoreReward()
+	local goldenCityScoreReward = GUIManager.inst:GetWindow(Constants.ViewName.GoldenCityRewardListUIView, false)
+	if 	goldenCityScoreReward ~= nil and goldenCityScoreReward.isShowing == true then
+		goldenCityScoreReward:Refresh()
+	end
+end
+
+function GoldenCitySystem:refreshMessRank(rankList,selfRankData)
+	local goldenCityMess = GUIManager.inst:GetWindow(Constants.ViewName.GoldenCityMessUIView, false)
+	if 	goldenCityMess ~= nil and goldenCityMess.isShowing == true then
+		goldenCityMess:getRankListData(rankList,selfRankData)
+	end
+end
+
+function GoldenCitySystem:hideGoldenCityPrepareUI()
+	GUIManager.inst:HideView(Constants.ViewName.GoldenCityPrepareUIView)
+end
+
+function GoldenCitySystem:hideGoldenCityMainUI()
+	GUIManager.inst:HideView(Constants.ViewName.GoldenCityUIView)
+end
+
+function GoldenCitySystem:openGoldenCityMainUI(toggleType)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GoldenCityUIView,
+		function(view)
+			view:SetUIData(toggleType)
+		end
+	)
+end
+
+function GoldenCitySystem:openGoldenCityMessUI(index)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GoldenCityMessUIView,
+		function(view)
+			view:SetUIData(index)
+		end
+	)
+end
+
+function GoldenCitySystem:openGoldenCityRewardListUI(lv)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GoldenCityRewardListUIView,
+		function(view)
+			view:SetUIData(lv)
+		end
+	)
+end
+
+function GoldenCitySystem:openGoldenCityPrepareUI(cfg)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GoldenCityPrepareUIView,
+		function(view)
+			view:SetUIData(cfg)
+		end
+	)
+end
+
+function GoldenCitySystem:openGoldenCityAdventureUI(slotId)
+	GUIManager.inst:OpenView(
+		Constants.ViewName.GoldenCityAdventureUIView,
+		function(view)
+			view:SetUIData(slotId)
+		end
+	)
+end
+
+
+----------------------------------------------------------------------

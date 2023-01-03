@@ -1,0 +1,801 @@
+--GUIManager
+
+require("utils/XLuaUtils")
+require("utils/Dictionary")
+require("class")
+require("ui/ViewBase")
+
+--require("ui/view/TestNewView")
+local EventDispatcher = require("event/EventDispatcher")
+local ViewStack = require("collection/Stack")
+local LFUCache = require("utils/LFUCache")
+
+local csAudioManager = CS.AudioManager
+
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+
+local csActivator = CS.System.Activator
+local csUnityUtils = CS.UnityUtils
+local CS_ManagerBinderInst = CS.ManagerBinder.inst
+local CS_ViewPrefabName = CS.ViewPrefabName
+
+local PlayViewShowSound = {
+	[0] = function()
+		print("switch:" .. 0)
+	end,
+	[1] = function()
+		print("switch:" .. 1)
+		CS.AudioManager.inst:PlaySound(147)
+	end,
+	[2] = function()
+		print("switch:" .. 2)
+		CS.AudioManager.inst:PlaySound(147)
+	end,
+	[3] = function()
+		print("switch:" .. 3)
+		CS.AudioManager.inst:PlaySound(10)
+	end
+}
+local PlayViewHideSound = {
+	[0] = function()
+		print("switch:" .. 0)
+	end,
+	[1] = function()
+		print("switch:" .. 1)
+		CS.AudioManager.inst:PlaySound(9)
+	end,
+	[2] = function()
+		print("switch:" .. 2)
+		CS.AudioManager.inst:PlaySound(9)
+	end,
+	[3] = function()
+		print("switch:" .. 3)
+		CS.AudioManager.inst:PlaySound(9)
+	end
+}
+
+local number
+mGUIUIorder = 0
+GUIManager = class()
+
+print("GUIManager.ctor", GUIManager.ctor)
+
+function GUIManager:ClearAllView()
+	for i = 1, self.mLuaWindowList:Count() do
+		local view = self.mLuaWindowList:GetValueByIndex(i)
+		if (view ~= nil) then
+			view:Dispose()
+		end
+	end
+	for i = 1, self.mCSWindowList:Count() do
+		local view = self.mCSWindowList:GetValueByIndex(i)
+		if (view ~= nil) then
+			view:Dispose()
+		end
+	end
+
+	mGUIUIorder = 0
+	self.mViewList:Clear()
+	self.mCSWindowList:Clear()
+	self.mNameViewList = {}
+	self.mLuaWindowList:Clear()
+	self.muiWindowNameList:Clear()
+	self.mCurOpenRealList:Clear()
+	self.windowCache_LFU:Clear()
+
+end
+
+function GUIManager:ClaerResidentView()
+
+	for i = 1, #self.mResidentViewList do
+
+		local viewId = self.mResidentViewList[i]
+		local view = self:GetViewByViewIDLUA(viewId)
+
+		if view ~= nil then
+
+			view:Dispose()
+			self.mViewList:Remove(view)
+			self.mLuaWindowList:Remove(view.viewID)
+			self.muiWindowNameList:Remove(view.viewID)
+
+		end
+
+	end
+
+end
+
+
+function GUIManager:ctor()
+	print("GUIManager:ctor")
+	--self:init()
+end
+
+GUIManager.inst = GUIManager:new()
+
+function GUIManager:GetUIorder()
+	mGUIUIorder = mGUIUIorder + 1
+	return mGUIUIorder
+end
+function GUIManager:init()
+	print("GUIManager:init")
+	self.mViewList = get_csharp_list(CS.uiWindow)
+	self.mCSWindowList = Dictionary:New(CS.System.Type, CS.uiWindow) -----111
+	self.mNameViewList = {}
+	--get_csharp_dict(CS.System.String, CS.uiWindow) -----111
+	self.mLuaWindowList = Dictionary:New(string, table)
+	self.muiWindowNameList = get_csharp_list(CS.System.String)
+	self.mCurOpenRealList = get_csharp_list(CS.System.String)
+	--常驻界面 打开一次后不释放
+	self.mResidentViewList = {CS_ViewPrefabName.MainUI, CS_ViewPrefabName.EquipMakeUI, CS_ViewPrefabName.ShopperUI , CS_ViewPrefabName.BagUI, --[[店铺场景截止]] CS_ViewPrefabName.CityUI, CS_ViewPrefabName.MarketUI,CS_ViewPrefabName.ToMarketByBagUI,CS_ViewPrefabName.MarketTradingHallUI--[[城市场景截止]] }
+
+
+	--LFU缓存算法
+	self.windowCache_LFU = LFUCache.new()
+	self.windowCache_LFU:New(CS.System.String, 10, function(viewId)
+
+			local view = self:GetViewByViewIDLUA(viewId)
+			if view ~= nil and view.isShowing == false then --如果没打开
+
+				view:Dispose()
+				self.mViewList:Remove(view)
+				self.mLuaWindowList:Remove(view.viewID)
+				self.muiWindowNameList:Remove(view.viewID)
+				if type(view) ~= "table" then
+					self.mCSWindowList:Remove(view:GetType())
+				end
+				print("邦邦邦邦 界面已被LFU释放 且界面未打开 直接释放 viewId: ",viewId)
+
+			else
+				print("邦邦邦邦 界面已被LFU释放 界面仍打开中 hide时释放 viewId: ",viewId)
+			end
+
+		end)
+
+
+end
+
+function GUIManager:isResidentView(viewId)
+
+	for i = 1, #self.mResidentViewList do
+
+		if viewId == self.mResidentViewList[i] then
+			return true
+		end
+
+	end
+
+	if viewId == CS_ViewPrefabName.TextTip or viewId == CS_ViewPrefabName.TopPlayerInfoPanel--[[全游戏通用]] then
+
+		return true
+
+	end
+
+	return false
+
+end
+
+function GUIManager:allShowingViewCs()
+	return self.mViewList
+end
+--只适用于C# UIWindow
+function GUIManager:CurrWindowCs()
+	if (self.mViewList.Count > 0) then
+		for i = self.mViewList.Count - 1, 0, -1 do
+			if (self.mViewList[i].sortingLayerName ~= "resPlane" and self.mViewList[i].isShowing and self.mViewList[i].viewID ~= "TopPlayerInfoPanel" and self.mViewList[i].viewID ~= "TextTip") then
+				return self.mViewList[i]
+			end
+		end
+	end
+	return nil
+end
+--C#+lua生成的窗口  返回窗口ID
+function GUIManager:CurrWindowViewID()
+	if (self.mCurOpenRealList.Count > 0) then
+		for i = self.mCurOpenRealList.Count - 1, 0, -1 do
+			if (self.mCurOpenRealList[i] ~= "TopPlayerInfoPanel" and self.mCurOpenRealList[i] ~= "TextTip") then
+				local viewData = self:GetViewByViewIDLUA(self.mCurOpenRealList[i])
+				if(viewData ~= nil and viewData.isShowing)then
+					return self.mCurOpenRealList[i]
+				end
+			end
+		end
+	end
+	return ""
+end
+
+function GUIManager:WindowChangeLanguage()
+	for key, value in pairs(self.mViewWinMap) do
+		value:DefineTextFone()
+	end
+end
+
+-- C# GUI Operation
+
+function GUIManager:GetWindowCs(csType, needNew)
+	--print("GUIManager:GetWindowCs")
+	if (self.mCSWindowList:ContainsKey(csType) == false) then
+		if needNew == nil or needNew == false then
+			return nil
+		end
+
+		local obj = csActivator.CreateInstance(csType)
+		obj.viewType = csType
+		self.mCSWindowList:Add(csType, obj)
+		self.mNameViewList[obj.viewID] = obj
+		return obj
+	else
+		--if(self.mWindowList[csType]:IsNull())then
+		if (csUnityUtils.EqualsNull(self.mCSWindowList[csType])) then
+			self.mCSWindowList:Remove(csType)
+			return self:GetWindowCs(csType, true)
+		end
+		return self.mCSWindowList[csType]
+	end
+end
+
+function GUIManager:ShowingCs(csViewType)
+	local view = self:GetWindowCs(csViewType, false)
+	if csUnityUtils.EqualsNull(view) == true then
+		return false
+	end
+	return true
+end
+
+function GUIManager:GetWindowByViewIdCs(viewid)
+	return self.mNameViewList[viewid]
+end
+
+function GUIManager:ShowViewCs(view, onpenCallBack)
+	if csUnityUtils.EqualsNull(view) == false then
+		if self.mCSWindowList:ContainsKey(view.Type) then
+			if (view.isShowing == false) then
+				view.UIorder = self:GetUIorder()
+				view:MgrShowView(
+					function(v)
+						if CS_ManagerBinderInst ~= nil then
+							CS_ManagerBinderInst:AddGameEvent(1, v.viewID, "open")
+						end
+						--if (csCallback ~= nil) then
+						--csCallback(v)
+						--end
+						PlayViewShowSound[v.showType]()
+						if (csUnityUtils.EqualsNull(onpenCallBack) == false) then
+							onpenCallBack(v)
+						end
+						if
+							(v.sortingLayerName == "window" or v.sortingLayerName == "popup" or v.sortingLayerName == "resPlane" or
+								v.sortingLayerName == "popup_2")
+							then
+							local index = -1
+							for i = 0, self.mViewList.Count - 1 do
+								if (self.mViewList[i].viewID == v.viewID) then
+									index = index + 1
+									break
+								end
+							end
+
+							if (index >= 0) then
+								self.mViewList:RemoveAt(index)
+							end
+							self.mViewList:Add(v)
+							self.muiWindowNameList:Remove(v.viewID)
+							self.muiWindowNameList:Add(v.viewID)
+							self.mCurOpenRealList:Add(v.viewID)
+
+							if (v.sortingLayerName == "window" and self.mCurOpenRealList.Count > 1) then
+								local lview = self:GetViewByViewIDLUA(self.mCurOpenRealList[self.mCurOpenRealList.Count - 2])
+								if (lview ~= nil and lview.isShowing and (lview.sortingLayerName == "window" --[[or lview.sortingLayerName == "popup" or lview.sortingLayerName == "popup_2"]])) then
+									lview:shiftOut()
+								end
+							end
+						end
+					end
+				)
+				if (view.sortingLayerName == "window" or view.sortingLayerName == "popup" or view.sortingLayerName == "popup_2") then
+					if (view.topResPanelType ~= CS.TopPlayerShowType.ignore) then
+						CS.GUIManager.curLuaTopPlayerShowType = view.topResPanelType
+						local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+						local func = funcGeneric(CS.System.Boolean)
+						func(csEventControllerInst, csGameEventType.UI_TOPTESPANEL_ShiftOut, view.isShowResPanel == false)
+					end
+				end
+			else
+				view:shiftIn()
+				--if csUnityUtils.EqualsNull(csCallback) == false then
+				--csCallback(view)
+				--end
+				if (csUnityUtils.EqualsNull(onpenCallBack) == false) then
+					onpenCallBack(view)
+				end
+			end
+		end
+	end
+end
+
+function GUIManager:OpenViewCS(csViewType, csCallback)
+	--load from cs
+	--load from lua
+
+	print("GUIManager--:OpenViewCS ", csViewType.Name)
+	local view = self:GetWindowCs(csViewType, true)
+
+	local isResident = self:isResidentView(view.viewID)
+
+	if not isResident then
+
+		--print("邦邦邦邦 windowCache_LFU put  viewId: ",view.viewID)
+		self.windowCache_LFU:Put(view.viewID,view)
+
+	end
+
+	if (view.isShowing == false) then
+		view.UIorder = self:GetUIorder()
+		view:MgrShowView(
+			function(v)
+				if CS.UnityUtils.EqualsNull(CS_ManagerBinderInst) == false then
+					CS_ManagerBinderInst:AddGameEvent(1, v.viewID, "open")
+				end
+
+				PlayViewShowSound[v.showType]()
+				if (csCallback ~= nil) then
+					csCallback(v)
+				end
+				if
+					(v.sortingLayerName == "window" or v.sortingLayerName == "popup" or v.sortingLayerName == "resPlane" or
+						v.sortingLayerName == "popup_2")
+					then
+					local index = -1
+					for i = 0, self.mViewList.Count - 1 do
+						if (self.mViewList[i].viewID == v.viewID) then
+							index = index + 1
+							break
+						end
+					end
+					if (index >= 0) then
+						self.mViewList:RemoveAt(index)
+					end
+					self.mViewList:Add(v)
+
+					self.muiWindowNameList:Remove(v.viewID)
+					self.muiWindowNameList:Add(v.viewID)
+					self.mCurOpenRealList:Add(v.viewID)
+
+					if (v.sortingLayerName == "window" and self.mCurOpenRealList.Count > 1) then
+						for i = self.mCurOpenRealList.Count - 2, 0, -1 do
+							local lview = self:GetViewByViewIDLUA(self.mCurOpenRealList[i])
+							if (lview ~= nil and lview.isShowing and (lview.sortingLayerName == "window" --[[or lview.sortingLayerName == "popup" or lview.sortingLayerName == "popup_2"]])) then
+								print("隐藏界面====》", lview.viewID)
+								lview:shiftOut()
+								break
+							end
+						end
+					end
+
+					if (v.sortingLayerName == "window" or v.sortingLayerName == "popup" or v.sortingLayerName == "popup_2") then
+						if (v.topResPanelType ~= CS.TopPlayerShowType.ignore) then
+							CS.GUIManager.curLuaTopPlayerShowType = v.topResPanelType
+							local shift = v.isShowResPanel == false
+							local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+							local func = funcGeneric(CS.System.Boolean)
+							func(csEventControllerInst, csGameEventType.UI_TOPTESPANEL_ShiftOut, shift)
+						end
+					end
+				end
+			end
+		)
+	else
+		view:shiftIn()
+		if csUnityUtils.EqualsNull(csCallback) == false then
+			csCallback(view)
+		end
+
+		if (view.sortingLayerName == "window" or view.sortingLayerName == "popup" or view.sortingLayerName == "popup_2") then
+			if (view.topResPanelType ~= CS.TopPlayerShowType.ignore) then
+				CS.GUIManager.curLuaTopPlayerShowType = view.topResPanelType
+				print("打开界面", view.viewID)
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+				local func = funcGeneric(CS.System.Boolean)
+				func(csEventControllerInst, csGameEventType.UI_TOPTESPANEL_ShiftOut, view.isShowResPanel == false)
+			end
+		end
+	end
+
+	return view
+end
+
+function GUIManager:HideViewCS(csViewType)
+	-- hide from cs
+	print("GUIManager--:HideViewCS", csViewType.Name)
+	if (self.mCSWindowList:ContainsKey(csViewType)) then
+		local view = self:GetWindowCs(csViewType, false)
+		--if(view:IsNull() == false and view.isShowing) then
+		if (csUnityUtils.EqualsNull(view) == false and view.isShowing) then
+			PlayViewHideSound[view.showType]()
+			if CS.ManagerBinder.inst ~= nil then
+				CS.ManagerBinder.inst:AddGameEvent(1, view.viewID, "close")
+			end
+
+			local isCache = self:isResidentView(view.viewID)
+
+			if not isCache then --是常驻界面 不放入缓存池
+
+				--print("邦邦邦邦 windowCache_LFU get  viewId: ",view.viewID)
+				isCache = self.windowCache_LFU:JustGet(view.viewID) ~= nil
+
+			end
+
+
+			view:MgrHideview(isCache)
+
+			if not isCache then
+				self.mViewList:Remove(view)
+				self.mCSWindowList:Remove(csViewType)
+			end
+
+			self.muiWindowNameList:Remove(view.viewID)
+			self.mCurOpenRealList:Remove(view.viewID)
+
+
+			if (self.mCurOpenRealList.Count > 0) then
+				
+				local Flag_UI_TOPTESPANEL_ShiftOut = false
+				
+				for i = self.mCurOpenRealList.Count - 1, 0, -1 do
+					local lview = self:GetViewByViewIDLUA(self.mCurOpenRealList[i])
+					if (lview ~= nil and lview ~= view and lview.isShowing) then
+
+						if (lview.sortingLayerName == "window" or lview.sortingLayerName == "popup" or lview.sortingLayerName == "popup_2") then
+							if (lview.topResPanelType ~= CS.TopPlayerShowType.ignore and not Flag_UI_TOPTESPANEL_ShiftOut) then
+								CS.GUIManager.curLuaTopPlayerShowType = lview.topResPanelType
+								local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+								local func = funcGeneric(CS.System.Boolean)
+								func(csEventControllerInst, csGameEventType.UI_TOPTESPANEL_ShiftOut, lview.isShowResPanel == false)
+								Flag_UI_TOPTESPANEL_ShiftOut = true
+							end
+						end
+
+						if lview.sortingLayerName == "window" --[[or lview.sortingLayerName == "popup" or lview.sortingLayerName == "popup_2"]] then
+							lview:shiftIn()
+							break
+						end
+
+					end
+
+				end
+			end
+
+			if isCache then
+				self.muiWindowNameList:Add(view.viewID)
+			end
+
+		end
+	end
+
+end
+
+function GUIManager:CloseViewCS(viewtype)
+	if csUnityUtils.EqualsNull(viewtype) == false then
+		self:HideViewCS(viewtype)
+	end
+end
+-- Lua GUI Operation
+
+function GUIManager:GetWindow(viewName, isnew)
+	print("GUIManager:GetWindow ", viewName)
+	print("_G[viewName]:", _G[viewName])
+
+	if (self.mLuaWindowList:ContainsKey(viewName)) then
+		return self.mLuaWindowList[viewName]
+	else
+		if (isnew == true) then
+			local viewObj = _G[viewName]:new()
+			self.mLuaWindowList:Add(viewName, viewObj)
+			return viewObj
+		end
+	end
+	return nil
+end
+
+function GUIManager:ShowCommonGlobalMask()
+
+	if CS.GuideDataProxy.inst.CurInfo ~= nil and CS.GuideDataProxy.inst.CurInfo.isAllOver then
+
+		local time = 0.1
+
+		local worldParCfg = CS.WorldParConfigManager.inst:GetConfig(8307)
+		if worldParCfg ~= nil then
+			time = worldParCfg.parameters / 1000
+		end
+
+		CS.FGUI.inst:showGlobalMask(time);
+
+	else
+
+		CS.FGUI.inst:showGlobalMask(0.5);
+
+	end
+
+end
+
+function GUIManager:OpenView(viewName, callback)
+
+	print("GUIManager--:OpenView Lua ", viewName)
+
+	self:ShowCommonGlobalMask()
+
+	local view = self:GetWindow(viewName, true)
+	print("view.isShowing ", view.isShowing)
+
+	local isResident = self:isResidentView(view.viewID)
+
+	if not isResident then
+
+		--print("邦邦邦邦 windowCache_LFU put  viewId: ",view.viewID)
+		self.windowCache_LFU:Put(view.viewID,view)
+
+	end
+
+	if (view.isShowing == false) then
+		view.UIorder = self:GetUIorder()
+		view:MgrShowView(
+			function(v)
+				if CS.ManagerBinder.inst ~= nil then
+					CS.ManagerBinder.inst:AddGameEvent(1, v.viewID, "open")
+				end
+				PlayViewShowSound[v.showType]()
+
+				if
+					(v.sortingLayerName == "window" or v.sortingLayerName == "popup" or v.sortingLayerName == "resPlane" or
+						v.sortingLayerName == "popup_2")
+					then
+					--保存当前打开的界面名称
+					--local index = -1
+					--for i = 0, self.muiWindowNameList.Count - 1 do
+					--if (self.muiWindowNameList[i] == v.viewID) then
+					--index = i
+					--break
+					--end
+					--end
+					self.muiWindowNameList:Remove(v.viewID)
+					self.muiWindowNameList:Add(v.viewID)
+					self.mCurOpenRealList:Add(v.viewID)
+
+					if (v.sortingLayerName == "window" and self.mCurOpenRealList.Count > 1) then
+						for i = self.mCurOpenRealList.Count - 2, 0, -1 do
+							local lview = self:GetViewByViewIDLUA(self.mCurOpenRealList[i])
+							if (lview ~= nil and lview.isShowing and (lview.sortingLayerName == "window" --[[or lview.sortingLayerName == "popup" or lview.sortingLayerName == "popup_2"]])) then
+								lview:shiftOut()
+								break
+							end
+						end
+					end
+				end
+
+				if csUnityUtils.EqualsNull(callback) == false then
+					callback(v)
+				end
+
+				if (v.sortingLayerName == "window" or v.sortingLayerName == "popup" or v.sortingLayerName == "popup_2") then
+					if (v.topResPanelType ~= CS.TopPlayerShowType.ignore) then
+						CS.GUIManager.curLuaTopPlayerShowType = view.topResPanelType
+						print("打开界面", v.viewID)
+						local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+						local func = funcGeneric(CS.System.Boolean)
+						func(csEventControllerInst, csGameEventType.UI_TOPTESPANEL_ShiftOut, v.isShowResPanel == false)
+					end
+				end
+			end
+		)
+	else
+		view:shiftIn()
+		if csUnityUtils.EqualsNull(callback) == false then
+			callback(view)
+		end
+
+		if (view.sortingLayerName == "window" or view.sortingLayerName == "popup" or view.sortingLayerName == "popup_2") then
+			if (view.topResPanelType ~= CS.TopPlayerShowType.ignore) then
+				CS.GUIManager.curLuaTopPlayerShowType = view.topResPanelType
+				print("打开界面", view.viewID)
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+				local func = funcGeneric(CS.System.Boolean)
+				func(csEventControllerInst, csGameEventType.UI_TOPTESPANEL_ShiftOut, view.isShowResPanel == false)
+			end
+		end
+	end
+	return view
+end
+
+function GUIManager:HideView(viewName)
+	print("GUIManager--:HideView ", viewName)
+
+	local view = self:GetWindow(viewName, false)
+	if (view ~= nil and view.isShowing) then
+		PlayViewHideSound[view.showType]()
+		if CS.ManagerBinder.inst ~= nil then
+			CS.ManagerBinder.inst:AddGameEvent(1, view.viewID, "close")
+		end
+
+		local isCache = self:isResidentView(view.viewID)
+
+		if not isCache then --是常驻界面 不放入缓存池
+
+			--print("邦邦邦邦 windowCache_LFU get  viewId: ",view.viewID)
+			isCache = self.windowCache_LFU:JustGet(view.viewID) ~= nil
+
+		end
+
+		view:MgrHideview(isCache)
+
+		if not isCache then
+			self.mViewList:Remove(view)
+			self.mLuaWindowList:Remove(view.viewID)
+		end
+
+		self.muiWindowNameList:Remove(view.viewID)
+		self.mCurOpenRealList:Remove(view.viewID)
+
+		if (self.mCurOpenRealList.Count > 0) then
+			
+			local Flag_UI_TOPTESPANEL_ShiftOut = false
+			
+			for i = self.mCurOpenRealList.Count - 1, 0, -1 do
+				local lview = self:GetViewByViewIDLUA(self.mCurOpenRealList[i])
+				if (lview ~= nil and view ~= lview and lview.isShowing) then
+					if (lview.sortingLayerName == "window" or lview.sortingLayerName == "popup" or lview.sortingLayerName == "popup_2") then
+						if (lview.topResPanelType ~= CS.TopPlayerShowType.ignore and not Flag_UI_TOPTESPANEL_ShiftOut) then
+							CS.GUIManager.curLuaTopPlayerShowType = lview.topResPanelType
+							local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+							local func = funcGeneric(CS.System.Boolean)
+							func(csEventControllerInst, csGameEventType.UI_TOPTESPANEL_ShiftOut, lview.isShowResPanel == false)
+							Flag_UI_TOPTESPANEL_ShiftOut = true
+						end
+					end
+					if lview.sortingLayerName == "window" --[[or lview.sortingLayerName == "popup" or lview.sortingLayerName == "popup_2"]] then
+						lview:shiftIn()
+						break
+					end
+				end
+			end
+		end
+
+		if isCache then
+			self.muiWindowNameList:Add(view.viewID)
+		end
+
+	end
+
+end
+
+function GUIManager:GetViewByViewIDLUA(viewID)
+	--先检查lua界面
+	local view = self:GetWindow(viewID, false)
+	if (view ~= nil) then
+		return view
+	end
+	--检查c#界面
+	view = self:GetWindowByViewIdCs(viewID)
+	if csUnityUtils.EqualsNull(view) == false then
+		return view
+	end
+	return nil
+end
+
+function GUIManager:GetViewIsShowingByViewID(viewID)
+	--先检查lua界面
+	local view = self:GetWindow(viewID, false)
+	if (view ~= nil) then
+		return view.isShowing
+	end
+	--检查c#界面
+	view = self:GetWindowByViewIdCs(viewID)
+	if csUnityUtils.EqualsNull(view) == false then
+		return view.isShowing
+	end
+
+	return false
+end
+
+--在城市场景和商店场景中生效
+function GUIManager:BackMainView()
+
+	local removeList = get_csharp_list(CS.System.String)
+	for i = self.muiWindowNameList.Count - 1, 0, -1 do
+		--	while self.muiWindowNameList.Count > 0 do
+		local viewid = self.muiWindowNameList[i]
+		local lview = self:GetViewByViewIDLUA(viewid)
+
+		local continue = false
+		if lview ~= nil then
+			if CS.ManagerBinder.inst.mGameState == CS.kGameState.Shop then
+				--self:OpenViewCS(typeof(CS.CityMainView))
+				if (viewid == "mainUI") then
+					lview:shiftIn()
+					continue = true
+				end
+			end
+			if CS.ManagerBinder.inst.mGameState == CS.kGameState.Town then
+				--self:OpenViewCS(typeof(CS.MenuUIView))
+				if (viewid == "CityUI") then
+					lview:shiftIn()
+					continue = true
+				end
+			end
+			if continue == false and viewid ~= "TopPlayerInfoPanel" and viewid ~= "GuideUI" and viewid ~= "GuideTaskUIView" then
+				removeList:Add(viewid)
+				lview:MgrHideview(false)
+				self.mViewList:Remove(lview)
+				
+				if type(lview) ~= "table" then
+					self.mCSWindowList:Remove(lview:GetType())
+				end
+				
+			end
+		end
+	end
+
+	for i = 0, removeList.Count - 1, 1 do
+
+		self.mCurOpenRealList:Remove(removeList[i])
+		self.muiWindowNameList:Remove(removeList[i])
+		self.mLuaWindowList:Remove(removeList[i])
+
+	end
+
+	removeList:Clear()
+	self.windowCache_LFU:Clear()
+
+	CS.GameTimer.inst:AddTimerFrame(
+		2,
+		1,
+		function()
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+			local func = funcGeneric(CS.TopPlayerShowType)
+			func(csEventControllerInst, csGameEventType.MenuEvent.SETTOPBTNSTATE, CS.TopPlayerShowType.all)
+		end
+	)
+end
+
+function GUIManager:BackAndChangeMainView()
+
+	while self.muiWindowNameList.Count > 0 do
+		local viewid = self.muiWindowNameList[self.muiWindowNameList.Count - 1]
+		local lview = self:GetViewByViewIDLUA(viewid)
+		if lview ~= nil then
+			lview:MgrHideview(false)
+		end
+		self.mViewList:Remove(lview)
+		self.muiWindowNameList:Remove(viewid)
+		self.mLuaWindowList:Remove(viewid)
+		
+		if type(lview) ~= "table" then
+			
+			if lview:GetType() ~= typeof(CS.CityMainView) and lview:GetType() ~= typeof(CS.MenuUIView) then
+				self.mCSWindowList:Remove(lview:GetType())
+			end
+			
+		end
+		
+	end
+
+	self.mCurOpenRealList:Clear()
+	self.windowCache_LFU:Clear()
+
+	CS.GameTimer.inst:AddTimerFrame(
+		2,
+		1,
+		function()
+			if CS.ManagerBinder.inst.mGameState == CS.kGameState.Town then
+				self:OpenViewCS(typeof(CS.CityMainView))
+			elseif CS.ManagerBinder.inst.mGameState == CS.kGameState.Shop then
+				self:OpenViewCS(typeof(CS.MenuUIView))
+			end
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+			local func = funcGeneric(CS.TopPlayerShowType)
+			func(csEventControllerInst, csGameEventType.MenuEvent.SETTOPBTNSTATE, CS.TopPlayerShowType.all)
+		end
+	)
+
+end

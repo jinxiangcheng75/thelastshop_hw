@@ -1,0 +1,236 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("config/SystemUnlockConfigManager")
+
+require("ui/view/UnlockNewSystem/UnlockNewSystemUIView")
+
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+
+
+SystemUnlockSystem = class(BaseSystem)
+SystemUnlockSystem.super = BaseSystem
+
+local systemUnlockUIView
+
+function SystemUnlockSystem:ctor()
+end
+
+function SystemUnlockSystem:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.SystemUnlock.ShowUI_SystemUnlock,self,self.showSystemUnlockUI)
+	EventDispatcherInis:addEvent(GameEvent.SystemUnlock.Check_SystemUnlock,self,self.CheckCfg)
+end
+
+function SystemUnlockSystem:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.SystemUnlock.ShowUI_SystemUnlock,self,self.showSystemUnlockUI)
+	EventDispatcherInis:removeEvent(GameEvent.SystemUnlock.Check_SystemUnlock,self,self.CheckCfg)
+end
+
+function SystemUnlockSystem:OnEnter()
+	SystemUnlockSystem.super.OnEnter(self)
+end
+
+function SystemUnlockSystem:OnExit()
+	SystemUnlockSystem.super.OnExit(self)
+end
+
+function SystemUnlockSystem:CheckCfg(level)
+
+	--前端临时 直接激活第一个宠物栏位和宠物皮肤
+	if level == CS.WorldParConfigManager.inst:GetConfig(170).parameters and CS.PetDataProxy.inst.BoothNum <= 0 then
+		EventDispatcherInis:dispatchEvent(GameEvent.PetEvent.REQUEST_PET_BUYSLOT,0)
+		EventDispatcherInis:dispatchEvent(GameEvent.PetEvent.REQUEST_PET_BUYBREED,1,0)
+	end
+
+	--等级到了 通知一下巧匠大赛
+	if CS_UserDataProxyInst.playerData.level >= CS.WorldParConfigManager.inst:GetConfig(323).parameters then
+
+		if Activity_WorkerGameProxy.inst.flag then --活动开启
+
+			local storyNpcCfg = StoryNpcConfigManager:GetConfig(3, -1)
+
+			if storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account .. "_StoryNpc_ActivityWorkerGame_" .. tostring(Activity_WorkerGameProxy.inst.version) .. "_" .. tostring(storyNpcCfg.story_id),"-1") == "-1" then
+
+				EventDispatcherInis:dispatchEvent(
+					GameEvent.EventSystem.AddEvent,
+					GameEvent.StoryRoleEvent.AddStoryRole,
+					{
+						storyType = 3,
+						parame = -1,
+						callback = function()
+							CS_PlayerPrefs.SetString(
+								CS_AccountDataProxyInst.account ..
+								"_StoryNpc_ActivityWorkerGame_" .. tostring(Activity_WorkerGameProxy.inst.version) .. "_" .. tostring(storyNpcCfg.story_id),
+								"1"
+							)
+							EventDispatcherInis:dispatchEvent(GameEvent.Activity_WorkerGameEvent.ShowUI_Activity_WorkerGamePanel)
+							CS.GoOperationManager.inst.isDoing = false
+							EventDispatcherInis:dispatchEvent(GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState, Activity_WorkerGameProxy.inst.flag)
+							CS.FGUI.inst:SetAllUIInteractable(true)
+							CS.FGUI.inst:SetAllUIAlpha(1)
+							EventDispatcherInis:dispatchEvent(GameEvent.EventSystem.EventEnd)
+							EventDispatcherInis:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+						end
+					},
+					ExecuteType.queueup,
+					kGameState.Shop
+				)
+			else
+				EventDispatcherInis:dispatchEvent(GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,Activity_WorkerGameProxy.inst.flag)
+			end
+
+		end
+	end
+
+	--等级到了 通知一下夺宝奇兵
+	if CS_UserDataProxyInst.playerData.level >= CS.WorldParConfigManager.inst:GetConfig(8405).parameters then
+
+		if GoldenCityDataProxy.inst.flag then --活动开启
+
+			local storyNpcCfg = StoryNpcConfigManager:GetConfig(5, -1)
+
+			if storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account .. "_GoldenCity_" .. tostring(GoldenCityDataProxy.inst.version) .. "_" .. tostring(storyNpcCfg.story_id),"-1") == "-1" then
+
+				EventDispatcherInis:dispatchEvent(
+					GameEvent.EventSystem.AddEvent,
+					GameEvent.StoryRoleEvent.AddStoryRole,
+					{
+						storyType = 5,
+						parame = -1,
+						callback = function()
+							CS_PlayerPrefs.SetString(
+								CS_AccountDataProxyInst.account ..
+								"_GoldenCity_" .. tostring(GoldenCityDataProxy.inst.version) .. "_" .. tostring(storyNpcCfg.story_id),
+								"1"
+							)
+
+							EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityMain)
+							CS.GoOperationManager.inst.isDoing = false
+							EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState, GoldenCityDataProxy.inst.flag)
+							CS.FGUI.inst:SetAllUIInteractable(true)
+							CS.FGUI.inst:SetAllUIAlpha(1)
+							EventDispatcherInis:dispatchEvent(GameEvent.EventSystem.EventEnd)
+							EventDispatcherInis:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+						end
+					},
+					ExecuteType.queueup,
+					kGameState.Shop
+				)
+			else
+				EventDispatcherInis:dispatchEvent(GameEvent.GoldenCityEvent.RefrshActivity_GoldenCityState,GoldenCityDataProxy.inst.flag)
+			end
+
+		end
+	end
+
+	--等级到了 通知一下勇气挑战
+	if CS_UserDataProxyInst.playerData.level >= CS.WorldParConfigManager.inst:GetConfig(8511).parameters then
+
+		if Activity_ScoreAwardGameProxy.inst.flag then --活动开启
+
+			local storyNpcCfg = StoryNpcConfigManager:GetConfig(6, -1)
+
+			if storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account .. "_StoryNpc_ActivityScoreAwardGame_" .. tostring(Activity_ScoreAwardGameProxy.inst.version) .. "_" .. tostring(storyNpcCfg.story_id),"-1") == "-1" then
+
+				EventDispatcherInis:dispatchEvent(
+					GameEvent.EventSystem.AddEvent,
+					GameEvent.StoryRoleEvent.AddStoryRole,
+					{
+						storyType = 3,
+						parame = -1,
+						callback = function()
+							CS_PlayerPrefs.SetString(
+								CS_AccountDataProxyInst.account ..
+								"_StoryNpc_ActivityScoreAwardGame_" .. tostring(Activity_ScoreAwardGameProxy.inst.version) .. "_" .. tostring(storyNpcCfg.story_id),
+								"1"
+							)
+							EventDispatcherInis:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_MainPanel, false)
+							CS.GoOperationManager.inst.isDoing = false
+							EventDispatcherInis:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.RefrshActivity_ScoreAwardGameState, self.flag)
+							CS.FGUI.inst:SetAllUIInteractable(true)
+							CS.FGUI.inst:SetAllUIAlpha(1)
+							EventDispatcherInis:dispatchEvent(GameEvent.EventSystem.EventEnd)
+							EventDispatcherInis:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+						end
+					},
+					ExecuteType.queueup,
+					kGameState.Shop
+				)
+			else
+				EventDispatcherInis:dispatchEvent(GameEvent.Activity_WorkerGameEvent.RefrshActivity_WorkerGameState,Activity_ScoreAwardGameProxy.inst.flag)
+			end
+
+		end
+	end
+	
+	
+	--等级到了 通知一下buff
+	if CS_UserDataProxyInst.playerData.level >= CS.WorldParConfigManager.inst:GetConfig(151).parameters then
+		csEventControllerInst:TriggerEvent(csGameEventType.GlobalBuffEvent.GLOBALBUFF_REFRESHUI_BUFFITEM)
+	end
+
+	--等级到了 判断一下淘金工人
+	if CS_UserDataProxyInst.playerData.level >= CS.WorldParConfigManager.inst:GetConfig(363).parameters then
+
+		local storyNpcCfg =  StoryNpcConfigManager:GetConfig(4,-1)
+
+		--GemMonthCardDataProxy.inst.remainCount <= 0 and
+		if storyNpcCfg ~= nil and CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"-1") == "-1"  then
+
+			EventDispatcherInis:dispatchEvent(GameEvent.EventSystem.AddEvent,GameEvent.StoryRoleEvent.AddStoryRole,{storyType = 4,parame = -1,callback = function()
+
+						CS_PlayerPrefs.SetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"1")
+						EventDispatcherInis:dispatchEvent(GameEvent.MallEvent.ShowUI_MallUI,3)
+						CS.GoOperationManager.inst.isDoing = false
+						CS.FGUI.inst:SetAllUIInteractable(true)
+						CS.FGUI.inst:SetAllUIAlpha(1)
+						EventDispatcherInis:dispatchEvent(GameEvent.EventSystem.EventEnd)
+						EventDispatcherInis:dispatchEvent(GameEvent.ShopMapEditEvent.ShowHeadTips)
+
+					end},ExecuteType.queueup,kGameState.Shop)
+
+		end
+
+	end
+
+	--等级到了 通知一下活动积分的按钮
+	local unlockLv = 999
+	if(CS.WorldParConfigManager.inst:GetConfig(8501) ~= nil)then
+		unlockLv = CS.WorldParConfigManager.inst:GetConfig(8501).parameters
+	end
+	if(level == unlockLv)then
+		EventDispatcherInis:dispatchEvent(GameEvent.ActivityPointEvent.RefreshUI_ActivityPoint_Btn)
+	end
+
+
+	local cfg = SystemUnlockConfigManager:CheckHasLevel(level)
+	if(cfg ~= nil)then
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.Award_AboutVal)
+		local data = CS.Award_AboutVal()
+		data.type = CS.ReceiveInfoUIType.UnlockSystem
+		data.val = level
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, data)
+	end
+end
+
+function SystemUnlockSystem:showSystemUnlockUI(level)
+	local cfg = SystemUnlockConfigManager:CheckHasLevel(level)
+	if(cfg ~= nil)then
+		GUIManager.inst:OpenView(
+			Constants.ViewName.UnlockNewSystemUIView,
+			function(view)
+				systemUnlockUIView = view
+				systemUnlockUIView:SetUIData(cfg)
+			end
+		)
+	else
+		csEventControllerInst:TriggerEvent(csGameEventType.ReceiveEvent.GO_ON);
+	end
+end

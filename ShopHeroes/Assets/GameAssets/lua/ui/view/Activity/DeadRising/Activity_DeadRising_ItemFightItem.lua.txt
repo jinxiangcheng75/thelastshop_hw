@@ -1,0 +1,80 @@
+
+-- Activity_DeadRising_ItemFightItem
+
+
+
+require("class")
+require("utils/XLuaUtils")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+
+
+local Activity_DeadRising_ItemFightItem = class()
+
+
+function Activity_DeadRising_ItemFightItem:Init(obj,clickHandler)
+
+	self.type = type
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaBehaviour)
+	self.clickHandler = clickHandler
+	
+	self.obj_have = self.contentPane:GetObjByName("obj_have")
+	self.obj_none = self.contentPane:GetObjByName("obj_none")
+	self.icon_item = self.contentPane:GetGUIIcon("icon_item")
+	self.tx_fight = self.contentPane:GetText("tx_fight")
+
+	self.icon_bg = self.gameObject:GetComponent(CS_type_GUIIcon)
+	self.button = self.gameObject:GetComponent("Button")
+
+	self.button.onClick:AddListener(function ()
+			self:onButtonClick()
+		end)
+
+end
+
+function Activity_DeadRising_ItemFightItem:SetData(data)
+
+	--self.data = data
+	self.obj_have:SetActive(true)
+	self.obj_none:SetActive(false)
+
+end
+
+function Activity_DeadRising_ItemFightItem:Clear()
+
+	self.data = nil
+
+	self.obj_have:SetActive(false)
+	self.obj_none:SetActive(true)
+	--self.icon_bg:SetSprite("","")
+
+end
+
+
+function Activity_DeadRising_ItemFightItem:onButtonClick()
+
+	if self.clickHandler ~= nil then
+		
+		local itemId = -1
+		if self.data ~= nil then
+			itemId = self.data.id
+		end
+		self.clickHandler(itemId)
+		
+	end
+	
+end
+
+
+
+return Activity_DeadRising_ItemFightItem
+
+
+
+
+
+

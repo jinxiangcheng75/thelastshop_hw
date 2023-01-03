@@ -1,0 +1,105 @@
+
+
+local EventDispatcher = require("event/EventDispatcher")
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+
+
+--LackResUIView_dlc
+
+
+local LackResUIView_dlc = class()
+
+function LackResUIView_dlc:ctor()
+
+	self.isInitComp = false
+
+end
+
+function LackResUIView_dlc:initComp(obj)
+
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent(CS_type_LuaBehaviour)
+
+	self.obj_gemCanClick = self.contentPane:GetObjByName("obj_gemCanClick")
+	self.obj_gemProcessing = self.contentPane:GetObjByName("obj_gemProcessing")
+	self.obj_unionCanClick = self.contentPane:GetObjByName("obj_unionCanClick")
+	self.obj_unionProcessing = self.contentPane:GetObjByName("obj_unionProcessing")
+	self.btn_gemBuy = self.contentPane:GetButton("btn_gemBuy")
+	self.btn_unionBuy = self.contentPane:GetButton("btn_unionBuy")
+	
+	self.isInitComp = true
+
+end
+
+function LackResUIView_dlc:init(obj)
+
+	self:initComp(obj)
+	self:addListeners()
+
+end
+
+function LackResUIView_dlc:addListeners()
+
+	EventDispatcher:addEvent(GameEvent.TempHotfix_LackResUIEvent.SetBtnRefreshAni,self,self.setBtnRefreshAni)
+	
+	
+end
+
+
+function LackResUIView_dlc:removeListeners()
+	
+	EventDispatcher:removeEvent(GameEvent.TempHotfix_LackResUIEvent.SetBtnRefreshAni,self,self.setBtnRefreshAni)
+	
+	
+end
+
+function LackResUIView_dlc:setBtnRefreshAni(isInDealing)
+	
+	if self.isInitComp then
+
+		self.obj_unionProcessing:SetActive(isInDealing);
+		self.obj_unionCanClick:SetActive(not isInDealing);
+		self.btn_unionBuy.enabled = not isInDealing;
+
+		self.obj_gemProcessing:SetActive(isInDealing);
+		self.obj_gemCanClick:SetActive(not isInDealing);
+		self.btn_gemBuy.enabled = not isInDealing;
+		
+	end
+	
+end
+
+
+function LackResUIView_dlc:clear()
+
+	self.isInitComp = false
+	self:removeListeners()
+
+end
+
+
+
+-----------LuaBehaviour---------------------------------------------------------------------------------------------------------------------------------------
+
+local lackResUIView_dlc
+
+function awake()
+
+	lackResUIView_dlc = LackResUIView_dlc.new()
+	lackResUIView_dlc:init(self.gameObject)
+
+end
+
+function onEnable()
+
+end
+
+function ondestroy()
+
+	if lackResUIView_dlc ~= nil then
+		lackResUIView_dlc:clear()
+		lackResUIView_dlc = nil
+	end
+
+end

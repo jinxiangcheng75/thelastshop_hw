@@ -1,0 +1,321 @@
+--RoleExchangeUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_luaList = typeof(CS.LuaListItem)
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local EventDispatcher = require("event/EventDispatcher")
+local csVector2 = CS.UnityEngine.Vector2
+local type_newscrollRect = typeof(CS.NewScrollRect)
+local csRoleDataProxyInst = CS.RoleDataProxy.inst
+
+RoleExchangeUIView = class(ViewBase)
+
+local isClickHandler = true
+local exchangeList
+local curRarity = 1 -- 1 - N 2 - R 3 - SR 4 - SSR
+
+function RoleExchangeUIView:ctor()
+	self.viewID = Constants.ViewName.RoleExchangeUIView
+	RoleExchangeUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.roleExchange
+end
+
+function RoleExchangeUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.slider = contentPane:GetObjByName("Slider"):GetComponent("Slider")
+	self.backBtn = contentPane:GetButton("backBtn")
+	self.Content = contentPane:GetObjByName("Content"):GetComponent("RectTransform")
+	self.newScroll = contentPane:GetObjByName("itemList"):GetComponent(type_newscrollRect)
+	self.group = contentPane:GetObjByName("group"):GetComponent("ToggleGroupMarget")
+	local superList = contentPane:GetObjByName("itemList")
+	self.scrollView = superList:GetComponent(CS_type_superList)
+	self.scrollRect = superList:GetComponent("ScrollRect")
+	self.itemHeight = self.scrollView.itemPrototype.sizeDelta.y
+	self.itemWidth = self.scrollView.itemPrototype.sizeDelta.x
+	self.listItemCount = 0
+end
+
+function RoleExchangeUIView:onInit()
+	self:initComp()
+
+	self.scrollView.itemRenderer = function(index, item)
+		self:ListItemRenderer(index, item)
+	end
+
+	self.scrollView.activeFalse = function(index, item)
+		self:activeFalseRenderer(index, item)
+	end
+
+	self.scrollView.clearItemRender = function(index, item)
+		self:ClearItemRenderer(index, item)
+	end
+
+	self.backBtn:ButtonClickTween(
+		function()
+			if(CS.GuideDataProxy.inst == nil or CS.GuideDataProxy.inst.CurInfo == nil) then return end
+			if(CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver)then
+				if (CS.GuideDataProxy.inst.CurInfo.m_curCfg.btn_name ~= self.backBtn.gameObject.name) then
+					return
+				end
+			end
+			self:closeBtnClick()
+		end
+	)
+
+	self.newScroll.onValueChanged:AddListener(
+		function(v2)
+			self:onScrollChange(v2)
+		end
+	)
+
+	for i = 0, self.group.togglesBtn.Count - 1 do
+		local newToggle = self.group.togglesBtn[i].gameObject:GetComponent("NewToggle")
+		newToggle.curToggleIndex = i
+		newToggle:onClickHandle(
+			"+",
+			function(index)
+				self:OnToggleClick(index)
+			end
+		)
+	end
+
+	self.group.OnSelectedIndexValueChange = function(index)
+		self:ToggleSelectChange(index)
+	end
+
+	self.group:SetToggleSize(csVector2(220, 124), csVector2(180, 124))
+end
+
+function RoleExchangeUIView:OnToggleClick(index)
+	if(CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver)then
+			return
+	end
+	isClickHandler = true
+	self.group:OnEnableMethod(index)
+end
+
+function RoleExchangeUIView:ToggleSelectChange(index)
+	if (not isClickHandler) then
+		return
+	end
+	self.newScroll.inertia = false
+	self:JumpToTargetRarity(index + 1)
+end
+
+function RoleExchangeUIView:JumpToTargetRarity(rarity) -- 1 - N ...
+	local targetIndex = csRoleDataProxyInst:GetTargetIndexByRarity(rarity)
+	if (CS.FGUI.inst.isLandscape) then
+		self.scrollView:scrollByItemIndex(targetIndex)
+	else
+		self.scrollView:scrollByItemIndexToMiddle(targetIndex)
+	end
+
+	self.newScroll.inertia = true
+end
+
+function RoleExchangeUIView:onScrollChange(v2)
+	if (exchangeList == nil) then
+		return
+	end
+	if (exchangeList.Count <= 0) then
+		return
+	end
+	if (isClickHandler) then
+		self.newScroll.inertia = false
+	else
+		self.newScroll.inertia = true
+	end
+	local tempAnchore = 0
+	local tempItem = 0
+	local tempSize = 0
+	if (CS.FGUI.inst.isLandscape) then
+		tempAnchore = self.Content.anchoredPosition.x
+		tempItem = self.itemWidth
+		tempSize = 0.5
+	else
+		tempAnchore = self.Content.anchoredPosition.y
+		tempItem = self.itemHeight
+		tempSize = 3
+	end
+	local curPos = tempAnchore + tempItem * tempSize -- 548
+	--print("~~~~~~~~~~~~~1",curPos)
+	curPos = math.floor(curPos / tempItem)
+	curPos = math.abs(curPos)
+	--print("~~~~~~~~~~~~~2",curPos)
+	if (curPos >= exchangeList.Count or curPos < 0) then
+		return
+	end
+	if (curRarity ~= exchangeList[curPos].rarity) then
+		curRarity = exchangeList[curPos].rarity
+		isClickHandler = false
+		self.group.selectedIndex = curRarity - 1
+	end
+end
+
+function RoleExchangeUIView:onHide()
+	CS.AudioManager.inst:PlaySound(9)
+	csRoleDataProxyInst:ClearHeroGraphicDressCache()
+	self.scrollView:clearData()
+end
+
+function RoleExchangeUIView:onShowed()
+	if(CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver)then
+		for i = 0, self.group.togglesBtn.Count - 1 do
+			self.group.togglesBtn[i].interactable = false
+		end
+	else
+		for i = 0, self.group.togglesBtn.Count - 1 do
+			self.group.togglesBtn[i].interactable = true
+		end
+	end
+
+	csRoleDataProxyInst:ResetHeroExchangeGraphicCache()
+
+	CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.Content)
+end
+
+function RoleExchangeUIView:shiftIn()
+	self.contentObject:SetActive(true)
+	self.scrollRect.vertical = true
+	--if(exchangeList == nil)then return end
+	--if(exchangeList.Count <= 0)then return end
+	--self.scrollView:scrollByItemIndex(exchangeList.Count - 1)
+	self:SetUIData()
+end
+
+function RoleExchangeUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RoleExchangeUIView:closeBtnClick()
+	self:hide()
+end
+
+function RoleExchangeUIView:ListItemRenderer(index, item)
+	local smallItem = item.gameObject:GetComponent(CS_type_luaList)
+
+	if (index >= self.listItemCount) then
+		smallItem.gameObject:SetActive(false)
+		smallItem.gameObject.name = "item"
+	end
+
+	if (index < self.listItemCount) then
+		if (index == 0) then
+			smallItem.gameObject:SetActive(false)
+			smallItem.gameObject.name = "item"
+		else
+			smallItem.gameObject:SetActive(true)
+			smallItem:SetData(exchangeList[index - 1])
+		end
+	else
+		smallItem.gameObject:SetActive(false)
+		smallItem.gameObject.name = "item"
+	end
+end
+
+function RoleExchangeUIView:activeFalseRenderer(index, item)
+	local smallItem = item.gameObject:GetComponent(CS_type_luaList)
+
+	smallItem.gameObject.name = "item"
+end
+
+function RoleExchangeUIView:ClearItemRenderer(index, item)
+	local smallItem = item.gameObject:GetComponent(CS_type_luaList)
+	smallItem:ClearData()
+end
+
+function RoleExchangeUIView:SetListItemTotalCount(count)
+	self.listItemCount = count
+	if (self.listItemCount < 0) then
+		self.listItemCount = 0
+	end
+
+	self.scrollView.totalItemCount = count
+end
+
+function RoleExchangeUIView:SetUIData()
+	--if csRoleDataProxyInst.exchangeIsNew then
+	--csRoleDataProxyInst.exchangeIsNew = false
+	--end
+
+	if (CS.FGUI.inst.isLandscape) then
+		exchangeList = csRoleDataProxyInst.heroFrontExchangeList
+	else
+		exchangeList = csRoleDataProxyInst.heroExchangeList
+	end
+
+	if (exchangeList == nil) then
+		return
+	end
+	if (exchangeList.Count <= 0) then
+		return
+	end
+
+	self:SetListItemTotalCount(exchangeList.Count + 1)
+	self:SetToggleData()
+
+	local curIndex
+	for i = 0, exchangeList.Count - 1 do
+		if (exchangeList[i].state == CS.EHeroExchangeState.Idle) then
+			curIndex = i
+		end
+	end
+
+	self.scrollView:refresh()
+	self.scrollView:scrollByItemIndex(curIndex)
+
+	CS.GameTimer.inst:AddTimer(
+		0.2,
+		1,
+		function()
+			if
+				(CS.GuideDataProxy.inst ~= null and CS.GuideDataProxy.inst.CurInfo ~= null and
+					not CS.GuideDataProxy.inst.CurInfo.isAllOver)
+				then
+				if (CS.FGUI.inst.isLandscape) then
+					self.scrollRect.horizontal = false
+				else
+					self.scrollRect.vertical = false
+				end
+			else
+				if (CS.FGUI.inst.isLandscape) then
+					self.scrollRect.horizontal = true
+				else
+					self.scrollRect.vertical = true
+				end
+			end
+		end
+	)
+end
+
+function RoleExchangeUIView:SetToggleData()
+	local targetIndex = -1
+	for i = 0, exchangeList.Count - 1 do
+		if
+			(exchangeList[i].state == CS.EHeroExchangeState.Idle and
+				CS.UserDataProxy.inst.playerData.level >= exchangeList[i].unlockLevel and
+				CS.UserDataProxy.inst.playerData.gold >= exchangeList[i].unlockCost)
+			then
+			targetIndex = exchangeList[i].rarity - 1
+		end
+	end
+
+	for i = 0, self.group.togglesBtn.Count - 1 do
+		local go = self.group.togglesBtn[i].transform
+		if (i == targetIndex) then
+			go:GetChild(1).gameObject:SetActive(true)
+		else
+			go:GetChild(1).gameObject:SetActive(false)
+		end
+	end
+end

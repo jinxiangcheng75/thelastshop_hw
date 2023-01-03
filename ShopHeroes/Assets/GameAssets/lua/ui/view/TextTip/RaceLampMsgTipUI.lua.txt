@@ -1,0 +1,183 @@
+--RaceLampMsgTipUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_RectTransform = typeof(CS.UnityEngine.RectTransform)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+local CS_itemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_HeroProfessionConfigManagerInst = CS.HeroProfessionConfigManager.inst
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_UnityUtils = CS.UnityUtils
+
+RaceLampMsgTipUI = class(ViewBase)
+
+function RaceLampMsgTipUI:ctor()
+	self.viewID = Constants.ViewName.RaceLampMsgTipUI
+	RaceLampMsgTipUI.super.init(self, self.viewID)
+	self.sortingLayerName = "top"
+end
+------------------------------------------------
+
+--[[
+
+rect
+text
+
+--]]
+
+function RaceLampMsgTipUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.rect = contentPane:GetObjByName("rect");
+	self.text = contentPane:GetText("text");
+
+
+end
+
+
+function RaceLampMsgTipUI:onInit()
+
+	self:initComp()
+	self.isMoving = false
+	self.pause = false
+
+end
+
+function RaceLampMsgTipUI:SetMsgTip(msg)
+
+	if 	self.pause == true then
+		return
+	end
+
+	if self.isMoving == true then
+		return
+	end
+
+	self.isMoving = true
+
+	local type = msg.type
+	local itemId = msg.itemId
+	local userName = CS_LanguageManagerInst:GetValueByKey(msg.userName)
+	local otherParam = msg.otherParam
+	
+	local raceLampConfig = RaceLampConfigManager:GetConfig(type)
+
+	local content = ""
+	local content2 = ""
+
+	if 	type == 1 then
+
+		local config = CS_itemConfigManagerInst:GetConfig(itemId)
+		content = "<color=#"..raceLampConfig.goal_color..">"..CS_LanguageManagerInst:GetValueByKey(config.name).."*"..otherParam.."</color>"
+
+	elseif type == 2 then
+
+		local config = CS_HeroProfessionConfigManagerInst:GetConfig(tonumber(itemId))
+
+		local color = raceLampConfig.goal_color
+		local quality = "SR"
+
+		if tonumber(otherParam) >= 31 and tonumber(otherParam) <= 40 then --SR 紫色
+			color = "C692E5"
+			quality = "SR"
+		elseif tonumber(otherParam) >= 41 and tonumber(otherParam) <= 50 then --SSR 橙色
+			color = "D1813D"
+			quality = "SSR"
+		end
+
+		content = "<color=#"..color..">"..quality..CS_LanguageManagerInst:GetValueByKey(config.name).."</color>"
+
+
+	elseif type == 3 then
+
+		local equipConfig = CS_EquipConfigManagerInst:GetEquipInfoConfig(tonumber(itemId))
+		content = "<color="..CS.StaticConstants.qualityColor[equipConfig.equipQualityConfig.quality - 1]..">"..equipConfig.quality_name.."</color>"
+
+	elseif type == 4 then
+
+		local itemCfg = CS_itemConfigManagerInst:GetConfig(tonumber(itemId))
+		if(itemCfg ~= nil)then
+			content = "<color=#"..raceLampConfig.goal_color..">"..CS_LanguageManagerInst:GetValueByKey(itemCfg.name).."</color>"
+		end
+		--content2 = "<color=#"..raceLampConfig.goal_color..">"..otherParam.."</color>"
+
+	elseif type == 5 then
+
+		local equipConfig = CS_EquipConfigManagerInst:GetEquipInfoConfig(tonumber(itemId))
+		content = "<color="..CS.StaticConstants.qualityColor[equipConfig.equipQualityConfig.quality - 1]..">"..equipConfig.quality_name.."</color>"
+
+	elseif type == 6 then
+
+		local boxItemCfg = CS_itemConfigManagerInst:GetConfig(tonumber(itemId))
+		content = "<Color=#" .. raceLampConfig.goal_color .. ">" .. CS_LanguageManagerInst:GetValueByKey(boxItemCfg.name) .. "</Color>"
+		local equipDrawingItemCfg = CS_itemConfigManagerInst:GetConfig(tonumber(otherParam))
+		if(equipDrawingItemCfg ~= nil)then
+			local equipDrawingCfg = CS_EquipConfigManagerInst:GetEquipDrawingsCfg(equipDrawingItemCfg.effect)
+			if(equipDrawingCfg ~= nil)then
+				content2 = CS_LanguageManagerInst:GetValueByKey(equipDrawingCfg.name)
+			end
+		end
+
+	elseif type == 7 then
+
+		local boxItemCfg = CS_itemConfigManagerInst:GetConfig(tonumber(itemId))
+		content = "<Color=#" .. raceLampConfig.goal_color .. ">" .. CS_LanguageManagerInst:GetValueByKey(boxItemCfg.name) .. "</Color>"
+		local eqcfg = CS_EquipConfigManagerInst:GetEquipQualityConfig(tonumber(otherParam))
+		if(eqcfg ~= nil)then
+			content2 = "<Color=" .. CS.StaticConstants.qualityColor[eqcfg.quality - 1] .. ">" ..  CS_LanguageManagerInst:GetValueByKey(eqcfg.name) .. "</Color>"
+		end
+
+	end
+
+	self.text.text = CS_LanguageManagerInst:GetValueByKey(raceLampConfig.content_des,"<color=#"..raceLampConfig.player_color..">"..userName.."</color>",content,content2).."   "
+
+	local width = self.text.preferredWidth
+	local endX = -(380 + width)
+
+	self.rect:SetActive(true)
+
+	--:SetDelay(0.01)
+	self.text.rectTransform:DOLocalMoveX(endX,width / 60):From(400 + 100):SetEase(CS.DG.Tweening.Ease.Linear).onComplete = function()
+		self:AniOverMethod(false)
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.GoOnRaceLampTip)
+	end
+
+end
+
+function RaceLampMsgTipUI:AniOverMethod(allOver)
+	self.isMoving = false
+	self.text.text = ""
+	self.text.rectTransform:setLocalX(5000)
+
+	if allOver then
+
+		self.rect:SetActive(false)
+
+	end
+
+end
+
+function RaceLampMsgTipUI:Pause()
+	self.pause = true
+	CS.DG.Tweening.DOTween.Kill(self.text.rectTransform);
+	self.text.text = ""
+	self.text.rectTransform:setLocalX(5000)
+
+	self.rect:SetActive(false)
+end
+
+function RaceLampMsgTipUI:Replay()
+	self.pause = false
+	self.isMoving = false
+end
+
+------------------------------------------------

@@ -1,0 +1,63 @@
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+require("ui/view/CreatRole/CreatRoleUIView")
+require("ui/view/Binding/BindingUIView")
+local EventDispatcherInis = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+
+CreatRoleSystem = class(BaseSystem)
+CreatRoleSystem.super = BaseSystem
+
+local creatRoleUIView
+local bindingUIView
+
+function CreatRoleSystem:ctor()
+end
+
+function CreatRoleSystem:AddListeners()
+	EventDispatcherInis:addEvent(GameEvent.CreatRoleEvent.ShowUI_CreatRoleUI,self,self.openCreatRoleUI)
+	EventDispatcherInis:addEvent(GameEvent.CreatRoleEvent.HideUI_CreatRoleUI,self,self.hideCreatRoleUI)
+	EventDispatcherInis:addEvent(GameEvent.CreatRoleEvent.ShowUI_BindingUI,self,self.openBindingUI)
+	
+end
+
+function CreatRoleSystem:RemoveListeners()
+	EventDispatcherInis:removeEvent(GameEvent.CreatRoleEvent.ShowUI_CreatRoleUI,self.openCreatRoleUI)
+	EventDispatcherInis:removeEvent(GameEvent.CreatRoleEvent.HideUI_CreatRoleUI,self.hideCreatRoleUI)
+	EventDispatcherInis:removeEvent(GameEvent.CreatRoleEvent.ShowUI_BindingUI,self.openBindingUI)
+	
+end
+
+function CreatRoleSystem:openBindingUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.BindingUIView,
+		function(view)
+			bindingUIView = view
+		end
+	)
+end
+
+function CreatRoleSystem:hideCreatRoleUI()
+	GUIManager.inst:HideView(Constants.ViewName.CreatRoleUIView)
+end
+
+function CreatRoleSystem:openCreatRoleUI()
+	GUIManager.inst:OpenView(
+		Constants.ViewName.CreatRoleUIView,
+		function(view)
+			creatRoleUIView = view
+		end
+	)
+end
+
+function CreatRoleSystem:OnEnter()
+	CreatRoleSystem.super.OnEnter(self)
+end
+
+function CreatRoleSystem:OnExit()
+	CreatRoleSystem.super.OnExit(self)
+end

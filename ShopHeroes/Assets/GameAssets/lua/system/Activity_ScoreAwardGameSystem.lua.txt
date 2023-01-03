@@ -1,0 +1,190 @@
+
+-- Activity_ScoreAwardGameSystem
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("utils/XLuaUtils")
+
+require("ui/view/Activity/ScoreAwardGame/Activity_ScoreAwardGamePanel")
+require("ui/view/Activity/ScoreAwardGame/Activity_ScoreAwardGameScoreRewardPanel")
+require("ui/view/Activity/ScoreAwardGame/Activity_ScoreAwardGame_messRankUI")
+
+local EventDispatcher= require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+Activity_ScoreAwardGameSystem = class(BaseSystem)
+Activity_ScoreAwardGameSystem.super = BaseSystem
+
+function Activity_ScoreAwardGameSystem:ctor()
+end
+
+function Activity_ScoreAwardGameSystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_MainPanel,self,self.showActivity_ScoreAwardGame_MainPanel)
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_MainPanel,self,self.refreshActivity_ScoreAwardGame_MainPanel)
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_ScoreRewardPanel,self,self.showActivity_ScoreAwardGame_ScoreRewardPanel)
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_ScoreRewardPanel,self,self.refreshActivity_ScoreAwardGame_ScoreRewardPanel)
+	
+	-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_messRankUI,self,self.showActivity_ScoreAwardGame_messRankUI)
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.Activity_ScoreAwardGame_GetMemberRankMess,self,self.activity_ScoreAwardGame_messRankUI_refreshRankList)
+	
+	-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.RefrshActivity_ScoreAwardGameState,self,self.refrshActivity_ScoreAwardGameState)
+	
+	
+	-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckData,self,self.request_PointActivity2_CheckData)
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_TaskReward,self,self.request_PointActivity2_TaskReward)
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckReward,self,self.request_PointActivity2_CheckReward)
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_Reward,self,self.request_PointActivity2_Reward)
+	EventDispatcher:addEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_UnionRankList,self,self.request_PointActivity2_UnionRankList)
+	
+	
+	
+
+end
+
+function Activity_ScoreAwardGameSystem:RemoveListeners()
+
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_MainPanel,self,self.showActivity_ScoreAwardGame_MainPanel)
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_MainPanel,self,self.refreshActivity_ScoreAwardGame_MainPanel)
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_ScoreRewardPanel,self,self.showActivity_ScoreAwardGame_ScoreRewardPanel)
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.RefreshUI_Activity_ScoreAwardGame_ScoreRewardPanel,self,self.refreshActivity_ScoreAwardGame_ScoreRewardPanel)
+	
+	-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.ShowUI_Activity_ScoreAwardGame_messRankUI,self,self.showActivity_ScoreAwardGame_messRankUI)
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.Activity_ScoreAwardGame_GetMemberRankMess,self,self.activity_ScoreAwardGame_messRankUI_refreshRankList)
+	-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.RefrshActivity_ScoreAwardGameState,self,self.refrshActivity_ScoreAwardGameState)
+	
+	-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckData,self,self.request_PointActivity2_CheckData)
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_TaskReward,self,self.request_PointActivity2_TaskReward)
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckReward,self,self.request_PointActivity2_CheckReward)
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_Reward,self,self.request_PointActivity2_Reward)
+	EventDispatcher:removeEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_UnionRankList,self,self.request_PointActivity2_UnionRankList)
+	
+	
+end
+
+function Activity_ScoreAwardGameSystem:showActivity_ScoreAwardGame_MainPanel(needGotoTop)
+	
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_ScoreAwardGamePanel,
+		function(view)
+			view:SetData(needGotoTop)
+		end
+	)
+
+end
+
+function Activity_ScoreAwardGameSystem:refreshActivity_ScoreAwardGame_MainPanel()
+	
+	local activity_ScoreAwardGame_MainPanel = GUIManager.inst:GetWindow(Constants.ViewName.Activity_ScoreAwardGamePanel, false)
+	if 	activity_ScoreAwardGame_MainPanel ~= nil and activity_ScoreAwardGame_MainPanel.isShowing == true then
+		activity_ScoreAwardGame_MainPanel:Refresh()
+	end
+	
+end
+
+function Activity_ScoreAwardGameSystem:refreshActivity_ScoreAwardGame_ScoreRewardPanel()
+	
+	local activity_ScoreAwardGame_ScoreRewardPanel = GUIManager.inst:GetWindow(Constants.ViewName.Activity_ScoreAwardGameScoreRewardPanel, false)
+	if 	activity_ScoreAwardGame_ScoreRewardPanel ~= nil and activity_ScoreAwardGame_ScoreRewardPanel.isShowing == true then
+		activity_ScoreAwardGame_ScoreRewardPanel:Refresh()
+	end
+	
+end
+
+function Activity_ScoreAwardGameSystem:showActivity_ScoreAwardGame_ScoreRewardPanel(lv)
+	
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_ScoreAwardGameScoreRewardPanel,
+		function (view)
+			view:ShowByRewardLv(lv)
+		end)
+	
+end
+
+function Activity_ScoreAwardGameSystem:showActivity_ScoreAwardGame_messRankUI(type) -- 0 信息 1 排行榜
+	
+	GUIManager.inst:OpenView(
+		Constants.ViewName.Activity_ScoreAwardGame_messRankUI,
+		function (view)
+			view:SetUIData(type)
+		end)
+	
+end
+
+function Activity_ScoreAwardGameSystem:activity_ScoreAwardGame_messRankUI_refreshRankList(rankList,selfRankData)
+	
+	local activity_ScoreAwardGame_messRankUI = GUIManager.inst:GetWindow(Constants.ViewName.Activity_ScoreAwardGame_messRankUI, false)
+	if 	activity_ScoreAwardGame_messRankUI ~= nil and activity_ScoreAwardGame_messRankUI.isShowing == true then
+		activity_ScoreAwardGame_messRankUI:getRankListData(rankList,selfRankData)
+	end
+	
+end
+
+function Activity_ScoreAwardGameSystem:refrshActivity_ScoreAwardGameState(flag)
+	
+	if not flag then --关闭所有打开的界面
+
+		GUIManager.inst:HideView(Constants.ViewName.Activity_ScoreAwardGamePanel)
+		--GUIManager.inst:HideView(Constants.ViewName.Activity_ScoreAwardGameScoreRewardPanel) --奖励界面不关
+		GUIManager.inst:HideView(Constants.ViewName.Activity_ScoreAwardGame_messRankUI)
+		
+	end
+	
+end
+
+--function Activity_ScoreAwardGameSystem:hideWelfareUI()
+
+	--GUIManager.inst:HideView(Constants.ViewName.WelfareUI)
+
+--end
+
+
+function Activity_ScoreAwardGameSystem:request_PointActivity2_CheckData()
+	
+	
+	local req = MsgType.Request_PointActivity2_CheckData:New()
+	req:Send()
+	
+end
+
+function Activity_ScoreAwardGameSystem:request_PointActivity2_TaskReward(taskId)
+	
+	local req = MsgType.Request_PointActivity2_TaskReward:New()
+	req.taskId = taskId
+	req:Send()
+	
+end
+
+function Activity_ScoreAwardGameSystem:request_PointActivity2_CheckReward()
+	
+	local req = MsgType.Request_PointActivity2_CheckReward:New()
+	req:Send()
+	
+end
+
+function Activity_ScoreAwardGameSystem:request_PointActivity2_Reward(groupId,id)
+	
+	local req = MsgType.Request_PointActivity2_Reward:New()
+	req.groupId = groupId
+	req.id = id
+	req:Send()
+	
+end
+
+function Activity_ScoreAwardGameSystem:request_PointActivity2_UnionRankList()
+	
+	local req = MsgType.Request_PointActivity2_UnionRankList:New()
+	req:Send()
+	
+end
+
+

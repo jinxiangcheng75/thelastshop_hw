@@ -1,0 +1,187 @@
+
+--Welfare_moneyBox
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+local CS_type_ProgressStateTip = typeof(CS.ProgressStateTip)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_TimeUtils = CS.TimeUtils
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Welfare_moneyBox = class(luaClass_Welfare_CtrlBase)
+
+function Welfare_moneyBox:initComp(luaBehaviour)
+
+	local contentPane = luaBehaviour
+
+	self.stateTips = {}
+
+	local objs = contentPane:GetObjByName("objs_stateTip"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objs.Count - 1 do
+		self.stateTips[#self.stateTips + 1] = objs[i]:GetComponent(CS_type_ProgressStateTip)
+	end
+
+	self.tx_gold = contentPane:GetText("tx_gold")
+	self.tx_progress = contentPane:GetText("tx_progress")
+	self.tx_coolTime = contentPane:GetText("tx_coolTime")
+	self.img_mask = contentPane:GetImage("img_mask")
+	self.btn_ok = contentPane:GetButton("btn_ok")
+	self.slider = contentPane:GetObjByName("slider"):GetComponent("Slider")
+	self.tf_window = contentPane:GetObjByName("tf_window").transform
+	self.tf_inProgress = contentPane:GetObjByName("tf_inProgress").transform
+	self.tf_nextTime = contentPane:GetObjByName("tf_nextTime").transform
+	self.icon_bgPig = contentPane:GetGUIIcon("icon_bgPig")
+	self.icon_maskPig = contentPane:GetGUIIcon("icon_maskPig")
+	self.icon_grayPig = contentPane:GetGUIIcon("icon_grayPig")
+	self.icon_reward = contentPane:GetGUIIcon("icon_reward")
+	self.obj_effect = contentPane:GetObjByName("obj_effect")
+	self.anim_reward = contentPane:GetObjByName("anim_reward"):GetComponent("Animator")
+
+end
+
+function Welfare_moneyBox:Init(luaBehaviour)
+
+	self:initComp(luaBehaviour)
+
+	self.timerComp = nil
+
+	self.btn_ok:ButtonClickTween(
+		function()
+			self:onOkBtnClick()
+		end
+	)
+
+end
+
+function Welfare_moneyBox:UpdateUI()
+
+	local data = CS.MoneyBoxDataProxy.inst.moneyBoxData;
+
+	self.tf_window.gameObject:SetActive(true)
+	self.icon_reward.gameObject:SetActive(false)
+	local sliderVal = data.currOrderIndex - 1 + data.hasBeenStored * 1.0 / data.targetGoldCount
+	if sliderVal < 0.05 then
+		sliderVal = 0.05
+	end
+	self.slider.value = sliderVal
+
+	for i = 1, #self.stateTips do
+
+		local tip = self.stateTips[i]
+
+		if i == data.currOrderIndex then
+			tip.State = data.currState
+		else
+			tip.State = i < data.currOrderIndex and 3 or 4
+		end
+
+	end
+
+	if data.currOrderIndex >= 7 then
+
+		self.icon_bgPig:SetSprite("moneybox_atlas", "xiaozhu_chuxuguanjin1");
+		self.icon_maskPig:SetSprite("moneybox_atlas", "xiaozhu_chuxuguanjin1");
+		self.icon_grayPig:SetSprite("moneybox_atlas", "xiaozhu_chuxuguanjin1");
+		self.icon_reward:SetSprite("moneybox_atlas", "xiaozhu_chuxuguanjin1");
+
+	else
+
+		self.icon_bgPig:SetSprite("moneybox_atlas", "xiaozhu_chuxuguan1");
+		self.icon_maskPig:SetSprite("moneybox_atlas", "xiaozhu_chuxuguan1");
+		self.icon_grayPig:SetSprite("moneybox_atlas", "xiaozhu_chuxuguan1");
+		self.icon_reward:SetSprite("moneybox_atlas", "xiaozhu_chuxuguan1");
+
+	end
+
+	self.obj_effect:SetActive(data.currState == 2);
+	self.btn_ok.gameObject:SetActive(data.currState == 2);
+	self.tf_inProgress.gameObject:SetActive(data.currState == 1);
+	self.tf_nextTime.gameObject:SetActive(data.currState == 0);
+	self.tx_gold.gameObject:SetActive(data.currState == 1);
+	self.tx_progress.gameObject:SetActive(data.currState == 1);
+
+	self:clearTimer()
+
+	self.img_mask.fillAmount = 1 - data.hasBeenStored * 1.0 / data.targetGoldCount
+
+	if data.currState == 1 then
+
+		self.tx_gold.text = CS.System.String.Format("{0:N0}", data.hasBeenStored).."/"..CS.System.String.Format("{0:N0}", data.targetGoldCount)
+		if data.targetGoldCount == 0 then
+			self.tx_progress.text = "0%"
+		else
+			self.tx_progress.text = string.format("%0.0f", data.hasBeenStored * 100 / data.targetGoldCount).."%";
+		end
+
+	elseif data.currState == 0 then
+
+		self:timerMethod()
+		self.timerComp = CS_GameTimerInst:AddLoopTimerComp(self.tx_coolTime.gameObject,1,function()
+				self:timerMethod()
+			end)
+
+	end
+
+
+end
+
+
+function Welfare_moneyBox:RefreshUIData()
+
+	self:UpdateUI()
+
+end
+
+
+function Welfare_moneyBox:onOkBtnClick()
+
+	self.obj_effect:SetActive(false);
+	self.tf_window.gameObject:SetActive(false);
+	self.icon_reward.gameObject:SetActive(true);
+
+	self.anim_reward:CrossFade("open", 0);
+	self.anim_reward:Update(0);
+	self.anim_reward:Play("open");
+	CS.AudioManager.inst:PlaySound(104);
+	local animTime = self.anim_reward:GetClipLength("openMoneyBox");
+	CS.FGUI.inst:showGlobalMask(animTime)
+	CS_GameTimerInst:AddTimer(animTime * 0.95,1,function ()
+			self.icon_reward.gameObject:SetActive(false)
+			CS_EventControllerInst:TriggerEvent(CS_GameEventType.MoneyBoxEvent.MONEYBOX_REQUEST_REWARDS)
+		end)
+
+end
+
+function Welfare_moneyBox:timerMethod()
+
+	local data = CS.MoneyBoxDataProxy.inst.moneyBoxData;
+	self.tx_coolTime.text = CS_TimeUtils.timeSpanStrip(data.stateCoolTime)
+
+end
+
+function Welfare_moneyBox:clearTimer()
+
+	if (self.timerComp ~= nil) then
+		CS_GameTimerInst:removeLoopTimer(self.timerComp)
+		self.timerComp = nil
+	end
+
+end
+
+function Welfare_moneyBox:Clear()
+
+	self:clearTimer()
+
+end
+
+return Welfare_moneyBox

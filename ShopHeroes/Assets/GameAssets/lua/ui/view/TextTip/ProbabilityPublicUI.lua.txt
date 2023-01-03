@@ -1,0 +1,90 @@
+--ProbabilityPublicUI
+
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_GameTimerInst = CS.GameTimer.inst
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+
+--概率公示面板
+ProbabilityPublicUI = class(ViewBase)
+
+function ProbabilityPublicUI:ctor()
+	self.viewID = Constants.ViewName.ProbabilityPublicUI
+	ProbabilityPublicUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup_2"
+	self.topResPanelType = CS.TopPlayerShowType.ignore
+end
+------------------------------------------------
+
+
+function ProbabilityPublicUI:initComp()
+	
+	local contentPane = self.contentPanel
+
+	self.objList = contentPane:GetComponent(CS_type_ObjList).objList
+	
+	self.btn_closes = {}
+	self.uiAnimators = {}
+	
+	for i = 0, self.objList.Count - 1 do
+		
+		local luaBehaviour = self.objList[i]:GetComponent(CS_type_LuaBehaviour)
+		local btn_close = luaBehaviour:GetButton("btn_close")
+		local uiAnimator = luaBehaviour.uiAnimator
+		
+		self.btn_closes[#self.btn_closes + 1] = btn_close
+		self.uiAnimators[#self.uiAnimators + 1] = uiAnimator
+		
+	end
+
+
+end
+
+
+function ProbabilityPublicUI:onInit()
+
+	self:initComp()
+	
+	for i = 1, #self.btn_closes do
+		
+		local uiAnimator = self.uiAnimators[i]
+		local btn_close = self.btn_closes[i]:ButtonClickTween(function()
+			
+				uiAnimator:Play("hide")
+				local animLength = uiAnimator:GetClipLength("common_popUpUI_hide")
+
+				CS_GameTimerInst:AddTimer(
+					animLength,
+					1,
+					function()
+						uiAnimator:CrossFade("null", 0)
+						uiAnimator:Update(0)
+						self:hide()
+					end
+				)
+		end)
+	end
+
+end
+
+function ProbabilityPublicUI:ShowProbability(type) --0英雄 1转盘
+
+	for i = 0, self.objList.Count - 1 do
+
+		self.objList[i]:SetActive(false);
+
+	end
+	
+	self.objList[type]:SetActive(true)
+	
+	local uiAnimator = self.uiAnimators[type + 1];
+	uiAnimator:CrossFade("show", 0);
+	uiAnimator:Update(0);
+	uiAnimator:Play("show");
+	
+end

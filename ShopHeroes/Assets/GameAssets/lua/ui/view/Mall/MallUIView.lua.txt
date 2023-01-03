@@ -1,0 +1,478 @@
+--MallUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+
+local EventDispatcher = require("event/EventDispatcher")
+local luaClass_MallDaily = require("ui/view/Mall/Mall_daily")
+local luaClass_MallLegend = require("ui/view/Mall/Mall_legend")
+local luaClass_MallExclusive = require("ui/view/Mall/Mall_exclusive")
+local luaClass_MallStore = require("ui/view/Mall/Mall_store")
+local luaClass_MallBlackMarket = require("ui/view/Mall/Mall_blackmarket")
+
+
+local Vector2 = CS.UnityEngine.Vector2
+local Color = CS.UnityEngine.Color
+
+local CS_type_luaList = typeof(CS.LuaListItem)
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_TimeUtils = CS.TimeUtils
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_type_LuaBehaviour = typeof(CS.LuaBehaviour)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_type_ToggleGroupMarget = typeof(CS.ToggleGroupMarget)
+local CS_type_ItemSubType = typeof(CS.ItemSubType)
+local CS_type_Toggle = typeof(CS.UnityEngine.UI.Toggle)
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_UIUnLockConfigMrgInst = CS.UIUnLockConfigMrg.inst
+
+MallContentType = --0 日常礼包  1 传奇礼包  2 专享礼包  3 储值  4 黑市
+{
+	daily = 0,
+	legend = 1,
+	exclusive = 2,
+	store = 3,
+	blackmarket = 4,
+}
+
+MallUIView = class(ViewBase)
+
+function MallUIView:ctor()
+	self.viewID = Constants.ViewName.MallUIView
+	MallUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+	--self.topResPanelType = CS.TopPlayerShowType.noRoleAndSettingAndEnergy
+end
+
+function MallUIView:initComp()
+
+	local contentPane = self.contentPanel
+
+	self.btn_close = contentPane:GetButton("btn_close")
+	self.rtf_coverBg = contentPane:GetObjByName("rtf_coverBg"):GetComponent("RectTransform")
+	self.obj_gold = contentPane:GetObjByName("obj_gold")
+	self.tx_gold = contentPane:GetText("tx_gold")
+	self.btn_gem = contentPane:GetButton("btn_gem")
+	self.tx_gem = contentPane:GetText("tx_gem")
+
+	self.rtf_togglesContent = contentPane:GetObjByName("rtf_togglesContent"):GetComponent("RectTransform")
+	local obj_stateGroup = contentPane:GetObjByName("stateGroup")
+	self.stateGroup = obj_stateGroup:GetComponent(CS_type_ToggleGroupMarget)
+
+	self.toggles = {}
+	for i = 0, self.stateGroup.togglesBtn.Count - 1 do
+		self.toggles[#self.toggles + 1] = self.stateGroup.togglesBtn[i]:GetComponent(CS_type_Toggle)
+	end
+
+	self.redPoints = {}
+	local objs_redPoint = contentPane:GetObjByName("objs_redPoint"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objs_redPoint.Count - 1 do
+		self.redPoints[i] = objs_redPoint[i]
+	end
+
+	self.obj_nothing = contentPane:GetObjByName("obj_nothing")
+
+	self.toggleLinkObjs = contentPane:GetObjByName("toggleLinkObjs"):GetComponent(CS_type_ObjList).objList
+
+	--日常礼包
+	self.ctrl_daily = luaClass_MallDaily.new()
+	self.ctrl_daily:Init(contentPane:GetObjByName("luaBehaviour_daily"):GetComponent(CS_type_LuaBehaviour))
+
+	--传奇礼包
+	self.ctrl_legend = luaClass_MallLegend.new()
+	self.ctrl_legend:Init(contentPane:GetObjByName("luaBehaviour_legend"):GetComponent(CS_type_LuaBehaviour),self.obj_nothing)
+
+	--专享礼包
+	self.ctrl_exclusive = luaClass_MallExclusive.new()
+	self.ctrl_exclusive:Init(contentPane:GetObjByName("luaBehaviour_exclusive"):GetComponent(CS_type_LuaBehaviour),self.obj_nothing)
+
+	--储值
+	self.ctrl_store = luaClass_MallStore.new()
+	self.ctrl_store:Init(contentPane:GetObjByName("luaBehaviour_store"):GetComponent(CS_type_LuaBehaviour))
+
+	--黑市
+	self.ctrl_blackmarket = luaClass_MallBlackMarket.new()
+	self.ctrl_blackmarket:Init(contentPane:GetObjByName("luaBehaviour_blackmarket"):GetComponent(CS_type_LuaBehaviour),self.obj_nothing)
+end
+
+function MallUIView:onInit()
+
+	self:initComp()
+
+	self.realIndex = MallContentType.daily
+	self.mallCtrl = false
+
+	self.btn_close.onClick:AddListener(function ()
+			self:hide()
+		end)
+
+	self.btn_gem:ButtonClickTween(function ()
+			self:onGemBtnClick()
+		end)
+
+	self.stateGroup.OnSelectedIndexValueChange = function (index)
+		self:onSelectedIndexValueChange(index)
+	end
+
+
+	local sizeDelta = CS.FGUI.inst.uiRootTF.sizeDelta
+
+	local len = sizeDelta.x > sizeDelta.y and sizeDelta.x or sizeDelta.y
+
+	self.rtf_coverBg.sizeDelta = Vector2.one * len
+
+end
+
+function MallUIView:onGemBtnClick()
+
+	self:ShowByMallContentType(MallContentType.store)
+
+end
+
+function MallUIView:updateTopShow()
+
+	self.tx_gold.text = CS.AbbreviationUtility.AbbreviateNumber(CS_UserDataProxyInst.playerData.gold , 2)
+	self.tx_gem.text = CS.AbbreviationUtility.AbbreviateNumber(CS_UserDataProxyInst.playerData.gem , 2)
+
+end
+
+function MallUIView:updateRedPoints()
+
+	self.redPoints[MallContentType.daily]:SetActive(DailyRewardDataProxy.inst:HasReward())
+	self.redPoints[MallContentType.legend]:SetActive(false)
+	self.redPoints[MallContentType.exclusive]:SetActive(false)
+	self.redPoints[MallContentType.store]:SetActive(false)
+	self.redPoints[MallContentType.blackmarket]:SetActive(false)
+
+	self.redPoints[self.realIndex]:SetActive(false)
+
+end
+
+
+function MallUIView:onHide()
+
+	if self.mallCtrl then
+		self.mallCtrl:Clear()
+		self.mallCtrl = false
+	end
+
+end
+
+function MallUIView:getLegendToggleActive()
+
+	--传奇
+	local legendGiftList = DirectPurchaseProxy.inst:GetGiftsList(3)
+	if legendGiftList == nil or #legendGiftList == 0 then
+		return false
+	end
+
+	return true
+
+end
+
+function MallUIView:getExclusiveToggleActive()
+
+	--专享
+	local exclusiveGiftList = DirectPurchaseProxy.inst:GetGiftsList(2)
+	if exclusiveGiftList == nil or #exclusiveGiftList == 0 then
+		return false
+	end
+
+	return true
+
+end
+
+
+function MallUIView:getShowToggles()
+
+	local ignoreTypes = {}
+
+	--每日礼包
+	local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(149)
+	if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+		ignoreTypes[#ignoreTypes + 1] = MallContentType.daily
+	end
+
+	--传奇
+	if not self:getLegendToggleActive() then
+		ignoreTypes[#ignoreTypes + 1] = MallContentType.legend
+	else
+
+		if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_legend") then
+
+			if not CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_legend") then
+				ignoreTypes[#ignoreTypes + 1] = MallContentType.legend
+			end
+
+		else
+
+			--local worldParCfg = CS_WorldParConfigManagerInst:GetConfig("???") --传奇礼包 ???
+			--if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+			--ignoreTypes[#ignoreTypes + 1] = MallContentType.legend
+			--end
+
+		end
+
+	end
+
+	--专享
+	if not self:getExclusiveToggleActive() then
+		ignoreTypes[#ignoreTypes + 1] = MallContentType.exclusive
+	else
+
+		if CS_UIUnLockConfigMrgInst:HasBtnMatchedCfg("toggle_exclusive") then
+
+			if not CS_UIUnLockConfigMrgInst:GetBtnInteractable("toggle_exclusive") then
+				ignoreTypes[#ignoreTypes + 1] = MallContentType.exclusive
+			end
+
+		else
+
+			--local worldParCfg = CS_WorldParConfigManagerInst:GetConfig("???") --专享礼包 ???
+			--if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+			--ignoreTypes[#ignoreTypes + 1] = MallContentType.exclusive
+			--end
+
+		end
+
+	end
+
+	--黑市
+	local worldParCfg = CS_WorldParConfigManagerInst:GetConfig(8301)
+	if worldParCfg ~= nil and worldParCfg.parameters > CS_UserDataProxyInst.playerData.level then
+		ignoreTypes[#ignoreTypes + 1] = MallContentType.blackmarket
+	end
+
+	local showToggles = {}
+
+	for i = 1, #self.toggles do
+
+		local toggle = self.toggles[i]
+		local itemSubType = toggle:GetComponent(CS_type_ItemSubType)
+
+		if itemSubType ~= nil then
+
+			local isIgnore = false
+
+			for k = 1, #ignoreTypes do
+				if ignoreTypes[k] == itemSubType.subType then
+					toggle.gameObject:SetActive(false)
+					isIgnore = true
+					break
+				end
+			end
+
+			if not isIgnore then
+				toggle.gameObject:SetActive(true)
+				showToggles[#showToggles + 1] = toggle
+			end
+
+		end
+	end
+
+
+	local toggleArray = get_csharp_array(CS_type_Toggle,#showToggles)
+	for i = 1, #showToggles do
+		toggleArray[i - 1] = showToggles[i]
+	end
+
+	if CS.FGUI.inst.isLandscape then
+		self.rtf_togglesContent.sizeDelta = Vector2(self.rtf_togglesContent.sizeDelta.x,#showToggles * 145 + 112 + 14 * (#showToggles - 1))
+	else
+		self.rtf_togglesContent.sizeDelta = Vector2(#showToggles * 256 + 60,self.rtf_togglesContent.sizeDelta.y)
+	end
+
+	return toggleArray
+
+end
+
+function MallUIView:ShowByMallContentType(mallContentType,extraParam)
+
+	self.stateGroup:ClearTogglesBtn();
+
+	self.stateGroup.togglesBtn:AddRange(self:getShowToggles())
+
+	if mallContentType then
+
+		local hasContentType = false
+
+		for i = 0, self.stateGroup.togglesBtn.Count - 1 do
+
+			local toggle = self.stateGroup.togglesBtn[i]
+			local itemSubType = toggle:GetComponent(CS_type_ItemSubType)
+
+			if itemSubType ~= nil and itemSubType.subType == mallContentType then
+
+				self.stateGroup:OnEnableMethod(i)
+				hasContentType = true
+				if CS.FGUI.inst.isLandscape then
+					self.rtf_togglesContent.anchoredPosition = Vector2(self.rtf_togglesContent.anchoredPosition.x,50 + 156 * i)
+				else
+					self.rtf_togglesContent.anchoredPosition = Vector2(-30 - 206 * i,self.rtf_togglesContent.anchoredPosition.y)
+				end
+
+				break
+
+			end
+
+		end
+
+		if not hasContentType then
+			self.stateGroup:OnEnableMethod()
+		end
+
+		if self.welfareCtrl then
+			self.welfareCtrl:ExtraDispose(extraParam)
+		end
+	else
+		self.stateGroup:OnEnableMethod()
+	end
+
+end
+
+
+function MallUIView:onSelectedIndexValueChange(index)
+
+
+	self.realIndex = index;
+	local itemSubType = self.stateGroup.togglesBtn[index]:GetComponent(CS_type_ItemSubType)
+
+	if itemSubType ~= nil then
+		self.realIndex = itemSubType.subType
+	end
+
+	for i = 0, self.toggleLinkObjs.Count - 1 do
+		self.toggleLinkObjs[i]:SetActive(false)
+	end
+
+	self.toggleLinkObjs[self.realIndex]:SetActive(true)
+
+	if self.mallCtrl then
+		self.mallCtrl:Clear()
+	end
+
+	if self.realIndex == MallContentType.daily then
+		self:setData_daily()
+	elseif self.realIndex == MallContentType.legend then
+		self:setData_legend()
+	elseif self.realIndex == MallContentType.exclusive then
+		self:setData_exclusive()
+	elseif self.realIndex == MallContentType.store then
+		self:setData_store()
+	elseif self.realIndex == MallContentType.blackmarket then
+		self:setData_blackmarket()
+	end
+
+	self:updateTopShow()
+	self:updateRedPoints()
+
+end
+
+
+function MallUIView:Refresh(index)
+
+	if (self.realIndex == index and self.mallCtrl) then
+		self.mallCtrl:RefreshUIData()
+	end
+
+	self:updateTopShow()
+	self:updateRedPoints()
+
+end
+
+function MallUIView:RefreshDirectPurchaseData()
+
+	if self.mallCtrl then
+
+		local needResetToggles = false
+
+		if self.realIndex == MallContentType.legend then
+
+			if self:getLegendToggleActive() then
+				self.mallCtrl:RefreshUIData()
+			else
+				needResetToggles = true
+			end
+
+		elseif self.realIndex == MallContentType.exclusive then
+
+			if self:getExclusiveToggleActive() then
+				self.mallCtrl:RefreshUIData()
+			else
+				needResetToggles = true
+			end
+
+		end
+
+		if needResetToggles then
+
+			self.stateGroup:ClearTogglesBtn();
+			self.stateGroup.togglesBtn:AddRange(self:getShowToggles())
+			self.stateGroup:OnEnableMethod()
+
+		end
+
+	end
+
+	self:updateTopShow()
+	self:updateRedPoints()
+
+end
+
+
+--日常礼包
+function MallUIView:setData_daily()
+
+	self.obj_nothing:SetActive(false)
+
+	self.mallCtrl = self.ctrl_daily
+	--打开界面请求一下每日广告宝箱数据
+	EventDispatcher:dispatchEvent(GameEvent.DailyReward.DailyReward_RequestInfo)
+	--self.ctrl_daily:RefreshUIData()
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--传奇礼包
+function MallUIView:setData_legend()
+
+	self.mallCtrl = self.ctrl_legend
+	self.ctrl_legend:RefreshUIData()
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--专享礼包
+function MallUIView:setData_exclusive()
+
+	self.mallCtrl = self.ctrl_exclusive
+	self.ctrl_exclusive:RefreshUIData()
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--储值
+function MallUIView:setData_store()
+
+	self.obj_nothing:SetActive(false)
+
+	self.mallCtrl = self.ctrl_store
+	self.ctrl_store:RefreshUIData()
+	
+	--test 调用好评的测试
+	--CS.PlatformManager.inst:show5star();
+
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--黑市商店
+function MallUIView:setData_blackmarket()
+	self.obj_nothing:SetActive(false)
+
+	self.mallCtrl = self.ctrl_blackmarket
+	self.ctrl_blackmarket:RefreshUIData()
+end
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

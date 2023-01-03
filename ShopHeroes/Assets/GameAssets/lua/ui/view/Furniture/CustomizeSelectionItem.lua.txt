@@ -1,0 +1,344 @@
+
+local EventDispatcher = require("event/EventDispatcher")
+
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+
+--CustomizeSelectionItem
+
+local img_bg;
+local img_titleBg;
+local img_palette;
+local img_bottomBg;
+
+local img_iconBg;
+local img_icon;
+local img_level;
+local txt_level;
+local img_num;
+local txt_num;
+local txt_title;
+local img_subTypeIcon;
+local img_mark;
+local txt_mark;
+local img_cost;
+local txt_cost;
+local txt_owned;
+local txt_storeNum;
+local txt_sellOut;
+local txt_type;
+local img_contentTypeList;
+local VarietyIconsTf;
+local unlock;
+local slider_unlock;
+local text_unlock;
+local txt_unlockSlider;
+local txt_lockVipText;
+local vipImg;
+
+local giftBgIcon;
+local giftIcon;
+
+local buffObj;
+local buffTextList;
+
+local button
+local btnAnimator;
+
+local isShowAnimed
+
+local txt_type2
+local txt_mark2
+local img_mark2
+
+local luxuryObj
+local luxuryNumText
+
+local _data
+
+function InitComp()
+
+	img_bg = self:GetObjByName("img_bg"):GetComponent(CS_type_GUIIcon)
+	img_titleBg = self:GetObjByName("img_titleBg"):GetComponent(CS_type_GUIIcon)
+	img_palette = self:GetObjByName("img_palette"):GetComponent("Image")
+	img_bottomBg = self:GetObjByName("img_bottomBg"):GetComponent("Image")
+
+	img_iconBg = self:GetObjByName("img_iconBg"):GetComponent(CS_type_GUIIcon)
+	img_icon = self:GetObjByName("img_icon"):GetComponent(CS_type_GUIIcon)
+	img_level = self:GetObjByName("img_level"):GetComponent("Image")
+	txt_level = self:GetObjByName("txt_level"):GetComponent("Text")
+	img_num = self:GetObjByName("img_num"):GetComponent("Image")
+	txt_num = self:GetObjByName("txt_num"):GetComponent("Text")
+	txt_title = self:GetObjByName("txt_title"):GetComponent("Text")
+	img_subTypeIcon = self:GetObjByName("img_subTypeIcon"):GetComponent(CS_type_GUIIcon)
+	img_mark = self:GetObjByName("img_mark"):GetComponent(CS_type_GUIIcon)
+	txt_mark = self:GetObjByName("txt_mark"):GetComponent("Text")
+	img_cost = self:GetObjByName("img_cost"):GetComponent(CS_type_GUIIcon)
+	txt_cost = self:GetObjByName("txt_cost"):GetComponent("Text")
+	txt_owned = self:GetObjByName("txt_owned"):GetComponent("Text")
+	txt_storeNum = self:GetObjByName("txt_storeNum"):GetComponent("Text")
+	txt_sellOut = self:GetObjByName("txt_sellOut"):GetComponent("Text")
+	txt_type = self:GetObjByName("txt_type"):GetComponent("Text")
+
+	img_contentTypeList = {}
+	local objList = self:GetObjByName("img_contentTypeList"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList.Count - 1 do
+		img_contentTypeList[#img_contentTypeList + 1] = objList[i]:GetComponent(CS_type_GUIIcon)
+	end
+
+	VarietyIconsTf = self:GetObjByName("VarietyIconsTf").transform
+	unlock = self:GetObjByName("unlock").transform
+	slider_unlock = self:GetObjByName("slider_unlock"):GetComponent("Slider")
+	text_unlock = self:GetObjByName("text_unlock"):GetComponent("Text")
+	txt_unlockSlider = self:GetObjByName("txt_unlockSlider"):GetComponent("Text")
+	txt_lockVipText = self:GetObjByName("txt_lockVipText"):GetComponent("Text")
+	vipImg = self:GetObjByName("vipImg"):GetComponent("Image")
+
+	giftBgIcon = self:GetObjByName("giftBgIcon"):GetComponent(CS_type_GUIIcon)
+	giftIcon = self:GetObjByName("giftIcon"):GetComponent(CS_type_GUIIcon)
+
+	buffObj = self:GetObjByName("buffObj")
+
+	buffTextList = {}
+	local buffTextObjList = self:GetObjByName("buffTextList"):GetComponent(CS_type_ObjList).objList
+	for i = 0, buffTextObjList.Count - 1 do
+		buffTextList[#buffTextList + 1] = buffTextObjList[i]:GetComponent("Text")
+	end
+
+	button = self.gameObject:GetComponent("Button")
+	btnAnimator = self:GetObjByName("btnAnimator"):GetComponent("Animator")
+
+	txt_type2 = self:GetObjByName("txt_type2"):GetComponent("Text")
+	txt_mark2 = self:GetObjByName("txt_mark2"):GetComponent("Text")
+	img_mark2 = self:GetObjByName("img_mark2"):GetComponent("GUIIcon")
+	
+	luxuryObj = self:GetObjByName("luxuryObj")
+	luxuryNumText = self:GetObjByName("luxuryNum"):GetComponent("Text")
+
+	init()
+
+end
+
+
+function onButtonClick()
+
+	--_data.furnitureDisplayData
+	--_data.furnitureDisplayType
+
+	local cfg = CS.FurnitureConfigManager.inst:getConfig(_data.furnitureDisplayData.id);
+
+	local hase = cfg.type_1 == 1 and CS_UserDataProxyInst.shopData:hasWall(cfg.id) or CS_UserDataProxyInst.shopData:hasFloor(cfg.id);
+
+	if not hase then
+
+		if (cfg.cost_type == 3) then --VIP
+
+			if (CS.K_Vip_State.__CastFrom(CS_UserDataProxyInst.playerData.vipState) ~= CS.K_Vip_State.Vip) then
+				EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_BuyVipUI, 0);
+				return
+			end
+
+
+		elseif (cfg.cost_type == 4) then --礼包
+			EventDispatcher:dispatchEvent(GameEvent.DirectPurchaseEvent.CSCallLua_ShowGiftDeatilUI, cfg.cost_num);
+			return;
+		end
+
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.ShopDesignEvent.ShopDesignUI_Create_Customize, _data.furnitureDisplayData.cfg.id);
+	EventDispatcher:dispatchEvent(GameEvent.ShopDesignEvent.HideUI_CustomizeSelectionUI)
+
+end
+
+function init()
+
+	_data = nil
+	isShowAnimed = false
+
+	button.onClick:AddListener(function ()
+			onButtonClick()
+		end)
+
+end
+
+function showAnim(index)
+
+	if isShowAnimed then
+		return
+	end
+
+	isShowAnimed  = true
+	self.gameObject:SetActive(false)
+
+	CS_GameTimerInst:AddTimer(0.28 + 0.02 * index, 1,function ()
+			self.gameObject:SetActive(true);
+			btnAnimator:CrossFade("show", 0);
+			btnAnimator:Update(0);
+			btnAnimator:Play("show");
+		end)
+
+end
+
+
+function SetData(data) --CS.FurnitureDisplayData , kFurnitureDisplayType , needShowAni
+
+
+	ClearData()
+
+	unlock.gameObject:SetActive(false);
+	img_palette.enabled = false;
+
+	_data = data
+
+	local furnitureDisplayData = data.furnitureDisplayData
+	local displayType = data.furnitureDisplayType
+	local needShowAni = data.needShowAni
+
+	local cfg = furnitureDisplayData.cfg
+	
+	if(cfg.luxury > 0)then
+		luxuryObj:SetActive(true)
+		luxuryNumText.text = tostring(cfg.luxury)
+	else
+		luxuryObj:SetActive(false)
+	end
+	
+	self.gameObject.name = tostring(cfg.id)
+	img_icon:SetSprite(cfg.atlas, cfg.icon);
+	txt_title.text = CS_LanguageManagerInst:GetValueByKey(cfg.name)
+	img_subTypeIcon:SetSprite("shopdesign_atlas", CS.StaticConstants.furnitureSubTypeIconNames[cfg.type_1]);
+	img_level.gameObject:SetActive(false);
+	img_num.enabled = false;
+	txt_num.text = "";
+	txt_lockVipText.enabled = false;
+	vipImg.enabled = false;
+	buffObj:SetActive(false);
+	giftBgIcon.gameObject:SetActive(false);
+
+	local _lock = cfg.unlock_lv > CS_UserDataProxyInst.playerData.level
+	local hase = cfg.type_1 == 1 and CS_UserDataProxyInst.shopData:hasWall(cfg.id) or CS_UserDataProxyInst.shopData:hasFloor(cfg.id);
+	button.enabled = not _lock or hase;
+
+	if (not _lock or hase) then
+
+		if (cfg.energy > 0) then
+
+			txt_type.text = CS_LanguageManagerInst:GetValueByKey("能量");
+			img_mark:SetSprite("__common_1", "zhuejiemian_tili");
+			txt_mark.text = tostring(cfg.energy);
+
+		else
+			txt_type.gameObject:SetActive(false)
+			--txt_type.text = "";
+			--img_mark.iconImage.enabled = false;
+			--txt_mark.text = "";
+
+		end
+
+
+		if (hase) then
+
+			txt_owned.gameObject:SetActive(true);
+			txt_cost.gameObject:SetActive(false);
+
+		else
+
+			txt_owned.gameObject:SetActive(false);
+			txt_cost.gameObject:SetActive(false);
+
+			if (cfg.cost_type == 3) then --Vip
+
+				txt_lockVipText.enabled = true;
+				if (CS.K_Vip_State.__CastFrom(CS_UserDataProxyInst.playerData.vipState) ~= CS.K_Vip_State.Vip) then
+
+					vipImg.enabled = true;
+					txt_lockVipText.text = CS_LanguageManagerInst:GetValueByKey("购买贵宾特权获取");
+
+				else
+
+					--buff待处理
+
+					buffObj:SetActive(true);
+					for i = 1, cfg.buff_ids.Length do
+
+						if i <= 2 then
+
+							local buffCfg = CS.FurnitureBuffConfigManager.inst:GetConfig(cfg.buff_ids[i - 1]);
+							buffTextList[i].text = CS_LanguageManagerInst:GetValueByKey(buffCfg.buff_txt, tostring(buffCfg.getEffectVal()));
+
+						end
+
+					end
+
+				end
+
+
+			elseif (cfg.cost_type == 4) then --礼包
+
+				local directPurchaseData = DirectPurchaseProxy.inst:GetDirectPurchaseDataById(cfg.cost_num)
+
+				if directPurchaseData ~= nil then
+
+					giftBgIcon.gameObject:SetActive(true);
+					giftBgIcon:SetSprite(directPurchaseData.data.atlasIcon, directPurchaseData.data.icon1);
+					giftIcon:SetSprite(directPurchaseData.btnIconAtlas, directPurchaseData.btnIcon);
+
+				else
+					giftBgIcon.gameObject:SetActive(false);
+				end
+
+			else
+
+				txt_cost.gameObject:SetActive(true);
+				img_cost:SetSprite("__common_1", furnitureDisplayData.cfg.cost_type == 1 and "zhuejiemian_meiyuan" or "zhuejiemian_jinkuai");
+				txt_cost.text = tostring(cfg.cost_num);
+
+			end
+
+		end
+
+	else
+		luxuryObj:SetActive(false)
+		unlock.gameObject:SetActive(true);
+		img_num.gameObject:SetActive(false);
+		txt_type.gameObject:SetActive(false);
+		txt_cost.gameObject:SetActive(false);
+		VarietyIconsTf.gameObject:SetActive(false);
+
+		slider_unlock.gameObject:SetActive(true);
+
+		text_unlock.text = CS_LanguageManagerInst:GetValueByKey("解锁等级：")..tostring(cfg.unlock_lv);
+
+		slider_unlock.maxValue = cfg.unlock_lv;
+		slider_unlock.value = CS_UserDataProxyInst.playerData.level;
+		txt_unlockSlider.text = tostring(CS_UserDataProxyInst.playerData.level).."/"..tostring(cfg.unlock_lv);
+
+	end
+
+
+	CS.UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(txt_type.rectTransform);
+
+	if (self.index < 9 and needShowAni) then
+		showAnim(self.index)
+	end
+
+
+end
+
+
+
+
+function ClearData()
+
+	isShowAnimed = false
+
+end

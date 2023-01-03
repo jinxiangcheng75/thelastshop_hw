@@ -1,0 +1,159 @@
+--Mall_blackmarket
+
+--local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_TimeUtils = CS.TimeUtils
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local csColor = CS.UnityEngine.Color
+local MallDataProxyInst = MallDataProxy.inst
+local csVector3 = CS.UnityEngine.Vector3
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Mall_blackmarket = class(luaClass_Welfare_CtrlBase)
+
+local needGem = 0
+local isRefreshing = false
+
+function Mall_blackmarket:initComp(luaBehaviour)
+
+	local contentPane = luaBehaviour
+
+	self.timeText = contentPane:GetText("countdownTx")
+	self.gemBtn = contentPane:GetButton("gemButton")
+	self.confimObj = contentPane:GetObjByName("confirmObj")
+	self.gemText = contentPane:GetText("gemText")
+
+	self.backBg = contentPane:GetObjByName("backBg"):GetComponent("Graphic")
+	self.refreshText = contentPane:GetObjByName("refreshText"):GetComponent("Graphic")
+
+	self.freeText = contentPane:GetText("freeText")
+
+	local objList = contentPane:GetObjByName("allItem"):GetComponent("ObjList")
+	self.allItem = {}
+	for i = 0, objList.objList.Count - 1 do
+		self.allItem[#self.allItem + 1] = objList.objList[i]:GetComponent(CS_type_LuaListItem)
+	end
+
+	self.gemBtn:ButtonClickTween(
+		function()
+			if(isRefreshing) then return end
+			if(MallDataProxyInst.freeRefresh ~= 0 and CS_UserDataProxyInst.playerData.gem < needGem)then
+				--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				--local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+				--func(CS_EventControllerInst, CS_GameEventType.SHOWUI_TEXTMSGTIP, CS_LanguageManagerInst:GetValueByKey("金条不足"),CS_GUIHelper.GetColorByColorHex("FF2828"))
+				EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,needGem - CS_UserDataProxyInst.playerData.gem)
+				return
+			end
+			if(MallDataProxyInst.freeRefresh ~= 0 and not self.confimObj.activeSelf) then
+				self.confimObj:SetActive(true)
+			else
+				self.confimObj:SetActive(false)
+				self:SetRefreshAnim()
+				EventDispatcher:dispatchEvent(GameEvent.MallEvent.REQUEST_MALLREFRESH)
+			end
+		end
+	)
+end
+
+function Mall_blackmarket:Init(luaBehaviour,obj_nothing)
+
+	self:initComp(luaBehaviour)
+
+	self.obj_nothing = obj_nothing
+end
+
+function Mall_blackmarket:SetRefreshAnim()
+	isRefreshing = true
+	for i = 1, #self.allItem do
+		if(i == #self.allItem)then
+			self.allItem[i].transform:DORotate(csVector3(0,360 * 3,0),1,CS.DG.Tweening.RotateMode.FastBeyond360):OnComplete(function ()
+					isRefreshing = false
+					self.backBg.gameObject:SetActive(true)
+					self.backBg:DOFade(1,0.3):OnComplete(function ()
+							self.backBg:DOFade(0,0.6):OnComplete(function ()
+									self.backBg.gameObject:SetActive(false)
+								end)
+						end)
+					self.refreshText:DOFade(1,0.3):OnComplete(function ()
+							self.refreshText:DOFade(0,0.6)
+						end)
+				end)
+		else
+			self.allItem[i].transform:DORotate(csVector3(0,360 * 3,0),1,CS.DG.Tweening.RotateMode.FastBeyond360)
+		end
+	end
+end
+
+function Mall_blackmarket:RefreshUIData()
+	needGem = MallDataProxyInst.refreshCost
+	if(needGem ~= nil) then
+		self.gemText.text = string.format("%d",needGem)
+
+		--if(CS_UserDataProxyInst.playerData.gem >= needGem)then
+			--self.gemText.color = csColor.white
+		--else
+			--self.gemText.color = csColor.red
+		--end
+	end
+
+	--倒计时
+	if (MallDataProxyInst.refreshTime > 0) then
+		self.timeText.text = CS_TimeUtils.timeSpan3Str(MallDataProxyInst.refreshTime)
+	end
+
+	self.freeText.enabled = MallDataProxyInst.freeRefresh == 0
+	self.gemText.gameObject:SetActive(MallDataProxyInst.freeRefresh ~= 0)
+
+	self.countdownTimer =
+	CS_GameTimerInst:AddLoopTimerComp(
+		self.timeText.gameObject,
+		1,
+		function()
+			if (MallDataProxyInst.refreshTime > 0) then
+				self.timeText.text = CS_TimeUtils.timeSpan3Str(MallDataProxyInst.refreshTime)
+			else
+				CS_GameTimerInst:removeLoopTimer(self.countdownTimer)
+				self.countdownTimer = false
+			end
+		end
+	)
+
+	local itemCount = #MallDataProxyInst.blackMarketList
+	for i = 1, #self.allItem do
+		if i <= itemCount then
+			self.allItem[i].gameObject:SetActive(true)
+			local curData = MallDataProxyInst:GetBlackMarketDataByIndex(i)
+			if(curData ~= nil)then
+				self.allItem[i]:SetData(curData)
+			else
+				self.allItem[i].gameObject:SetActive(false)
+			end
+		else
+			self.allItem[i].gameObject:SetActive(false)
+		end
+	end
+
+end
+
+function Mall_blackmarket:Clear()
+
+	if self.countdownTimer then
+		CS_GameTimerInst:removeLoopTimer(self.countdownTimer)
+	end
+
+	if(self.confimObj.activeSelf)then
+		self.confimObj:SetActive(false)
+	end
+end
+
+return Mall_blackmarket

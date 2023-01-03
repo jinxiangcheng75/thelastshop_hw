@@ -1,0 +1,76 @@
+--RuinsMainUIView
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local EventDispatcher = require("event/EventDispatcher")
+
+RuinsMainUIView = class(ViewBase)
+
+function RuinsMainUIView:ctor()
+	self.viewID = Constants.ViewName.RuinsMainUIView
+	RuinsMainUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+end
+
+function RuinsMainUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.cityBtn = contentPane:GetButton("cityBtn")
+	self.startBattleBtn = contentPane:GetButton("startBattleBtn")
+
+	self.uiAnimator = contentPane.uiAnimator
+end
+
+function RuinsMainUIView:onInit()
+	self:initComp()
+
+	self.cityBtn:ButtonClickTween(
+		function()
+			EventDispatcher:dispatchEvent(GameEvent.CSEvent.Change_State, CS.StateTransition(CS.kGameState.Town,true))
+		end
+	)
+
+	self.startBattleBtn:ButtonClickTween(
+		function()
+			if(RuinsDataProxy.inst.curId ~= 9999)then
+				EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.OpenUI_RuinsPrepareUI)
+			else
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+				local func = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+				func(csEventControllerInst, csGameEventType.SHOWUI_TEXTMSGTIP, cs_LanguageManagerInst:GetValueByKey("已全部通关"),csGUIHelper.GetColorByColorHex("FF2828"))
+			end
+		end
+	)
+end
+
+function RuinsMainUIView:onHide()
+
+end
+
+function RuinsMainUIView:onShowed()
+	if(CS.RuinsMap.inst ~= nil)then
+		CS.RuinsMap.inst:setIsInMain(true)
+	end
+end
+
+function RuinsMainUIView:shiftIn()
+	self.contentObject:SetActive(true)
+	if(CS.RuinsMap.inst ~= nil)then
+		CS.RuinsMap.inst:setIsInMain(true)
+	end
+end
+
+function RuinsMainUIView:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function RuinsMainUIView:closeBtnClick()
+	self:hide()
+end
+------------------------------------------------

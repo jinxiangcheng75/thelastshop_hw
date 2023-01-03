@@ -1,0 +1,72 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csCharacterManagerInst = CS.CharacterManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local csEGender = CS.EGender
+local csVector3 = CS.UnityEngine.Vector3
+local csSpineUtils = CS.SpineUtils
+
+local goldenStateHeroItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	goldenStateHeroItem_dlc = GoldenStateHeroItem_dlc.new()
+	goldenStateHeroItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if goldenStateHeroItem_dlc~=nil then
+		goldenStateHeroItem_dlc:Clear()
+		goldenStateHeroItem_dlc = nil
+	end
+end
+
+function SetData(_data)
+	if goldenStateHeroItem_dlc~=nil then
+		goldenStateHeroItem_dlc:SetData(_data)
+	end
+end
+
+GoldenStateHeroItem_dlc = class()
+
+function GoldenStateHeroItem_dlc:ctor()
+
+end
+
+function GoldenStateHeroItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+end
+
+function GoldenStateHeroItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.icon = self.gameObject:GetComponent("GUIIcon")
+	self.rolePos = self.contentPane:GetObjByName("rolePos").transform
+	self.expSlider = self.contentPane:GetObjByName("expSlider"):GetComponent("Slider")
+end
+
+function GoldenStateHeroItem_dlc:SetData(_data)
+	if(_data == nil) then return end
+
+
+end
+
+function GoldenStateHeroItem_dlc:Clear()
+
+	self:removeListeners()
+
+end
+
+function GoldenStateHeroItem_dlc:addListeners()
+
+end
+
+function GoldenStateHeroItem_dlc:removeListeners()
+
+end

@@ -1,0 +1,1151 @@
+--ShopDesignUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+local CS_GUIHelper = CS.GUIHelper
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local Vector2 = CS.UnityEngine.Vector2
+local Vector3 = CS.UnityEngine.Vector3
+local Ease = CS.DG.Tweening.Ease
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+
+ShopDesignUI = class(ViewBase)
+
+
+
+
+function ShopDesignUI:ctor()
+	self.viewID = Constants.ViewName.ShopDesignUI
+	ShopDesignUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.luxury
+
+	self.kPickTypeOp =
+	{
+		PickTrunk = 1,--cancel, skin, upgrade, storage, edit,
+		PickBin = 2,--cancel, upgrade, resource, edit
+		PickShelf = 3,--cancel, skins, upgrade, content, edit
+		PickCounter = 4,--cancel, skin, upgrade, edit
+		PickDecor = 5,--cancel, edit,
+		PickPetHouse = 6,--cancel, edit, puppy
+		PickCarpet = 7,--cancel, rotate, store, confirm
+		Num = 8,
+	}
+
+	self.kEditTypeOp =
+	{
+		EditUpgradable = 1,--cancel, rotate, store, upgrade, confirm
+		EditDecor = 2,--cancel, rotate, store, confirm
+		Num = 3,
+	}
+
+	self.kCreateTypeOp =
+	{
+		CreateFurniture = 1,--cancel, rotate, confirm_price
+		CreateFloor = 2,--back, applyall, apply
+		CreateWall = 3,--back, applyall, apply
+		None,
+	}
+
+end
+------------------------------------------------
+
+
+function ShopDesignUI:initComp()
+
+	local contentPane = self.contentPanel
+
+	----EditLayout 1
+	self.trans_edit = contentPane:GetObjByName("trans_edit"):GetComponent("RectTransform")
+	self.btn_done = contentPane:GetButton("btn_done")
+	self.btn_edit_pets = contentPane:GetButton("btn_edit_pets")
+	self.btn_customize = contentPane:GetButton("btn_customize")
+	self.btn_furniture = contentPane:GetButton("btn_furniture")
+	--self.btn_basement = contentPane:GetButton("btn_basement")
+	self.btn_expand = contentPane:GetButton("btn_expand")
+
+	----EditLayer 2
+	self.trans_op = contentPane:GetObjByName("trans_op"):GetComponent("RectTransform")
+	self.hlayout_op = contentPane:GetObjByName("hlayout_op"):GetComponent("HorizontalLayoutGroup")
+	self.btn_cancel = contentPane:GetButton("btn_cancel")
+	self.btn_skin = contentPane:GetButton("btn_skin")
+	self.btn_upgrade = contentPane:GetButton("btn_upgrade")
+	self.btn_storage = contentPane:GetButton("btn_storage")
+	self.btn_resource = contentPane:GetButton("btn_resource")
+	self.img_resIcon = contentPane:GetObjByName("img_resIcon"):GetComponent(CS_type_GUIIcon)
+	self.txt_resName = contentPane:GetText("txt_resName")
+	self.txt_resNum = contentPane:GetText("txt_resNum")
+	self.btn_content = contentPane:GetButton("btn_content")
+	self.slider_content = contentPane:GetObjByName("slider_content"):GetComponent("Slider")
+	self.btn_edit = contentPane:GetButton("btn_edit")
+	self.btn_op_pets = contentPane:GetButton("btn_op_pets")
+	self.txt_op_pets = contentPane:GetText("txt_op_pets")
+	self.btn_rotate = contentPane:GetButton("btn_rotate")
+	self.btn_store = contentPane:GetButton("btn_store")
+	self.btn_confirm = contentPane:GetButton("btn_confirm")
+	self.img_confirmType = contentPane:GetObjByName("img_confirmType"):GetComponent(CS_type_GUIIcon)
+	self.txt_confirm = contentPane:GetText("txt_confirm")
+	self.txt_affirm = contentPane:GetText("txt_affirm")
+	self.go_itemTitle = contentPane:GetObjByName("go_itemTitle")
+	self.vlGroup_itemTitle = contentPane:GetObjByName("vlGroup_itemTitle"):GetComponent("VerticalLayoutGroup")
+	self.img_itemTitle = contentPane:GetImage("img_itemTitle")
+	self.txt_itemLevel = contentPane:GetText("txt_itemLevel")
+	self.txt_itemTitle = contentPane:GetText("txt_itemTitle")
+
+	self.txt_itemBuffDeses = {}
+	local itemBuffDeses = contentPane:GetObjByName("txt_itemBuffDeses"):GetComponent(CS_type_ObjList).objList
+	for i = 0, itemBuffDeses.Count - 1 do
+		self.txt_itemBuffDeses[#self.txt_itemBuffDeses + 1] = itemBuffDeses[i]:GetComponent("Text")
+	end
+
+	self.create_op = contentPane:GetObjByName("create_op"):GetComponent("RectTransform")
+	self.btn_apply = contentPane:GetButton("btn_apply")
+	self.btn_applyAll = contentPane:GetButton("btn_applyAll")
+	self.btn_back = contentPane:GetButton("btn_back")
+	self.create_btn_rotate = contentPane:GetButton("create_btn_rotate")
+
+
+end
+
+
+function ShopDesignUI:onInit()
+
+	self:initComp()
+
+	self.mOpBtns = self.trans_op:GetComponentsInChildren(typeof(CS.UnityEngine.UI.Button),true)
+	self.mCreateBtns = self.create_op:GetComponentsInChildren(typeof(CS.UnityEngine.UI.Button),true)
+	self:initModeList()
+
+	self.mCreateMode = self.kCreateTypeOp.None
+	self.mDesignMode = CS.kDesignMode.None
+	self.mEditMode = self.kPickTypeOp.Num
+
+	self.mSelectItem = nil
+	self.confirmbtnMeet = false
+
+	--animater
+	--self.hideOpBtnsTween = nil;
+	self.hideItemTitleTween = nil;
+
+	self.res_isFull = false
+	self.res_itemId = -1
+
+
+	self.btn_furniture:ButtonClickTween(function ()
+			self:onBtn_furnitureClick()
+		end)
+
+	self.btn_customize:ButtonClickTween(function ()
+			self:onBtn_customizeClick()
+		end)
+
+	self.btn_edit_pets:ButtonClickTween(function()
+			self:onBtn_edit_petsClick()
+		end)
+
+	self.btn_done:ButtonClickTween(function ()
+			self:onBtn_doneClick()
+		end)
+
+	self.btn_expand:ButtonClickTween(function ()
+			self:onBtn_expandClick()
+		end)
+
+	self.btn_edit:ButtonClickTween(function ()
+			self:onBtn_editClick()
+		end)
+
+	self.btn_op_pets:ButtonClickTween(function ()
+			self:onBtn_op_petsClick()
+		end)
+
+	self.btn_storage:ButtonClickTween(function ()
+			self:onBtn_storageClick()
+		end)
+
+	self.btn_resource:ButtonClickTween(function ()
+			self:onBtn_resourceClick()
+		end)
+
+	self.btn_cancel:ButtonClickTween(function ()
+			self:onBtn_cancelClick()
+		end)
+
+	self.btn_skin:ButtonClickTween(function ()
+			self:onBtn_skinClick()
+		end)
+
+	self.btn_rotate:ButtonClickTween(function ()
+			self:onBtn_rotateClick()
+		end)
+
+	self.create_btn_rotate:ButtonClickTween(function ()
+			self:onCreate_btn_rotateClick()
+		end)
+
+	self.btn_store:ButtonClickTween(function ()
+			self:onBtn_storeClick()
+		end)
+
+	self.btn_content:ButtonClickTween(function ()
+			self:onBtn_contentClick()
+		end)
+
+	self.btn_upgrade:ButtonClickTween(function ()
+			self:onBtn_upgradeClick()
+		end)
+
+	self.btn_confirm:ButtonClickTween(function ()
+			self:onBtn_confirmClick()
+		end)
+
+	self.btn_back:ButtonClickTween(function ()
+			self:onBtn_backClick()
+		end)
+
+	self.btn_apply:ButtonClickTween(function()
+			self:onBtn_applyClick()
+		end)
+
+	self.btn_applyAll:ButtonClickTween(function ()
+			self:onBtn_applyAllClick()
+		end)
+
+end
+
+function ShopDesignUI:initModeList()
+
+	--pick
+	self.mPickOpBtnList = {}
+	self.mPickOpBtnList[self.kPickTypeOp.PickTrunk] = {self.btn_cancel,self.btn_upgrade,self.btn_storage,self.btn_edit}
+	self.mPickOpBtnList[self.kPickTypeOp.PickBin] = {self.btn_cancel,self.btn_upgrade,self.btn_resource,self.btn_edit}
+	self.mPickOpBtnList[self.kPickTypeOp.PickShelf] = {self.btn_cancel,self.btn_upgrade,self.btn_content,self.btn_edit}
+	self.mPickOpBtnList[self.kPickTypeOp.PickCounter] = {self.btn_cancel,self.btn_upgrade,self.btn_edit}
+	self.mPickOpBtnList[self.kPickTypeOp.PickDecor] = {self.btn_cancel,self.btn_edit}
+	self.mPickOpBtnList[self.kPickTypeOp.PickPetHouse] = {self.btn_cancel,self.btn_edit,self.btn_op_pets}
+	self.mPickOpBtnList[self.kPickTypeOp.PickCarpet] = {self.btn_cancel,self.btn_rotate,self.btn_store,self.btn_confirm}
+
+
+	--edit
+	self.mEditOpBtnList = {}
+	self.mEditOpBtnList[self.kEditTypeOp.EditUpgradable] = {self.btn_cancel,self.btn_rotate,self.btn_store,self.btn_upgrade,self.btn_confirm}
+	self.mEditOpBtnList[self.kEditTypeOp.EditDecor] = {self.btn_cancel,self.btn_rotate,self.btn_store,self.btn_confirm}
+
+	--create
+	self.mCreateOpBtnList = {}
+	self.mCreateOpBtnList[self.kCreateTypeOp.CreateFurniture] = {self.btn_cancel,self.btn_rotate,self.btn_confirm}
+	self.mCreateOpBtnList[self.kCreateTypeOp.CreateFloor] = {self.btn_back,self.btn_applyAll,self.btn_apply}
+	self.mCreateOpBtnList[self.kCreateTypeOp.CreateWall] = {self.btn_back,self.create_btn_rotate,self.btn_applyAll,self.btn_apply}
+
+end
+
+function ShopDesignUI:buyCheck(costType,needGold,needGem,needLv)
+
+	if (CS.GuideManager.inst.isInTriggerGuide) then
+		return true
+	end
+
+	if (costType == 1) then --金币
+
+		if (CS_UserDataProxyInst.playerData.gold < needGold and CS_UserDataProxyInst.playerData.designFreeCount <= 0) then
+			EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("新币不足"),"FF2828")
+			return false
+		end
+
+		if (CS_UserDataProxyInst.playerData.level < needLv) then
+			EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("店主等级不足"),"FF2828")
+			return false
+		end
+
+	elseif costType == 2 then --钻石
+
+		if (CS_UserDataProxyInst.playerData.gem < needGem) then
+			EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("金条不够"),"FF2828")
+			return false
+		end
+
+	end
+
+	return true
+
+end
+
+function ShopDesignUI:onCreateFurniture(uiDisplayData)
+
+	local data = CS_UserDataProxyInst:GetFuriture(uiDisplayData.uid);
+	self.mDesignMode = CS.kDesignMode.Create
+	local cfg = uiDisplayData.cfg
+
+	self.txt_itemTitle.text =CS_LanguageManagerInst:GetValueByKey(cfg.name)
+	self.mCreateMode = self.kCreateTypeOp.CreateFurniture
+	self:animateHideEditButtons(true)
+	self:showOpButtons(self.mCreateOpBtnList[self.mCreateMode],true)
+
+	self.txt_itemLevel.text = CS.UnityUtils.EqualsNull(data) == true and "1" or tostring(data.level)
+
+	if CS.UnityUtils.EqualsNull(data) == true then
+
+		self.txt_affirm.gameObject:SetActive(false)
+		self.img_confirmType.gameObject:SetActive(true)
+		self.img_confirmType:SetSprite("__common_1", cfg.cost_type == 1 and "zhuejiemian_meiyuan" or "zhuejiemian_jinkuai")
+		self.txt_confirm.gameObject:SetActive(true)
+		self.txt_confirm.text = CS.System.String.Format("{0:N0}",uiDisplayData.costNum)
+
+		--新手引导
+		local guideInfo = CS.GuideDataProxy.inst.CurInfo
+		if guideInfo~= nil and not guideInfo.isAllOver then
+			if CS.K_Guide_Type.__CastFrom(guideInfo.m_curCfg.guide_type) == CS.K_Guide_Type.RestrictClick or CS.K_Guide_Type.__CastFrom(guideInfo.m_curCfg.guide_type) == CS.K_Guide_Type.TipsAndRestrictClick then
+
+				if CS_UserDataProxyInst.playerData.designFreeCount > 0 then
+
+					if cfg.id == tonumber(guideInfo.m_curCfg.conditon_param_1) then
+
+						self.txt_confirm.text = CS_LanguageManagerInst:GetValueByKey("免费")
+
+					end
+				end
+			end
+		end
+
+		self.confirmbtnMeet = self:buyCheck(cfg.cost_type, uiDisplayData.costNum, uiDisplayData.costNum, cfg.unlock_lv);
+
+		if CS.GuideManager.inst.isInTriggerGuide then
+			if tonumber(GuideTriggerManager.inst.severType) == 3 and cfg.id == tonumber(GuideTriggerManager.inst.severCondition) then
+				self.txt_confirm.text = CS_LanguageManagerInst:GetValueByKey("免费");
+				self.confirmbtnMeet = true;
+			end
+
+		end
+
+		if not self.confirmbtnMeet then
+
+			CS_GUIHelper.SetUIGray(self.btn_confirm.transform, true);
+			self.btn_confirm.interactable = false;
+
+		end
+
+	else
+
+		self.mSelectItem = data
+		self.img_confirmType.gameObject:SetActive(false)
+		self.txt_confirm.gameObject:SetActive(false)
+		self.txt_affirm.gameObject:SetActive(true)
+
+	end
+
+	self:setBuffDes(cfg)
+
+end
+
+function ShopDesignUI:onCreateCustomize(furnitureId)
+
+	self.mDesignMode = CS.kDesignMode.Create;
+	local cfg = CS.FurnitureConfigManager.inst:getConfig(furnitureId);
+
+	if CS.kTileGroupType.__CastFrom(cfg.type_1) == CS.kTileGroupType.Floor then
+
+		self.mCreateMode = self.kCreateTypeOp.CreateFloor;
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.DesignMode,CS.System.Int32)
+		func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.EDITMODE_CHANGE,CS.DesignMode.FloorEdit,furnitureId)
+
+	else
+
+		self.mCreateMode = self.kCreateTypeOp.CreateWall;
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+		local func = funcGeneric(CS.DesignMode,CS.System.Int32)
+		func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.EDITMODE_CHANGE,CS.DesignMode.WallEdit,furnitureId)
+
+	end
+
+	self:animateHideEditButtons(true)
+	self:showOpButtons(self.mCreateOpBtnList[self.mCreateMode],true)
+
+end
+
+function ShopDesignUI:CanApply(can)
+
+	CS_GUIHelper.SetUIGray(self.btn_apply.transform, not can);
+	self.btn_apply.interactable = can;
+
+	if (self.confirmbtnMeet) then
+		CS_GUIHelper.SetUIGray(self.btn_confirm.transform, not can);
+		self.btn_confirm.interactable = can;
+	else
+		CS_GUIHelper.SetUIGray(self.btn_confirm.transform, true);
+		self.btn_confirm.interactable = false;
+	end
+
+end
+
+function ShopDesignUI:animateHideEditButtons(needAnim)
+
+	if not CS.GameSettingManager.inst.needShowUIAnim or not needAnim then
+		self.trans_edit.gameObject:SetActive(false);
+		return
+	end
+
+	local tween = self.trans_edit:DOAnchorPos3DY(-500,0.1)
+	tween:From(0)
+	tween:SetEase(Ease.OutCubic)
+	tween.onComplete = function()
+		self.trans_edit.gameObject:SetActive(false);
+	end
+
+end
+
+function ShopDesignUI:showOpButtons(modeBtns,needAnim)
+
+	self.confirmbtnMeet = true
+
+	if self.mCreateMode == self.kCreateTypeOp.None or self.mCreateMode == self.kCreateTypeOp.CreateFurniture then
+
+		self.create_op.gameObject:SetActive(false);
+
+		for i = 0, self.mOpBtns.Length - 1 do
+			local btn = self.mOpBtns[i]
+			btn.gameObject:SetActive(false)
+		end
+
+		self.trans_op.gameObject:SetActive(true)
+
+		for i = 1, #modeBtns do
+			local btn = modeBtns[i]
+			if CS.UIUnLockConfigMrg.inst:GetBtnInteractable(btn.name) then
+				btn.gameObject:SetActive(true)
+			end
+		end
+
+		if needAnim then
+			self:animateOpButtons()
+		end
+
+	else
+
+		self.trans_op.gameObject:SetActive(false);
+
+		for i = 0, self.mCreateBtns.Length - 1 do
+			local btn = self.mCreateBtns[i]
+			btn.gameObject:SetActive(false)
+		end
+
+		self.create_op.gameObject:SetActive(true);
+
+		for i = 1, #modeBtns do
+			local btn = modeBtns[i]
+			if CS.UIUnLockConfigMrg.inst:GetBtnInteractable(btn.name) then
+				btn.gameObject:SetActive(true)
+			end
+		end
+
+		if needAnim then
+			self:animateCreateBtns()
+		end
+
+	end
+
+
+
+end
+
+function ShopDesignUI:setBuffDes(cfg)
+
+
+	if CS.UnityUtils.EqualsNull(cfg.buff_ids) or cfg.buff_ids.Length == 0 then
+
+		for i = 1, #self.txt_itemBuffDeses do
+
+			self.txt_itemBuffDeses[i].gameObject:SetActive(false)
+
+		end
+
+		self.vlGroup_itemTitle.padding.left = self.img_itemTitle.gameObject.activeSelf and 40 or 0
+
+		return
+
+	end
+
+	for i = 1, #self.txt_itemBuffDeses do
+
+		if i - 1 < cfg.buff_ids.Length then
+			self.txt_itemBuffDeses[i].gameObject:SetActive(true)
+			local buffCfg = CS.FurnitureBuffConfigManager.inst:GetConfig(cfg.buff_ids[i - 1])
+			if buffCfg ~= nil then
+				self.txt_itemBuffDeses[i].text = CS_LanguageManagerInst:GetValueByKey(buffCfg.type_title, tostring(buffCfg:getEffectVal()));
+			end
+
+		else
+			self.txt_itemBuffDeses[i].gameObject:SetActive(false)
+		end
+
+	end
+
+	self.vlGroup_itemTitle.padding.left = 0;
+
+end
+
+function ShopDesignUI:animateOpButtons()
+
+	if not CS.GameSettingManager.inst.needShowUIAnim then
+
+		self.trans_op.anchoredPosition = Vector2.zero
+		self.hlayout_op.spacing = 0;
+		return
+
+	end
+
+	local hlayout = self.hlayout_op;
+
+	self.trans_op:DOAnchorPos3DY(0,0.15):From(-350):SetEase(Ease.OutBack):OnComplete(function ()
+
+			CS.DG.Tweening.DOTween.To(function ()
+					return hlayout.spacing
+				end,function (v)
+					hlayout.spacing = v
+				end,4,0.2):SetEase(Ease.OutBack)
+
+		end):OnStart(function ()
+			self.hlayout_op.spacing = -144
+		end):SetDelay(self.mCreateMode == self.kCreateTypeOp.CreateFurniture and 0.5 or 0)
+
+end
+
+function ShopDesignUI:animateCreateBtns()
+
+	local btn_backRtf = self.btn_back.gameObject:GetComponent("RectTransform")
+	btn_backRtf:DOAnchorPos3DX(150,0.2):From(540):SetEase(Ease.OutBack):SetDelay(0.5);
+	local create_btn_rotateRtf = self.create_btn_rotate.gameObject:GetComponent("RectTransform")
+	create_btn_rotateRtf:DOAnchorPos3DX(318,0.2):From(540):SetEase(Ease.OutBack):SetDelay(0.5);
+	local btn_applyAllRtf = self.btn_applyAll.gameObject:GetComponent("RectTransform")
+	btn_applyAllRtf:DOAnchorPos3DX(-308, 0.2):From(-540):SetEase(Ease.OutBack):SetDelay(0.5);
+	local btn_applyRtf = self.btn_apply.gameObject:GetComponent("RectTransform")
+	btn_applyRtf:DOAnchorPos3DX(-140, 0.2):From(-540):SetEase(Ease.OutBack):SetDelay(0.5);
+
+end
+
+function ShopDesignUI:animateHideOpButtons(callback)
+
+	local hlayout = self.hlayout_op;
+
+
+	if (CS.GameSettingManager.inst.needShowUIAnim) then
+
+		for i = 0, self.mOpBtns.Length - 1 do
+
+			local btn = self.mOpBtns[i];
+			btn.transform:DOScale(0,0.2):From(1):SetEase(Ease.OutCubic):OnComplete(function()
+					btn.transform.localScale = Vector3.one;
+				end)
+
+		end
+
+		if self.hideItemTitleTween ~= nil then
+			self.hideItemTitleTween:Kill(true)
+		end
+
+		self.hideItemTitleTween = self.go_itemTitle.transform:DOScale(0,0.2):From(1):SetEase(Ease.OutCubic):OnComplete(function()
+
+				self.go_itemTitle.transform.localScale = Vector3.one;
+				self.trans_op.gameObject:SetActive(false);
+
+				if callback ~= nil then
+					callback()
+				end
+
+			end)
+
+	else
+		self:animateHideOpBtns(callback);
+	end
+
+end
+
+function ShopDesignUI:animateHideOpBtns(callback)
+
+	self.trans_op.gameObject:SetActive(false);
+	if callback ~= nil then
+		callback()
+	end
+
+end
+
+
+function ShopDesignUI:checkFirstPick()
+
+	if self.mDesignMode == CS.kDesignMode.None then
+
+		self.mDesignMode = CS.kDesignMode.Pick;
+		return true
+	end
+
+	return false
+
+end
+
+function ShopDesignUI:showItemTitle()
+
+	local cfg = CS.FurnitureConfigManager.inst:getConfig(self.mSelectItem.id)
+	self.txt_itemTitle.text =CS_LanguageManagerInst:GetValueByKey(cfg.name)
+	local editOp = self:toEditOp(self.mSelectItem.type);
+	self.img_itemTitle.gameObject:SetActive(editOp == self.kEditTypeOp.EditUpgradable);
+	self.txt_itemLevel.text = tostring(self.mSelectItem.level);
+
+	self.img_confirmType.gameObject:SetActive(false);
+	self.txt_confirm.gameObject:SetActive(false);
+	self.txt_affirm.gameObject:SetActive(true);
+
+
+	if (CS.kTileGroupType.__CastFrom(self.mSelectItem.type) == CS.kTileGroupType.ResourceBin) then
+
+		self:setResourceStatus(cfg.type_2, self.mSelectItem.level);
+
+	elseif CS.kTileGroupType.__CastFrom(self.mSelectItem.type) == CS.kTileGroupType.PetHouse then
+
+		local petInfo = CS.PetDataProxy.inst:GetPetDataByFurnitureUid(self.mSelectItem.uid).petInfo
+		self.txt_op_pets.text = CS_LanguageManagerInst:GetValueByKey(petInfo.petName)
+
+	end
+
+	self:reSetContentSliderVal();
+
+
+	self:setBuffDes(cfg)
+
+end
+
+function ShopDesignUI:setResourceStatus(type_2,level)
+
+	local upCfg = CS.ResourceBinUpgradeConfigManager.inst:getConfigByType(type_2, level);
+	local item =  CS.ItemBagProxy.inst:GetItem(upCfg.item_id);
+	self.res_itemId = item.ID
+	self.img_resIcon:SetSprite(item.itemConfig.atlas, item.itemConfig.icon);
+	self.txt_resName.text = CS_LanguageManagerInst:GetValueByKey(item.itemConfig.name);
+	self.txt_resNum.text = tostring(math.ceil(item.count)).."/"..CS_UserDataProxyInst:GetResCountLimit(upCfg.item_id);
+	self.res_isFull = item.count >= CS_UserDataProxyInst:GetResCountLimit(upCfg.item_id);
+
+end
+
+function ShopDesignUI:reSetContentSliderVal()
+
+	if CS.UnityUtils.EqualsNull(self.mSelectItem) or self.mSelectItem.uid == 0 or CS.kTileGroupType.__CastFrom(self.mSelectItem.type) ~= CS.kTileGroupType.Shelf then
+		return
+	end
+
+	local cfg = CS.ShelfUpgradeConfigManager.inst:getConfigByType(self.mSelectItem.config.type_2, self.mSelectItem.level);
+	self.slider_content.value = self.mSelectItem.equipList.Count * 1.0 / cfg.store;
+
+end
+
+function ShopDesignUI:RefreshUIUnlock()
+
+	CS_GUIHelper.SetUIGray(self.btn_edit_pets.transform,CS_UserDataProxyInst.playerData.level < tonumber(CS_WorldParConfigManagerInst:GetConfig(170).parameters));
+
+end
+
+function ShopDesignUI:onPickItem(uid)
+
+	if self.hideItemTitleTween ~= nil then
+		self.hideItemTitleTween:Kill(true)
+		self.hideItemTitleTween = nil
+	end
+
+	self.mSelectItem = CS_UserDataProxyInst:GetFuriture(uid);
+	local groupType = self.mSelectItem.type;
+	local newPick = self:checkFirstPick();
+
+	if CS.IndoorMapEditSys.inst == nil or not CS.IndoorMapEditSys.inst.isDesigning then
+		self:pickModeSelect(groupType, newPick);
+	end
+
+	self:showItemTitle();
+
+end
+
+function ShopDesignUI:pickModeSelect(groupType,newPick)
+
+	local pickOp = self:toPickOp(groupType);
+	self:animateHideEditButtons(true)
+	self:showOpButtons(self.mPickOpBtnList[pickOp], newPick);
+
+end
+
+function ShopDesignUI:animateShowEditButtons(delay)
+
+	if self.trans_edit.gameObject.activeSelf then
+		return
+	end
+
+	if (not CS.GameSettingManager.inst.needShowUIAnim) then
+		self.trans_edit.gameObject:SetActive(true);
+		self.trans_edit.anchoredPosition = Vector2.zero;
+		return
+	end
+
+	self.trans_edit.gameObject:SetActive(true);
+	self.trans_edit:DOAnchorPos3DY(0,0)
+
+	self.btn_done.transform:DOScale(1, 0.3):From(0):SetEase(Ease.OutBack):SetDelay(delay == 0 and 0 or 0.1);
+	local leftMovePosX = CS.FGUI.inst.isLandscape and 120 or 130;
+	local rightMovePosX = CS.FGUI.inst.isLandscape and -120 or -130;
+
+	local btn_edit_petsRtf = self.btn_edit_pets.gameObject:GetComponent("RectTransform")
+	btn_edit_petsRtf.anchoredPosition3D = Vector3(-1000,-200,0)
+	btn_edit_petsRtf:DOAnchorPos3D(Vector3(leftMovePosX,494,0),0.4):SetEase(Ease.OutBack):SetDelay(delay)
+
+	local btn_furnitureRtf = self.btn_furniture.gameObject:GetComponent("RectTransform")
+	btn_furnitureRtf.anchoredPosition3D = Vector3(-1000,-200,0)
+	btn_furnitureRtf:DOAnchorPos3D(Vector3(leftMovePosX,318,0),0.4):SetEase(Ease.OutBack):SetDelay(delay)
+
+	local btn_customizeRtf = self.btn_customize.gameObject:GetComponent("RectTransform")
+	btn_customizeRtf.anchoredPosition3D = Vector3(-1000,-200,0)
+	btn_customizeRtf:DOAnchorPos3D(Vector3(leftMovePosX,142,0),0.4):SetEase(Ease.OutBack):SetDelay(delay)
+
+	local btn_expandRtf = self.btn_expand.gameObject:GetComponent("RectTransform")
+	btn_expandRtf.anchoredPosition3D = Vector3(1000,-200,0)
+	btn_expandRtf:DOAnchorPos3D(Vector3(rightMovePosX,142,0),0.4):SetEase(Ease.OutBack):SetDelay(delay)
+
+end
+
+
+function ShopDesignUI:showEditMenus()
+
+	self.create_op.gameObject:SetActive(false);
+	if self.trans_op.gameObject.activeSelf then
+
+		--if self.hideOpBtnsTween ~= nil then
+		--self.hideOpBtnsTween:Kill(true)
+		--self.hideOpBtnsTween = nil
+		--end
+
+		self:animateHideOpButtons(function ()
+				self:animateShowEditButtons(0)
+			end)
+
+	else
+		self:animateShowEditButtons(0.05)
+	end
+
+
+end
+
+
+function ShopDesignUI:toPickOp(groupType)
+
+	groupType = CS.kTileGroupType.__CastFrom(groupType)
+	local pickType = self.kPickTypeOp.PickDecor
+
+	if groupType == CS.kTileGroupType.Carpet then
+		pickType = self.kPickTypeOp.PickCarpet
+	elseif groupType == CS.kTileGroupType.WallFurniture then
+		pickType = self.kPickTypeOp.PickDecor
+	elseif groupType == CS.kTileGroupType.Furniture then
+		pickType = self.kPickTypeOp.PickDecor
+	elseif groupType == CS.kTileGroupType.Counter then
+		pickType = self.kPickTypeOp.PickCounter
+	elseif groupType == CS.kTileGroupType.Shelf then
+		pickType = self.kPickTypeOp.PickShelf
+	elseif groupType == CS.kTileGroupType.Trunk then
+		pickType = self.kPickTypeOp.PickTrunk
+	elseif groupType == CS.kTileGroupType.ResourceBin then
+		pickType = self.kPickTypeOp.PickBin
+	elseif groupType == CS.kTileGroupType.OutdoorFurniture then
+		pickType = self.kPickTypeOp.PickDecor
+	elseif groupType == CS.kTileGroupType.PetHouse then
+		pickType = self.kPickTypeOp.PickPetHouse
+	end
+
+	return pickType
+
+end
+
+function ShopDesignUI:toEditOp(groupType)
+
+	groupType = CS.kTileGroupType.__CastFrom(groupType)
+
+	local editType = self.kEditTypeOp.EditDecor
+
+	if groupType == CS.kTileGroupType.Carpet then
+		editType = self.kEditTypeOp.EditDecor
+	elseif groupType == CS.kTileGroupType.WallFurniture then
+		editType = self.kEditTypeOp.EditDecor
+	elseif groupType == CS.kTileGroupType.Furniture then
+		editType = self.kEditTypeOp.EditDecor
+	elseif groupType == CS.kTileGroupType.Counter then
+		editType = self.kEditTypeOp.EditUpgradable
+	elseif groupType == CS.kTileGroupType.Shelf then
+		editType = self.kEditTypeOp.EditUpgradable
+	elseif groupType == CS.kTileGroupType.Trunk then
+		editType = self.kEditTypeOp.EditUpgradable
+	elseif groupType == CS.kTileGroupType.ResourceBin then
+		editType = self.kEditTypeOp.EditUpgradable
+	elseif groupType == CS.kTileGroupType.OutdoorFurniture then
+		editType = self.kEditTypeOp.EditDecor
+	elseif groupType == CS.kTileGroupType.PetHouse then
+		editType = self.kEditTypeOp.EditDecor
+	end
+
+	return editType
+
+end
+
+function ShopDesignUI:shiftIn()
+	self.contentObject:SetActive(true)
+
+	if self.trans_op.gameObject.activeSelf and self.mDesignMode ~= CS.kDesignMode.Create then
+		self:Refresh()
+	end
+
+	self:RefreshUIUnlock()
+
+end
+
+function ShopDesignUI:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+
+function ShopDesignUI:onShowed()
+
+	self:Refresh()
+	self:RefreshUIUnlock()
+
+end
+
+function ShopDesignUI:onHide()
+
+	self.trans_op.gameObject:SetActive(false);
+	self.mDesignMode = CS.kDesignMode.None
+	self.mCreateMode = self.kCreateTypeOp.None
+
+end
+
+function ShopDesignUI:DoHideAnimation()
+
+	self:animateHideEditButtons(true)
+	self:animateHideOpButtons(function ()
+			self:HideView()
+		end)
+
+end
+
+function ShopDesignUI:onBtn_furnitureClick()
+
+	if CS.GuideDataProxy.inst ~= nil and CS.GuideDataProxy.inst.CurInfo ~= nil and not CS.GuideDataProxy.inst.CurInfo.isAllOver then
+
+		local guideCfg = CS.GuideDataProxy.inst.CurInfo.m_curCfg;
+
+		if ((CS.K_Guide_Type.__CastFrom(guideCfg.guide_type) == CS.K_Guide_Type.RestrictClick or CS.K_Guide_Type.__CastFrom(guideCfg.guide_type) == CS.K_Guide_Type.TipsAndRestrictClick) and ( guideCfg.btn_name == "0" or guideCfg.btn_name == "btn_furniture")) then
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+			local func = funcGeneric(CS.System.Int16,CS.System.Int32)
+
+			func(CS_EventControllerInst, CS_GameEventType.SHOWUI_TARGETFURN, tonumber(guideCfg.conditon_param_2),-1)
+		else
+			CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_FURNITUREUI)
+		end
+
+	else
+		CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_FURNITUREUI)
+	end
+
+end
+
+function ShopDesignUI:onBtn_customizeClick()
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_CUSTOMIZEUI)
+end
+
+function ShopDesignUI:onBtn_edit_petsClick()
+
+	local needLv = math.ceil(tonumber(CS_WorldParConfigManagerInst:GetConfig(170).parameters))
+
+	if CS_UserDataProxyInst.playerData.level < needLv then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("店主达到{0}级可解锁，可以通过售卖装备升级",tostring(needLv)),"FFD907")
+		return
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.PetEvent.ShowUI_MainPetUI)
+
+end
+
+function ShopDesignUI:onBtn_doneClick()
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func = funcGeneric(CS.DesignMode,CS.System.Int32)
+	func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.EDITMODE_CHANGE,CS.DesignMode.normal,CS.IndoorMap.tempItemUid)
+
+end
+
+function ShopDesignUI:onBtn_expandClick()
+
+	local state = CS_UserDataProxyInst.shopData.currentState;
+
+	if state == MsgType.EDesignState.Idle then
+
+		if CS_UserDataProxyInst.shopData.shopLevel == CS.StaticConstants.shopMap_MaxLevel then
+			EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("已达到最大面积不可扩建"),"FF2828")
+		else
+			CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_EXTENSIONPANEL)
+		end
+
+	elseif state == MsgType.EDesignState.Upgrading then
+
+		CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_EXTENDINGPANEL)
+
+	elseif state == MsgType.EDesignState.Finished then
+
+		CS.IndoorMapEditSys.inst:shopUpgradeFinish();
+
+	end
+
+end
+
+function ShopDesignUI:onBtn_resourceClick()
+
+	if not self.res_isFull then
+
+		local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+		local func = funcGeneric(CS.System.Int32)
+		func(CS_EventControllerInst, CS_GameEventType.BagEvent.ShopDesign_Resource_BuyProduction,self.res_itemId)
+	end
+
+end
+
+function ShopDesignUI:onBtn_cancelClick()
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func = funcGeneric(CS.DesignMode,CS.System.Int32)
+	func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.EDITMODE_CHANGE,CS.DesignMode.normal,CS.IndoorMap.tempItemUid)
+
+end
+
+function ShopDesignUI:onBtn_skinClick()
+
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_SKINUI)
+
+end
+
+function ShopDesignUI:onBtn_rotateClick()
+
+	CS.AudioManager.inst:PlaySound(22);
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.ShopDesignEvent.ROTATE_ITEM)
+
+end
+
+function ShopDesignUI:onCreate_btn_rotateClick()
+
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.ShopDesignEvent.ROTATE_ITEM)
+
+end
+
+function ShopDesignUI:onBtn_storeClick()
+
+	if self.mSelectItem ~=nil then
+
+		if self.mSelectItem.type == 6 then
+
+			EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("柜台不可被回收"),"FFD907")
+			return
+
+		elseif self.mSelectItem.state ~= MsgType.EDesignState.Idle then
+
+			EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("不能存放正在升级的家具"),"FFD907")
+			return
+
+		end
+
+		CS.IndoorMapEditSys.inst:storeItem(self.mSelectItem.uid,self.mSelectItem.type)
+
+	end
+
+end
+
+function ShopDesignUI:onBtn_contentClick()
+
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_SHELFCONTENTUI)
+
+end
+
+function ShopDesignUI:onBtn_upgradeClick()
+
+	if self.mSelectItem ~= nil then
+
+		if self.mSelectItem.state == MsgType.EDesignState.Idle then
+
+			if CS.GuideManager.inst.isInTriggerGuide and (GuideTriggerManager.inst.curData ~= nil and GuideTriggerManager.inst.curData.behavior_num ~= nil and tonumber(GuideTriggerManager.inst.curData.behavior_num) == 9999) then
+				return
+			end
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.IndoorData.ShopDesignItem)
+			func(CS_EventControllerInst, CS_GameEventType.SHOWUI_UPGRADEPANEL,self.mSelectItem)
+
+		elseif self.mSelectItem.state == MsgType.EDesignState.Upgrading then
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.IndoorData.ShopDesignItem)
+			func(CS_EventControllerInst, CS_GameEventType.SHOWUI_SHELFUPGRADINGUI,self.mSelectItem)
+
+		elseif self.mSelectItem.state == MsgType.EDesignState.Finished then
+
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.System.Int32)
+			func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.Furniture_Upgrading_Finish,self.mSelectItem.uid)
+
+		end
+
+	end
+
+end
+
+function ShopDesignUI:onBtn_editClick()
+
+	self.mDesignMode = CS.kDesignMode.Edit
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func = funcGeneric(CS.DesignMode,CS.System.Int32)
+	func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.EDITMODE_CHANGE,CS.DesignMode.FurnitureEdit,CS.IndoorMap.tempItemUid)
+
+end
+
+function ShopDesignUI:onBtn_op_petsClick()
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.IndoorData.ShopDesignItem)
+	func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.LOOKPETHOUSE,self.mSelectItem)
+
+end
+
+function ShopDesignUI:onBtn_storageClick()
+
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_BAGUI)
+
+end
+
+function ShopDesignUI:onBtn_confirmClick()
+
+	if self.mCreateMode ~= self.kCreateTypeOp.None then
+		self.mCreateMode = self.kCreateTypeOp.None
+	end
+
+	CS.IndoorMapEditSys.inst.isClickFunriture = false;
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.Boolean)
+	func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.Apply,false)
+
+
+	local funcGeneric_2 = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func_2 = funcGeneric_2(CS.DesignMode,CS.System.Int32)
+	func_2(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.EDITMODE_CHANGE,CS.DesignMode.modeSelection,CS.IndoorMap.tempItemUid)
+
+end
+
+function ShopDesignUI:onBtn_backClick()
+
+	self.mCreateMode = self.kCreateTypeOp.None
+	CS.IndoorMapEditSys.inst.isClickFunriture = false;
+
+	local funcGeneric_2 = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func_2 = funcGeneric_2(CS.DesignMode,CS.System.Int32)
+	func_2(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.EDITMODE_CHANGE,CS.DesignMode.modeSelection,CS.IndoorMap.tempItemUid)
+
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.SHOWUI_CUSTOMIZEUI)
+
+end
+
+function ShopDesignUI:onBtn_applyClick()
+
+	CS.IndoorMapEditSys.inst.isClickFunriture = false;
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.Boolean)
+	func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.Apply,false)
+
+end
+
+function ShopDesignUI:onBtn_applyAllClick()
+
+	CS.IndoorMapEditSys.inst.isClickFunriture = false;
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.Boolean)
+	func(CS_EventControllerInst, CS_GameEventType.ShopDesignEvent.Apply,true)
+
+end
+
+function ShopDesignUI:Refresh()
+
+	local shopDesignMode =  CS.IndoorMapEditSys.inst.shopDesignMode
+
+	if shopDesignMode == CS.DesignMode.normal then
+
+		local uid = 0
+
+
+		if CS.IndoorMapEditSys.inst ~= nil then
+			uid = CS.IndoorMapEditSys.inst.currEntityUid
+		end
+
+		if uid > 0 then
+			self:onPickItem(uid)
+		else
+			self:hide()
+		end
+
+	elseif shopDesignMode == CS.DesignMode.modeSelection then--编辑类型 选择
+
+		local uid = CS.IndoorMapEditSys.inst.currEntityUid
+
+		if CS.IndoorMapEditSys.inst.isClickFunriture and uid ~= CS.IndoorMap.tempItemUid and uid ~= -1 then
+			self:onPickItem(uid);
+		else
+			CS.IndoorMapEditSys.inst.shopDesignMode = CS.DesignMode.FurnitureEdit;
+			self.mCreateMode = self.kCreateTypeOp.None;
+			self:showEditMenus()
+		end
+
+	elseif shopDesignMode == CS.DesignMode.FurnitureEdit then--场景家具编辑
+
+		if CS.IndoorMapEditSys.inst ~= nil then
+
+			local uid = CS.IndoorMapEditSys.inst.currEntityUid
+
+			self.mSelectItem = CS_UserDataProxyInst:GetFuriture(uid);
+
+			if self.mSelectItem == nil then
+				return
+			end
+
+			self.mEditMode = self:toEditOp(self.mSelectItem.type)
+			self:animateHideEditButtons(false)
+			self:showOpButtons(self.mEditOpBtnList[self.mEditMode],not self.trans_op.gameObject.activeSelf);
+			self:onPickItem(uid);
+
+		end
+
+
+	elseif shopDesignMode == CS.DesignMode.FloorEdit then--场景地板编辑
+
+	elseif shopDesignMode == CS.DesignMode.WallEdit then--场景墙纸编辑
+
+	end
+
+
+end
+
+------------------------------------------------

@@ -1,0 +1,339 @@
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local Vector2 = CS.UnityEngine.Vector2
+local CsStaticConstants = CS.StaticConstants
+local CSRoleDataProxyInst = CS.RoleDataProxy.inst
+local CSHeroSkillShowConfigManagerInst = CS.HeroSkillShowConfigManager.inst
+
+-- C#已同步
+
+xlua.private_accessible(CS.RoleHeroInfoView)
+xlua.hotfix(
+	CS.RoleHeroInfoView,
+	"AddUIEvent",
+	function(self)
+
+		self.contentPane.closeBtn:ButtonClickTween(function ()
+				self:hide()
+			end)
+
+		self.contentPane.leftBtn:ButtonClickTween(function ()
+				self:setHeroInfoData(CSRoleDataProxyInst:GetNearHeroData(self.data, true))
+			end)
+
+		self.contentPane.rightBtn:ButtonClickTween(function ()
+				self:setHeroInfoData(CSRoleDataProxyInst:GetNearHeroData(self.data, false))
+			end)
+
+		self.contentPane.useLevelItemBtn:ButtonClickTween(function ()
+				if (self.data.currentState == 2) then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+					func(
+						csEventControllerInst,
+						csGameEventType.SHOWUI_TEXTMSGTIP,
+						cs_LanguageManagerInst:GetValueByKey("英雄探索期间不能使用经验卡"),
+						csGUIHelper.GetColorByColorHex("FF2828")
+					)
+					return
+				end
+
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+				local func = funcGeneric(CS.System.Int32)
+				func(csEventControllerInst, csGameEventType.RoleEvent.ROLEUSEEXPITEM_SHOWUI, self.data.uid)
+			end)
+
+		self.contentPane.settingBtn:ButtonClickTween(function ()
+				if (self.data.currentState == 2) then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+					func(
+						csEventControllerInst,
+						csGameEventType.SHOWUI_TEXTMSGTIP,
+						cs_LanguageManagerInst:GetValueByKey("英雄探索期间不能设置英雄信息"),
+						csGUIHelper.GetColorByColorHex("FF2828")
+					)
+					return
+				end
+				if (self.contentPane.secondaryInterfaceObj.activeSelf) then
+					self.contentPane.secondaryInterfaceObj:SetActive(false)
+				else
+					self.contentPane.secondaryInterfaceObj:SetActive(true)
+				end
+			end)
+
+		self.contentPane.settingBgBtn:ButtonClickTween(function ()
+				self.contentPane.secondaryInterfaceObj:SetActive(false)
+			end)
+
+		self.contentPane.transferBtn:ButtonClickTween(function ()
+				if (self.data.currentState == 2) then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+					func(
+						csEventControllerInst,
+						csGameEventType.SHOWUI_TEXTMSGTIP,
+						cs_LanguageManagerInst:GetValueByKey("英雄探索期间不能转职"),
+						csGUIHelper.GetColorByColorHex("FF2828")
+					)
+					return
+				end
+
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+				local func = funcGeneric(CS.System.Int32)
+				func(csEventControllerInst, csGameEventType.RoleEvent.ROLETRANSFER_SHOWUI, self.data.uid)
+			end)
+
+		self.contentPane.allWearBtn:ButtonClickTween(function ()
+				self:equipAllWear()
+			end)
+
+		self.contentPane.restBtn:ButtonClickTween(function ()
+				GUIManager.inst:OpenViewCS(
+					typeof(CS.RoleRestingView),
+					function(view)
+						view:setSingleData(self.data,1)
+					end
+				)
+			end)
+
+		self.contentPane.exploreBtn:ButtonClickTween(function ()
+				local slotId = CS.ExploreDataProxy.inst:GetSlotIdByHeroUid(self.heroUid)
+				local tempSlotData = CS.ExploreDataProxy.inst:GetSlotDataById(slotId)
+				if (slotId ~= -1) then
+					if (tempSlotData.slotType == 0 or tempSlotData.slotType == 1) then
+						local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+						local func = funcGeneric(CS.System.Int32)
+						func(csEventControllerInst, csGameEventType.ExploreEvent.ROLEADVENTUREBYSLOT_SHOWUI, slotId)
+					elseif tempSlotData.slotType == 2 then
+						EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.ShowUI_RefugeAdventure,slotId)
+					elseif tempSlotData.slotType == 3 then
+						EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityAdventure,slotId)
+					end
+				end
+			end)
+
+		self.contentPane.renameBtn:ButtonClickTween(function ()
+				self.contentPane.secondaryInterfaceObj:SetActive(false)
+				self.contentPane.renameObj:SetActive(true)
+				self.contentPane.renameInput.text = cs_LanguageManagerInst:GetValueByKey(self.data.nickName)
+			end)
+
+		self.contentPane.dismissalBtn:ButtonClickTween(function ()
+				self:setFireData()
+			end)
+
+		self.contentPane.renameCancleBtn:ButtonClickTween(function ()
+				self:closeRenamePanel()
+			end)
+
+		self.contentPane.dismissalCancleBtn:ButtonClickTween(function ()
+				self:closeDismissalPanel()
+			end)
+
+		self.contentPane.renameConfirmBtn:ButtonClickTween(function ()
+				local curNameStr = self.contentPane.renameInput.text
+				if (curNameStr == nil or #curNameStr <= 0) then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+					func(
+						csEventControllerInst,
+						csGameEventType.SHOWUI_TEXTMSGTIP,
+						cs_LanguageManagerInst:GetValueByKey("名字不能为空"),
+						csGUIHelper.GetColorByColorHex("FF2828")
+					)
+				else
+					local result ,str = CS.WordFilter.inst:filter(curNameStr)
+					if (result) then
+
+						self.contentPane.renameInput.text = ""
+						local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+						local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+						func(
+							csEventControllerInst,
+							csGameEventType.SHOWUI_TEXTMSGTIP,
+							cs_LanguageManagerInst:GetValueByKey("名称中包含敏感词汇！"),
+							csGUIHelper.GetColorByColorHex("FF2828")
+						)
+
+					else
+						self:closeRenamePanel()
+						local rep = MsgType.Request_Hero_Setting:New()
+						rep.heroUid = self.data.uid
+						rep.nickName = str
+						rep:Send()
+					end
+				end
+			end)
+
+		self.contentPane.dismissalConfirmBtn:ButtonClickTween(function ()
+				if (not self.contentPane.dismissalAgainObj.activeSelf) then
+					self.contentPane.dismissalAgainObj:SetActive(true)
+				else
+					local gemCost = CS.heroupgradeconfigManager.inst:GetHeroUpgradeConfig(self.data.level).dismissal_cost
+					if (gemCost > CS.UserDataProxy.inst.playerData.gem) then
+						EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,gemCost - CS.UserDataProxy.inst.playerData.gem)
+					else
+						local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+						local func = funcGeneric(CS.System.Int32)
+						func(csEventControllerInst, csGameEventType.RoleEvent.REQUEST_DISMISSAL, self.data.uid)
+					end
+				end
+			end)
+
+		self.contentPane.renameCloseBtn:ButtonClickTween(function ()
+				self:closeRenamePanel()
+			end)
+
+		self.contentPane.dismissalCloseBtn:ButtonClickTween(function ()
+				self:closeDismissalPanel()
+			end)
+
+		self.contentPane.professionBtn:ButtonClickTween(function ()
+				local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+				local func = funcGeneric(CS.System.Int32)
+				func(csEventControllerInst, csGameEventType.RoleEvent.SHOWUI_TRANSFERPREVIEW, self.data.id)
+			end)
+
+		self.contentPane.attBtn:ButtonClickTween(function ()
+				if (self.contentPane.showCAttPanel) then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+					local func = funcGeneric(CS.HeroPropertyData)
+					func(csEventControllerInst, csGameEventType.RoleEvent.SHOWUI_ROLEHEROATTVIEW, self.data.attributeConfig)
+				else
+					EventDispatcher:dispatchEvent(GameEvent.RoleExchange.ShowUI_RoleAtt,self.data.uid)
+				end
+			end)
+
+		self.contentPane.btn_transferNumLimitDes:ButtonClickTween(function ()
+				self.contentPane.rtf_transferNumLimitDesViewBg.position = self.contentPane.btn_transferNumLimitDes.transform.position
+				self.contentPane.rtf_transferNumLimitDesViewContent.position = self.contentPane.btn_transferNumLimitDes.transform.position
+
+				self.contentPane.rtf_transferNumLimitDesViewBg.anchoredPosition = Vector2(self.contentPane.rtf_transferNumLimitDesViewBg.anchoredPosition.x + 24, self.contentPane.rtf_transferNumLimitDesViewBg.anchoredPosition.y + 65)
+				self.contentPane.rtf_transferNumLimitDesViewContent.anchoredPosition = Vector2(self.contentPane.rtf_transferNumLimitDesViewContent.anchoredPosition.x + 48, self.contentPane.rtf_transferNumLimitDesViewContent.anchoredPosition.y + 65)
+
+				self.contentPane.btn_transferNumLimitDesView.gameObject:SetActive(true)
+			end)
+
+		self.contentPane.btn_transferNumLimitDesView:ButtonClickTween(function ()
+				self.contentPane.btn_transferNumLimitDesView.gameObject:SetActive(false)
+			end)
+
+		self.contentPane.group.OnSelectedIndexValueChange = function (index)
+			self:typeSelectedChange(index)
+		end
+
+		self.contentPane.skillGroup.OnSelectedIndexValueChange = function (index)
+			self:typeSelectedChangeSkill(index)
+		end
+
+		self.contentPane.hpAddBtn:ButtonClickTween(function ()
+				self:onAddPropertyBtnClick(CS.kRolePropertyType.hp)
+			end)
+
+		self.contentPane.defAddBtn:ButtonClickTween(function ()
+				self:onAddPropertyBtnClick(CS.kRolePropertyType.def)
+			end)
+
+		self.contentPane.atkAddBtn:ButtonClickTween(function ()
+				self:onAddPropertyBtnClick(CS.kRolePropertyType.atk)
+			end)
+
+	end
+)
+
+xlua.hotfix(
+	CS.RoleHeroInfoView,
+	"setHeroInfoData",
+	function(self, heroUid)
+		
+		self.heroUid = heroUid
+
+		self.contentPane.toTransferObj:SetActiveTrue()
+
+		self.data = CSRoleDataProxyInst:GetHeroDataByUid(heroUid)
+		
+		self.contentPane.group:OnEnableMethod(self.contentPane.group.selectedIndex)
+
+		if (self.data.hasRedPoint == 1) then
+			self.data.hasRedPoint = 2
+		end
+
+		self.contentPane.skillGroup.togglesBtn[0].interactable = self.data.skill1 ~= nil
+		self.contentPane.skillGroup.togglesBtn[1].interactable = self.data.skill2 ~= nil
+		self.contentPane.skillGroup.togglesBtn[2].interactable = self.data.skill3 ~= nil
+
+		csGUIHelper.SetUIGray(self.contentPane.settingBtn.transform, self.data.currentState == 2)
+		csGUIHelper.SetUIGray(self.contentPane.useLevelItemBtn.transform, self.data.currentState == 2)
+
+		local upgradeCfg = CS.heroupgradeconfigManager.inst:GetHeroUpgradeConfig(self.data.level + 1)
+		if (upgradeCfg ~= nil)then
+			self.contentPane.useLevelItemBtn.gameObject:SetActive(true)
+		else
+			self.contentPane.useLevelItemBtn.gameObject:SetActive(false)
+		end
+
+		local rarity = CSRoleDataProxyInst:ReturnRarityByAptitude(self.data.intelligence)
+		self.contentPane.intelligenceBgIcon:SetSprite(CsStaticConstants.roleAtlasName, CsStaticConstants.roleHeroBgIconName[rarity - 1])
+		self.roleState = CS.ERoleState.__CastFrom(self.data.currentState)
+		local qualityColor = CsStaticConstants.roleIntelligenceColor[rarity]
+		self.contentPane.typeBgIcon:SetSprite(CsStaticConstants.roleAtlasName, CsStaticConstants.heroTypeBgIconName[self.data.config.type - 1])
+		self.contentPane.typeIcon:SetSprite(self.data.config.atlas, self.data.config.ocp_icon)
+		self.contentPane.intelligenceText.text = tostring(self.data.intelligence)
+		self.contentPane.intelligenceText.color = csGUIHelper.GetColorByColorHex(qualityColor)
+		self.contentPane.newintelligenceText.text = CsStaticConstants.roleIntelligenceStr[rarity - 1]
+		self.contentPane.newintelligenceText.color = csGUIHelper.GetColorByColorHex(qualityColor)
+
+		self.contentPane.professionNameTx.text = cs_LanguageManagerInst:GetValueByKey(self.data.config.name)
+		self.contentPane.talentNameText.text = cs_LanguageManagerInst:GetValueByKey(self.data.talentConfig.name)
+		self.contentPane.talentNameText.color = csGUIHelper.GetColorByColorHex(CsStaticConstants.roleIntelligenceColor[self.data.talentConfig.quality - 1])
+
+		self.contentPane.talentQualityStr.text = cs_LanguageManagerInst:GetValueByKey(CsStaticConstants.roleTalentQualityStr[self.data.talentConfig.quality - 2]) .. cs_LanguageManagerInst:GetValueByKey("天赋")
+
+		local talentBySkillCfg = CSHeroSkillShowConfigManagerInst:GetConfig(self.data.talentConfig.skill_id)
+		self.contentPane.talentXDescText.text = cs_LanguageManagerInst:GetValueByKey(talentBySkillCfg.skill_dec)
+
+		self.contentPane.talentDescText.gameObject:SetActive(self.data.talentConfig.easy_txt_1 ~= nil and self.data.talentConfig.easy_txt_1 ~= "")
+		self.contentPane.talentDescText2.gameObject:SetActive(self.data.talentConfig.easy_txt_2 ~= nil and self.data.talentConfig.easy_txt_2 ~= "")
+		self.contentPane.talentDescText3.gameObject:SetActive(self.data.talentConfig.easy_txt_3 ~= nil and self.data.talentConfig.easy_txt_3 ~= "")
+		self.contentPane.talentDescText4.gameObject:SetActive(self.data.talentConfig.easy_txt_4 ~= nil and self.data.talentConfig.easy_txt_4 ~= "")
+
+		if(self.data.talentConfig.easy_txt_1 ~= nil and self.data.talentConfig.easy_txt_1 ~= "")then
+			self.contentPane.talentDescText.text = cs_LanguageManagerInst:GetValueByKey(self.data.talentConfig.easy_txt_1)
+		end
+		
+		if(self.data.talentConfig.easy_txt_2 ~= nil and self.data.talentConfig.easy_txt_2 ~= "")then
+			self.contentPane.talentDescText2.text = cs_LanguageManagerInst:GetValueByKey(self.data.talentConfig.easy_txt_2)
+		end
+		
+		if(self.data.talentConfig.easy_txt_3 ~= nil and self.data.talentConfig.easy_txt_3 ~= "")then
+			self.contentPane.talentDescText3.text = cs_LanguageManagerInst:GetValueByKey(self.data.talentConfig.easy_txt_3)
+		end
+		
+		if(self.data.talentConfig.easy_txt_4 ~= nil and self.data.talentConfig.easy_txt_4 ~= "")then
+			self.contentPane.talentDescText4.text = cs_LanguageManagerInst:GetValueByKey(self.data.talentConfig.easy_txt_4)
+		end
+		
+		self.contentPane.talentQualityIcon:SetSprite(CsStaticConstants.roleAtlasName, CsStaticConstants.roleTalentBgIconName[self.data.talentConfig.quality - 2])
+		local cfg = CSHeroSkillShowConfigManagerInst:GetConfig(self.data.talentConfig.skill_id)
+		self.contentPane.talentIcon:SetSprite(cfg.skill_atlas, cfg.skill_icon)
+		self.contentPane.bgCanvas.sortingOrder = self._uiCanvas.sortingOrder - 2
+		
+		self.contentPane.qualityIcon:SetSprite(CsStaticConstants.roleAtlasName, CsStaticConstants.roleIntelligenceIconStr[rarity - 1])
+		
+		self:setHeroHeadIcon()
+		self:setAttributeData()
+		self:setEffectInfo()
+		self:setHeroExpInfo()
+		self:JudgeCanTransfer()
+		self:SetHeroPrefabData()
+		self:setStarNum()
+		self:setEquipData()
+		self:setSkillData()
+		self:setHeroState()
+
+	end
+)

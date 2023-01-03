@@ -1,0 +1,36 @@
+local goBtn
+
+function InitComp()
+	goBtn = self:GetObjByName("GoBtn"):GetComponent("Button")
+	goBtn:ButtonClickTween(
+		function ()
+			local data = self:GetComponent(typeof(CS.DailyTaskItem))
+			if(data == nil) then return end
+			if(data.data == nil) then return end
+			--CS.GoOperationManager.inst:StartHyperLink(linkid);
+			local operationData = CS.OperationData()
+			local cfg = data.data.config
+			if(cfg == nil) then return end
+			operationData.type = CS.K_Operation_DataType.DailyTask
+			operationData.task_scenes = cfg.task_scenes
+			operationData.condition_id = data.data.taskTargetId
+			operationData.dialog = cfg.dialog
+			if(cfg.task_guide_1 ~= nil and cfg.task_guide_1 ~= "")then
+				operationData.operations:Add(cfg.task_guide_1)
+			end
+			if(cfg.task_guide_2 ~= nil and cfg.task_guide_2 ~= "")then
+				operationData.operations:Add(cfg.task_guide_2)
+			end
+			if(cfg.task_guide_3 ~= nil and cfg.task_guide_3 ~= "")then
+				operationData.operations:Add(cfg.task_guide_3)
+			end
+			if(cfg.task_guide_4 ~= nil and cfg.task_guide_4 ~= "")then
+				operationData.operations:Add(cfg.task_guide_4)
+			end
+			if(cfg.task_guide_5 ~= nil and cfg.task_guide_5 ~= "")then
+				operationData.operations:Add(cfg.task_guide_5)
+			end
+			CS.GoOperationManager.inst:StartJumpOperation(operationData)
+		end
+	)
+end

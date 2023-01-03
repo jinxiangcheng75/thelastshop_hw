@@ -1,0 +1,191 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csCharacterManagerInst = CS.CharacterManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local csEGender = CS.EGender
+local csVector3 = CS.UnityEngine.Vector3
+local csSpineUtils = CS.SpineUtils
+
+local ruinsHeroItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	ruinsHeroItem_dlc = RuinsHeroItem_dlc.new()
+	ruinsHeroItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if ruinsHeroItem_dlc~=nil then
+		ruinsHeroItem_dlc:Clear()
+		ruinsHeroItem_dlc = nil
+	end
+end
+
+function onDisable()
+	if ruinsHeroItem_dlc~=nil then
+		ruinsHeroItem_dlc:clearData()
+	end
+end
+
+function SetData(_data)
+	if ruinsHeroItem_dlc~=nil then
+		ruinsHeroItem_dlc:SetData(_data)
+	end
+end
+
+RuinsHeroItem_dlc = class()
+
+function RuinsHeroItem_dlc:ctor()
+
+end
+
+function RuinsHeroItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+end
+
+function RuinsHeroItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.selfBtn = self.gameObject:GetComponent("Button")
+	self.levelText = self.contentPane:GetObjByName("levelText"):GetComponent("Text")
+	self.infoBtn = self.contentPane:GetObjByName("infoBtn"):GetComponent("Button")
+	self.qualityIcon = self.contentPane:GetObjByName("qualityIcon"):GetComponent("GUIIcon")
+	self.headDressParent = self.contentPane:GetObjByName("headDressParent").transform
+	self.nameText = self.contentPane:GetObjByName("nameText"):GetComponent("Text")
+	self.typeBgIcon = self.contentPane:GetObjByName("typeBgIcon"):GetComponent("GUIIcon")
+	self.typeIcon = self.contentPane:GetObjByName("typeIcon"):GetComponent("GUIIcon")
+	self.fightingNumText = self.contentPane:GetObjByName("fightingNumText"):GetComponent("Text")
+	self.hpSlider = self.contentPane:GetObjByName("expSlider"):GetComponent("Slider")
+	self.levelScheduleText = self.contentPane:GetObjByName("levelScheduleText"):GetComponent("Text")
+	self.grayImg = self.contentPane:GetObjByName("gray"):GetComponent("Image")
+	self.gouImg = self.contentPane:GetObjByName("gou"):GetComponent("Image")
+
+
+	local allStarComp = self.contentPane:GetObjByName("starNumBg"):GetComponent("ObjList")
+	if(allStarComp ~= nil)then
+		self.allStars = allStarComp.objList
+	end
+
+	self.data = nil
+	self.graphicDressUp = nil
+
+	self.infoBtn:ButtonClickTween(
+		function ()
+			if(self.data == nil) then return end
+			EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.OpenUI_RuinsHeroInfo,self.data,"-9999","")
+		end
+	)
+
+	if(self.selfBtn ~= nil)then
+		self.selfBtn:ButtonClickTween(
+			function ()
+				if(self.data == nil) then return end
+				if(self.data.currentState == 3)then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+					func(
+						csEventControllerInst,
+						csGameEventType.SHOWUI_TEXTMSGTIP,
+						cs_LanguageManagerInst:GetValueByKey("英雄已死亡"),
+						csGUIHelper.GetColorByColorHex("FF2828")
+					)
+					return
+				end
+				EventDispatcher:dispatchEvent(GameEvent.RuinsEvent.Ruins_AddHeroCom,self.data.uid)
+			end
+		)
+	end
+end
+
+function RuinsHeroItem_dlc:SetData(_data)
+	if(_data == nil) then return end
+
+	self.data = _data
+
+	local rarity = CS.RoleDataProxy.inst:ReturnRarityByAptitude(self.data.intelligence)
+	self.levelText.text = tostring(self.data.level)
+	self.qualityIcon:SetSprite(CS.StaticConstants.roleAtlasName, CS.StaticConstants.roleHeroBgIconName[rarity - 1])
+	self.nameText.text = cs_LanguageManagerInst:GetValueByKey(self.data.nickName)
+	self.typeBgIcon:SetSprite(CS.StaticConstants.roleAtlasName, CS.StaticConstants.heroTypeBgIconName[self.data.config.type - 1])
+	self.typeIcon:SetSprite(self.data.config.atlas, self.data.config.ocp_icon)
+	self.fightingNumText.text = tostring(self.data.fightingNum)
+	self.hpSlider.maxValue = self.data.attributeConfig.hp_basic
+	local remainHp = self.data.remainHp
+	if(remainHp <= 0 and self.data.currentState == 0)then
+		remainHp = self.data.attributeConfig.hp_basic
+	end
+	self.levelScheduleText.text = remainHp .. "/" .. self.data.attributeConfig.hp_basic
+	if(self.data.currentState == 3)then
+		remainHp = 0
+		self.levelScheduleText.text = cs_LanguageManagerInst:GetValueByKey("已淘汰")
+	end
+	self.hpSlider.value = remainHp
+	
+	self.grayImg.enabled = self.data.isSelect
+	self.gouImg.enabled = self.data.isSelect
+	
+	csGUIHelper.SetUIGray(self.transform,self.data.currentState == 3)
+
+	self:SetPrefab()
+end
+
+function RuinsHeroItem_dlc:SetPrefab()
+	if(self.graphicDressUp ~= nil)then
+		self.graphicDressUp.transform:SetParent(CS.FGUI.inst.heroGraphicCacheParent)
+		self.graphicDressUp = nil
+	end
+	if (RuinsDataProxy.inst:GetHeadByUid(self.data.uid) ~= nil)then
+		self.graphicDressUp = RuinsDataProxy.inst:GetHeadByUid(self.data.uid)
+		self.graphicDressUp.transform:SetParent(self.headDressParent)
+		self.graphicDressUp.transform.localScale = csVector3(1,1,1)
+		self.graphicDressUp.transform.localPosition = csVector3(0,0,0)
+	end
+end
+
+function RuinsHeroItem_dlc:Clear()
+
+	self:removeListeners()
+
+end
+
+function RuinsHeroItem_dlc:clearData()
+	if(self.graphicDressUp ~= nil)then
+		self.graphicDressUp = nil
+	end
+end
+
+function RuinsHeroItem_dlc:addListeners()
+	EventDispatcher:addEvent(GameEvent.RuinsEvent.Ruins_RemoveHeroCom,self,self.removeHeroChangeSelect)
+	EventDispatcher:addEvent(GameEvent.RuinsEvent.Ruins_AddHeroComItem,self,self.addHeroChangeSelect)
+
+end
+
+function RuinsHeroItem_dlc:removeListeners()
+	EventDispatcher:removeEvent(GameEvent.RuinsEvent.Ruins_RemoveHeroCom,self.removeHeroChangeSelect)
+	EventDispatcher:removeEvent(GameEvent.RuinsEvent.Ruins_AddHeroComItem,self.addHeroChangeSelect)
+
+end
+
+function RuinsHeroItem_dlc:removeHeroChangeSelect(heroUid, index)
+	if(self.data == nil) then return end
+
+	if(self.data.uid == heroUid)then
+		self.grayImg.enabled = false
+		self.gouImg.enabled = false
+	end
+end
+
+function RuinsHeroItem_dlc:addHeroChangeSelect(heroUid)
+	if(self.data == nil) then return end
+
+	if(self.data.uid == heroUid)then
+		self.grayImg.enabled = true
+		self.gouImg.enabled = true
+	end
+end

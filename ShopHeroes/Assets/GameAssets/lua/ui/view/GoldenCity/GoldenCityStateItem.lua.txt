@@ -1,0 +1,386 @@
+local EventDispatcher = require("event/EventDispatcher")
+
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGUIHelper = CS.GUIHelper
+local csVector2 = CS.UnityEngine.Vector2
+local csGameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+local goldenStateHeroItem_dlc
+--GetObjByName   GetComponent
+function InitComp()
+	goldenStateHeroItem_dlc = GoldenStateHeroItem_dlc.new()
+	goldenStateHeroItem_dlc:init(self.gameObject)
+end
+
+function onDestroy()
+	if goldenStateHeroItem_dlc~=nil then
+		goldenStateHeroItem_dlc:Clear()
+		goldenStateHeroItem_dlc = nil
+	end
+end
+
+function SetData(_data)
+	if goldenStateHeroItem_dlc~=nil then
+		goldenStateHeroItem_dlc:SetData(_data,self.index)
+	end
+end
+
+function onDisable()
+	if goldenStateHeroItem_dlc~=nil then
+		goldenStateHeroItem_dlc:ClearData()
+	end
+end
+
+GoldenStateHeroItem_dlc = class()
+
+function GoldenStateHeroItem_dlc:ctor()
+
+end
+
+function GoldenStateHeroItem_dlc:init(obj)
+	self:initComp(obj)
+
+	self:addListeners()
+
+	self.data = nil
+	self.timer = 0
+end
+
+function GoldenStateHeroItem_dlc:initComp(obj)
+	self.gameObject = obj
+	self.transform = obj.transform
+	self.contentPane = obj:GetComponent("LuaListItem")
+
+	self.bgIcon = self.contentPane:GetObjByName("bgIcon"):GetComponent("Image")
+	self.valText = self.contentPane:GetObjByName("valText"):GetComponent("Text")
+	self.operationBtn = self.contentPane:GetObjByName("operationBtn"):GetComponent("Button")
+	self.timeText = self.contentPane:GetObjByName("timeText"):GetComponent("Text")
+	self.finishBtn = self.contentPane:GetObjByName("finishBtn"):GetComponent("Button")
+	self.exploreIcon = self.contentPane:GetObjByName("exploreIcon"):GetComponent("GUIIcon")
+	self.exploreNameText = self.contentPane:GetObjByName("exploreNameText"):GetComponent("Text")
+	self.icon = self.contentPane:GetObjByName("icon"):GetComponent("GUIIcon")
+	self.redPoint = self.contentPane:GetObjByName("redPoint")
+
+	if(self.operationBtn ~= nil)then
+		self.operationBtnRect = self.operationBtn.gameObject:GetComponent("RectTransform")
+
+		self.operationBtn.onClick:AddListener(
+			function ()
+				if(self.data == nil) then return end
+
+				if(self.data.slotType == 0 or self.data.slotType == 1)then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+					local func = funcGeneric(CS.System.Int32)
+					func(csEventControllerInst, csGameEventType.ExploreEvent.ROLEADVENTUREBYSLOT_SHOWUI, self.data.slotId)
+				elseif self.data.slotType == 2 then
+					EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.ShowUI_RefugeAdventure,self.data.slotId)
+				elseif self.data.slotType == 3 then
+					EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.OpenUI_GoldenCityAdventure,self.data.slotId)
+				end
+			end
+		)
+	end
+	if(self.finishBtn ~= nil)then
+		self.finishBtnRect = self.finishBtn.gameObject:GetComponent("RectTransform")
+
+		self.finishBtn.onClick:AddListener(
+			function ()
+				if(self.data == nil) then return end
+
+				if(self.data.exploreState ~= 2) then return end
+
+				if(self.timer ~= 0)then
+					csGameTimerInst:RemoveTimer(self.timer)
+					self.timer = 0
+				end
+
+				--EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.HideUI_GoldenCityMain)
+
+				if(self.data.slotType == 0 or self.data.slotType == 1)then
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+					local func = funcGeneric(CS.System.Int32)
+					func(csEventControllerInst, csGameEventType.ExploreEvent.REQUEST_EXPLOREEND, self.data.slotId)
+				elseif self.data.slotType == 2 then
+					EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Request_RefugeEnd,self.data.slotId)
+				elseif self.data.slotType == 3 then
+					CS.GUIManager.BackMainView()
+					EventDispatcher:dispatchEvent(GameEvent.GoldenCityEvent.Request_GoldenCity_ExploreEnd,self.data.slotId)
+				end
+			end
+		)
+	end
+end
+
+function GoldenStateHeroItem_dlc:SetData(_data,index)
+	if(_data == nil) then return end
+
+	self.data = _data
+
+	self.bgIcon.enabled = index % 2 == 1
+	self.redPoint:SetActive(self.data.exploreState == 2)
+
+	local cfg = CS.ExploreInstanceConfigManager.inst:GetConfig(self.data.exploreId)
+	if(cfg ~= nil)then
+		self.exploreNameText.enabled = true
+		self.exploreNameText.text = cs_LanguageManagerInst:GetValueByKey(cfg.instance_name)
+	else
+		self.exploreNameText.enabled = false
+	end
+
+	self.operationBtn.gameObject:SetActive(self.data.exploreState == 1)
+	self.finishBtn.gameObject:SetActive(self.data.exploreState == 2)
+
+	if(self.data.slotType == 0 or self.data.slotType == 1)then
+		self:SetNormalExploreData(cfg)
+	elseif self.data.slotType == 2 then
+		self:SetRefugeData()
+	elseif self.data.slotType == 3 then
+		self:SetGoldenCityData(cfg)
+	end
+
+	self:SetTimer()
+end
+
+function GoldenStateHeroItem_dlc:SetTimer()
+	if(self.timer ~= 0)then
+		csGameTimerInst:RemoveTimer(self.timer)
+		self.timer = 0
+	end
+
+	if(self.data.exploreState == 1)then
+		if(self.data.exploringRemainTime > 0)then
+			self.timeText.text = CS_TimeUtils.timeSpanStrip(self.data.exploringRemainTime,true)
+		else
+			self.timeText.text = cs_LanguageManagerInst:GetValueByKey("完成")
+			csGameTimerInst:RemoveTimer(self.timer)
+			self.timer = 0
+		end
+
+		self.timer = csGameTimerInst:AddTimer(1,self.data.exploringRemainTime,function()
+				if(self.data.exploringRemainTime > 0)then
+					self.timeText.text = CS_TimeUtils.timeSpanStrip(self.data.exploringRemainTime,true)
+				else
+					self.timeText.text = cs_LanguageManagerInst:GetValueByKey("完成")
+					csGameTimerInst:RemoveTimer(self.timer)
+					self.timer = 0
+				end
+			end)
+	end
+end
+
+function GoldenStateHeroItem_dlc:SetNormalExploreData(cfg)
+
+	if(cfg ~= nil)then
+		self.exploreIcon.iconImage.enabled = true
+
+		self.exploreIcon:SetSprite(CS.StaticConstants.exploreAtlas,cfg.instance_icon)
+	else
+		self.exploreIcon.iconImage.enabled = false
+	end
+
+	self.icon.iconImage.enabled = true
+	self.valText.enabled = true
+
+	local exploreGroupData = CS.ExploreDataProxy.inst:GetGroupDataByGroupId(cfg.instance_group)
+	if(cfg.instance_type == 1)then
+		local itemCfg = CS.ItemconfigManager.inst:GetConfig(exploreGroupData.explores[self.data.exploreType - 1].id)
+		local selectCfg = CS.ItemconfigManager.inst:GetConfig(self.data.useItemId)
+
+		local itemAddPercent = 1
+		if(selectCfg ~= nil)then
+			itemAddPercent = (100 + selectCfg.effect) / 100
+		end
+
+		if(itemCfg ~= nil)then
+			self.icon.iconImage.enabled = true
+			self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+		else
+			self.icon.iconImage.enabled = false
+		end
+
+		local minNum = 0
+		local maxNum = 0
+		local addPercent = 0
+		if (self.data.exploreType == 1) then
+			minNum = cfg.drop1_num_min
+			maxNum = cfg.drop1_num_max
+			addPercent = exploreGroupData.dropCount[0]
+		elseif (self.data.exploreType == 2) then
+			minNum = cfg.drop2_num_min
+			maxNum = cfg.drop2_num_max
+			addPercent = exploreGroupData.dropCount[1]
+		elseif (self.data.exploreType == 3) then
+			minNum = cfg.drop3_num_min
+			maxNum = cfg.drop3_num_max
+			addPercent = exploreGroupData.dropCount[2]
+		end
+
+		minNum = minNum + addPercent
+		maxNum = maxNum + addPercent
+		minNum = math.ceil(minNum * itemAddPercent)
+		maxNum = math.ceil(maxNum * itemAddPercent)
+		local buildPercent = CS.UserDataProxy.inst:GetExploreDropMaterialOutputUp(itemCfg.id)
+		minNum = math.ceil(minNum * (1 + buildPercent))
+		maxNum = math.ceil(maxNum * (1 + buildPercent))
+		local buffCfg = CS.GlobalBuffDataProxy.inst:GetGlobalBuffData(CS.GlobalBuffType.explore_dropUp)
+		if (buffCfg ~= nil)then
+			minNum = math.ceil(minNum * (1 + buffCfg.buffInfo.buffParam / 100))
+			maxNum = math.ceil(maxNum * (1 + buffCfg.buffInfo.buffParam / 100))
+		end
+
+		self.valText.text = minNum .. "-" .. maxNum
+	else
+		self.icon:SetSprite("item_atlas",tostring(60000 + cfg.instance_group))
+		self.valText.text = CS.StaticConstants.getKeyProbability[cfg.difficulty - 1]
+	end
+
+	if(self.operationBtnRect ~= nil)then
+		self.operationBtnRect.anchoredPosition = csVector2(-176,-24)
+	end
+
+	if(self.finishBtnRect ~= nil)then
+		self.finishBtnRect.anchoredPosition = csVector2(-176,-24)
+	end
+end
+
+function GoldenStateHeroItem_dlc:SetRefugeData()
+	local rankData = RefugeTowerDataProxy.inst.refugeData
+	if(rankData ~= nil)then
+		self.exploreIcon.iconImage.enabled = true
+		self.exploreIcon:SetSprite(rankData.atlas_icon, rankData.icon)
+	else
+		self.exploreIcon.iconImage.enabled = false
+	end
+
+	self.icon.iconImage.enabled = false
+	self.valText.enabled = false
+
+	if(self.operationBtnRect ~= nil)then
+		self.operationBtnRect.anchoredPosition = csVector2(-176,0)
+	end
+
+	if(self.finishBtnRect ~= nil)then
+		self.finishBtnRect.anchoredPosition = csVector2(-176,0)
+	end
+end
+
+function GoldenStateHeroItem_dlc:SetGoldenCityData(cfg)
+
+	if(cfg ~= nil)then
+		self.exploreIcon.iconImage.enabled = true
+
+		if(cfg.instance_type == 2)then -- boss副本
+
+			local goldenCityCfg = nil
+			if(GoldenCityDataProxy.inst.bossExploreIsAllOver)then
+				goldenCityCfg = GoldenCityConfigManager:GetLastBossConfig()
+			else
+				goldenCityCfg = GoldenCityDataProxy.inst.bossExploreCfg
+			end
+
+			if(goldenCityCfg ~= nil)then
+				local keyItemCfg = CS.ItemconfigManager.inst:GetConfig(goldenCityCfg.ic_id)
+				if(keyItemCfg ~= nil)then
+					self.exploreIcon:SetSprite(keyItemCfg.atlas,keyItemCfg.icon)
+				else
+					self.exploreIcon.iconImage.enabled = false
+				end
+			else
+				self.exploreIcon.iconImage.enabled = false
+			end
+		else
+
+			local worldParCfg = CS.WorldParConfigManager.inst:GetConfig(8403)
+
+			if(worldParCfg ~= nil)then
+				self.exploreIcon.iconImage.enabled = true
+				local itemCfg = CS.ItemconfigManager.inst:GetConfig(worldParCfg.parameters)
+
+				if(itemCfg ~= nil)then
+					self.exploreIcon:SetSprite(itemCfg.atlas,itemCfg.icon)
+				else
+					self.exploreIcon.iconImage.enabled = false
+				end
+			else
+				self.exploreIcon.iconImage.enabled = false
+			end
+
+		end
+	else
+		self.exploreIcon.iconImage.enabled = false
+	end
+
+
+	local itemWdpCfg = CS.WorldParConfigManager.inst:GetConfig(8403)
+	if(itemWdpCfg ~= nil)then
+		local itemCfg = CS.ItemconfigManager.inst:GetConfig(itemWdpCfg.parameters)
+		if(itemCfg ~= nil)then
+			self.icon.iconImage.enabled = true
+			self.valText.enabled = true
+
+			self.icon:SetSprite(itemCfg.atlas,itemCfg.icon)
+
+			local useItemCfg = CS.ItemconfigManager.inst:GetConfig(self.data.useItemId)
+			local goldenCityCfg = GoldenCityConfigManager:GetConfigByInstanceId(cfg.id)
+			local percent = 1
+			local difficultPercent = 1
+
+			if(useItemCfg ~= nil and useItemCfg.type == 21)then
+				percent = 1 + useItemCfg.effect / 100
+			end
+
+			--if(goldenCityCfg ~= nil)then
+				--difficultPercent = goldenCityCfg.difficulty
+			--end
+
+			local val = self.data.heroInfoUIds.Count / cfg.people_number
+
+			local minCount = math.ceil(cfg.drop3_num_min * difficultPercent * val * percent)
+			local maxCount = math.ceil(cfg.drop3_num_max * difficultPercent * val * percent)
+
+			self.valText.text = minCount .. "-" .. maxCount
+		else
+			self.icon.iconImage.enabled = false
+			self.valText.enabled = false
+		end
+	else
+		self.icon.iconImage.enabled = false
+		self.valText.enabled = false
+	end
+
+	if(self.operationBtnRect ~= nil)then
+		self.operationBtnRect.anchoredPosition = csVector2(-176,-24)
+	end
+
+	if(self.finishBtnRect ~= nil)then
+		self.finishBtnRect.anchoredPosition = csVector2(-176,-24)
+	end
+end
+
+function GoldenStateHeroItem_dlc:Clear()
+
+	self:removeListeners()
+	if(self.timer ~= 0)then
+		csGameTimerInst:RemoveTimer(self.timer)
+		self.timer = 0
+	end
+
+end
+
+function GoldenStateHeroItem_dlc:ClearData()
+	if(self.timer ~= 0)then
+		csGameTimerInst:RemoveTimer(self.timer)
+		self.timer = 0
+	end
+end
+
+function GoldenStateHeroItem_dlc:addListeners()
+
+end
+
+function GoldenStateHeroItem_dlc:removeListeners()
+
+end

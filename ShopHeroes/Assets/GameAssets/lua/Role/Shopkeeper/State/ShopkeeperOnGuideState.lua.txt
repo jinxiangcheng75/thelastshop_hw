@@ -1,0 +1,35 @@
+
+require("utils/StateBase")
+
+local ShopkeeperOnGuideState = class(StateBase)
+
+
+function ShopkeeperOnGuideState:init(shopkeeper)
+
+end
+
+
+function ShopkeeperOnGuideState:getStateType()
+
+	return MachineShopkeeperState.inGuide
+
+end
+
+function ShopkeeperOnGuideState:onEnter(info)
+
+
+
+end
+
+
+function ShopkeeperOnGuideState:onExit()
+
+end
+
+function ShopkeeperOnGuideState:onUpdate()
+
+
+end
+
+
+return ShopkeeperOnGuideState

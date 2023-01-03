@@ -1,0 +1,205 @@
+
+
+local CS_type_GUIIcon = typeof(CS.GUIIcon)
+local CS_type_ObjList = typeof(CS.ObjList)
+
+local CS_ItemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_StaticConstants = CS.StaticConstants
+local CS_ItemType = CS.ItemType
+
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_GUIHelper = CS.GUIHelper
+
+local EventDispatcher = require("event/EventDispatcher")
+
+--ScoreAwardGame_TaskItem
+
+local btn_self
+local icon_bg
+local points
+local icon_iconBg
+local icon_task
+local tx_taskName
+local tx_subDes
+local slider_taskProgress
+local tx_taskProgress
+local tx_canReward
+local tx_over
+local icon_award
+local img_alreadyGet
+local tx_awardCount
+local btn_goto
+local img_maskBg
+
+local _taskData
+local liuguang_mat
+
+function InitComp()
+
+	icon_bg = self:GetGUIIcon("icon_bg")
+
+	points = {}
+	local objList_points = self:GetObjByName("objList_points"):GetComponent(CS_type_ObjList).objList
+	for i = 0, objList_points.Count - 1 do
+		points[#points + 1] = objList_points[i]:GetComponent(CS_type_GUIIcon)
+	end
+
+	icon_iconBg = self:GetGUIIcon("icon_iconBg")
+	btn_self = self:GetButton("btn_self")
+	icon_task = self:GetGUIIcon("icon_task")
+	tx_taskName = self:GetText("tx_taskName")
+	tx_subDes = self:GetText("tx_subDes")
+	slider_taskProgress = self:GetObjByName("slider_taskProgress"):GetComponent("Slider")
+	tx_taskProgress = self:GetText("tx_taskProgress")
+	tx_over = self:GetText("tx_over")
+	tx_canReward = self:GetText("tx_canReward")
+	icon_award = self:GetGUIIcon("icon_award")
+	img_alreadyGet = self:GetObjByName("img_alreadyGet"):GetComponent("Image")
+	tx_awardCount = self:GetText("tx_awardCount")
+	btn_goto = self:GetButton("btn_goto")
+	img_maskBg = self:GetObjByName("img_maskBg"):GetComponent("Image")
+
+	btn_self.onClick:AddListener(function ()
+			onSelfBtnClick()
+		end)
+
+	btn_goto.onClick:AddListener(function ()
+			onGotoBtnClick()
+		end)
+
+end
+
+function SetData(taskData)
+
+	if taskData == nil then
+		return
+	end
+
+	_taskData = taskData.data
+	liuguang_mat = taskData.mat
+
+	icon_bg.iconImage.material = nil
+	
+	if _taskData.state == MsgType.EPointActivityTaskState.Idle then
+
+		icon_bg:SetSprite("activity_scoreAwardGame_atlas",_taskData.isSpecialTask and "hodong_libaodihuang" or "hodong_libaodilan")
+		icon_iconBg:SetSprite("activity_scoreAwardGame_atlas",_taskData.isSpecialTask and "hodong_libaodihuang1" or "hodong_libaodilan1")
+		tx_subDes.color = CS.GUIHelper.GetColorByColorHex(_taskData.isSpecialTask and "ec990a" or "c59bff")
+
+		--btn_self.enabled = false
+		slider_taskProgress.gameObject:SetActive(true)
+		tx_canReward.enabled = false
+		tx_over.enabled = false
+		img_alreadyGet.enabled = false
+		img_maskBg.enabled = false
+		btn_goto.gameObject:SetActive(true)
+
+	elseif _taskData.state == MsgType.EPointActivityTaskState.CanReward then
+
+		icon_bg:SetSprite("activity_scoreAwardGame_atlas","hodong_libaodilv")
+		icon_iconBg:SetSprite("activity_scoreAwardGame_atlas","hodong_libaodilv1")
+		tx_subDes.color = CS.GUIHelper.GetColorByColorHex("FFFFFF")
+		icon_bg.iconImage.material = liuguang_mat
+
+		--btn_self.enabled = true
+		slider_taskProgress.gameObject:SetActive(false)
+		tx_canReward.enabled = true
+		tx_over.enabled = false
+		img_alreadyGet.enabled = false
+		img_maskBg.enabled = false
+		btn_goto.gameObject:SetActive(false)
+
+	elseif _taskData.state == MsgType.EPointActivityTaskState.Rewarded then
+
+		icon_bg:SetSprite("activity_scoreAwardGame_atlas",_taskData.isSpecialTask and "hodong_libaodihuang" or "hodong_libaodilan")
+		icon_iconBg:SetSprite("activity_scoreAwardGame_atlas",_taskData.isSpecialTask and "hodong_libaodihuang1" or "hodong_libaodilan1")
+		tx_subDes.color = CS.GUIHelper.GetColorByColorHex(_taskData.isSpecialTask and "ec990a" or "c59bff")
+
+		--btn_self.enabled = false
+		slider_taskProgress.gameObject:SetActive(false)
+		tx_canReward.enabled = false
+		tx_over.enabled = true
+		img_alreadyGet.enabled = true
+		img_maskBg.enabled = true
+		btn_goto.gameObject:SetActive(false)
+
+	end
+
+	setCommonInfo()
+
+
+end
+
+function setPoints()
+
+	local allNum,curProgress = Activity_ScoreAwardGameProxy.inst:GetTaskPointsParams(_taskData.type,_taskData.id)
+
+	for i = 1, #points do
+
+		if i <= allNum then
+
+			points[i].gameObject:SetActive(true)
+			
+			if _taskData.state == MsgType.EPointActivityTaskState.CanReward then
+				
+				points[i]:SetSprite("activity_scoreAwardGame_atlas",(i <= curProgress) and "hodong_dianbai" or "hodong_dianhuang")
+				
+			else
+				
+				points[i]:SetSprite("activity_scoreAwardGame_atlas",(i <= curProgress) and "hodong_dianbai" or (_taskData.isSpecialTask and "hodong_dianhuang" or "hodong_dianzi"))
+				
+			end
+			
+		else
+			points[i].gameObject:SetActive(false)
+		end
+
+	end
+
+end
+
+function setCommonInfo()
+
+	icon_task:SetSprite(_taskData.cfg.atlas,_taskData.cfg.icon)
+	tx_taskName.text = CS_LanguageManagerInst:GetValueByKey(_taskData.cfg.name,tostring(_taskData.limit))
+	--tx_subDes.text = CS_LanguageManagerInst:GetValueByKey("小标题--暂无--")
+	
+	local param = _taskData.param
+	if _taskData.param > _taskData.limit then
+		param = _taskData.limit
+	end
+	
+	tx_subDes.enabled = false
+	tx_taskProgress.text = param .. "/" .. _taskData.limit
+	slider_taskProgress.value = param / _taskData.limit
+	
+	local cfg = CS_ItemConfigManagerInst:GetConfig(_taskData.allAwards[1].itemId)	
+	if cfg ~= nil then
+		icon_award:SetSprite(cfg.atlas,cfg.icon)
+	end
+	
+	tx_awardCount.text = tostring(_taskData.allAwards[1].count)
+
+	setPoints()
+
+end
+
+function onGotoBtnClick()
+
+	if _taskData ~= nil then
+		CS.GoOperationManager.inst:StartJumpOperation(_taskData.operationData)
+	end
+
+end
+
+function onSelfBtnClick()
+
+	if _taskData ~= nil and _taskData.state == MsgType.EPointActivityTaskState.CanReward then
+		--领取奖励
+		EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_TaskReward,_taskData.id)
+	end
+
+end

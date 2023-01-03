@@ -1,0 +1,362 @@
+--RefugeTowerDataProxy
+
+require("class")
+require("data/BaseDataProxy")
+require("event/GameEvent")
+require("network/NetworkEvent")
+require("config/RefugeConfigManager")
+require("config/RefugeFloorConfigManager")
+local EventDispatcher = require("event/EventDispatcher")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local csGameTimerInst = CS.GameTimer.inst
+
+local csVipState = CS.K_Vip_State
+
+local realRemainTime = 0
+local timerId = nil
+
+RefugeTowerDataProxy = class(BaseDataProxy)
+
+RefugeTowerDataProxy.inst = RefugeTowerDataProxy:new()
+
+function RefugeTowerDataProxy:Init()
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Tower_Info_Cmd,
+		function(resp)
+			print("Response_Tower_Info success", resp)
+			self:GetInfoData(resp)
+		end,
+		function(code)
+			print("Response_Tower_Info fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Tower_ExploreStart_Cmd,
+		function(resp)
+			print("Response_Tower_ExploreStart success", resp)
+			self:GetStartData(resp)
+		end,
+		function(code)
+			print("Response_Tower_ExploreStart fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Tower_ExploreEnd_Cmd,
+		function(resp)
+			print("Response_Tower_ExploreEnd success", resp)
+			self:GetEndData(resp)
+		end,
+		function(code)
+			print("Response_Tower_ExploreEnd fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Tower_Reward_Cmd,
+		function(resp)
+			print("Response_Tower_Reward success", resp)
+			self:GetRewardData(resp)
+		end,
+		function(code)
+			print("Response_Tower_Reward fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Tower_ExploreImmediately_Cmd,
+		function(resp)
+			print("Response_Tower_ExploreImmediately success", resp)
+			self:GetImmediatelyData(resp)
+		end,
+		function(code)
+			print("Response_Tower_ExploreImmediately fail --- code", code)
+			--csEventControllerInst:TriggerEvent(csGameEventType.SHOWUI_MSGBOX,"获取签到数据失败!")
+		end
+	)
+
+	self.refugeData = nil
+	self.towerList = {}
+	self.maxTowerFloor = 0
+	self.haveNotGetAward = false
+	self.isAllOver = false
+end
+
+function RefugeTowerDataProxy:GetInfoData(respData)
+	local data = MsgType.Response_Tower_Info:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	self.refugeData = RefugeConfigManager:GetConfig(data.userRank)
+	if(self.refugeData ~= nil)then
+		CS.ExploreDataProxy.inst.refugeAtlas = self.refugeData.atlas_icon
+		CS.ExploreDataProxy.inst.refugeIcon = self.refugeData.icon
+	end
+	self.nextIndex = data.userIndex
+	self.remainTime = data.remainTime
+	for i = 1, #data.towerList do
+		if(i == 1)then
+			self.nextIndex = self.nextIndex - data.towerList[i].id + 1
+		end
+		self.maxTowerFloor = data.towerList[i].index
+		if(self.towerList[i] == nil)then
+			local tempData = RefugeData:new()
+			tempData:InitData(data.towerList[i])
+			self.towerList[i] = tempData
+		else
+			local selfData = self.towerList[i]
+			selfData:InitData(data.towerList[i])
+		end
+	end
+
+	if(self.nextIndex >= #self.towerList and self.towerList[#self.towerList] ~= nil and self.towerList[#self.towerList].normalState ~= 1)then
+		self.isAllOver = true
+	else
+		self.isAllOver = false
+	end
+
+	self.haveNotGetAward = false
+	for i = 1, #self.towerList do
+		if(self.towerList[i].index < self.nextIndex)then
+			if(self.towerList[i].sum >= 1 and self.towerList[i].sum < 2)then
+				if(self.towerList[i].normalState ~= 3)then
+					self.haveNotGetAward = true
+					break
+				end
+			elseif self.towerList[i].sum >= 2 then
+				if(self.towerList[i].normalState ~= 3)then
+					self.haveNotGetAward = true
+					break
+				end
+				if(self.towerList[i].vipState ~= 3 and csVipState.__CastFrom(CS.UserDataProxy.inst.playerData.vipState) == csVipState.Vip)then
+					self.haveNotGetAward = true
+					break
+				end
+			end
+		end
+	end
+
+	if(tonumber(self.remainTime) > 0)then
+		self:calculateTime()
+		csEventControllerInst:TriggerEvent(csGameEventType.MenuEvent.REFRESHREFUGEBTN)
+	else
+		if(self.haveNotGetAward)then
+			-- 仍然保留在界面上
+			csEventControllerInst:TriggerEvent(csGameEventType.MenuEvent.REFRESHREFUGEBTN)
+		else
+			-- 界面上按钮消失
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.System.Boolean)
+			func(csEventControllerInst, csGameEventType.MenuEvent.SETREFUGEBTNSTATE, false)
+		end
+	end
+	EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Refresh_RefugeRedPoint)
+end
+
+function RefugeTowerDataProxy:GetStartData(respData)
+	local data = MsgType.Response_Tower_ExploreStart:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	local tempData = CS.ExploreDataProxy.inst:GetMakeSlot(data.exploreSlot.slotId)
+	if(tempData ~= nil)then
+		tempData:setData(data.exploreSlot)
+
+		if(tempData.exploreState == 1) then
+
+			local title = CS.LanguageManager.inst:GetValueByKey("生存几何")
+			local body = ""
+			local instanceIdCfg = CS.ExploreInstanceConfigManager.inst:GetConfig(tempData.exploreId)
+			if (instanceIdCfg ~= nil) then
+				body = CS.LanguageManager.inst:GetValueByKey("您的英雄小队在{0}已完成探索，快来收取战利品！", instanceIdCfg.instance_name)
+			end
+			CS.PlatformManager.inst:AddLocalNotice(title, "", body, 1, tempData.exploringEndTime, "Explore_" .. tempData.exploreId)
+		end
+	end
+
+	for i = 1, #data.heroInfo do
+		CS.RoleDataProxy.inst:AddHeroData(data.heroInfo[i])
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.HideUI_RefugePrepareUI)
+	EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.RefreshUI_RefugePanelUI)
+	--CS.GUIManager.BackMainView()
+	--if(CS.ManagerBinder.inst.mGameState == CS.kGameState.Town) then
+	--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	--local func = funcGeneric(CS.ESlotAnimType)
+	--func(csEventControllerInst, csGameEventType.ExploreEvent.EXPLORE_UPDATESLOTDATA, CS.ESlotAnimType.Normal)
+	--end
+
+end
+
+function RefugeTowerDataProxy:GetEndData(respData)
+	local data = MsgType.Response_Tower_ExploreEnd:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+end
+
+function RefugeTowerDataProxy:GetImmediatelyData(respData)
+	local data = MsgType.Response_Tower_ExploreImmediately:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	local slotData = CS.ExploreDataProxy.inst:GetMakeSlot(data.exploreSlot.slotId)
+	if(slotData == nil)then
+		CS.ExploreDataProxy.inst:AddSlotData(data.exploreSlot)
+	else
+		slotData:setData(data.exploreSlot)
+	end
+
+	if(slotData ~= nil and slotData.exploreState ~= 1) then
+		CS.PlatformManager.inst:RemoveOneNotificationWithID("Explore_" .. slotData.exploreId)
+	end
+
+	CS.GUIManager.BackMainView()
+	--EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.HideUI_RefugeAdventure)
+	--csEventControllerInst:TriggerEvent(csGameEventType.RoleEvent.RESPONSE_HEROSHIFTIN)
+	--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	--local func = funcGeneric(CS.ESlotAnimType)
+	--func(csEventControllerInst, csGameEventType.ExploreEvent.EXPLORE_UPDATESLOTDATA, CS.ESlotAnimType.Normal)
+	EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Request_RefugeEnd,data.exploreSlot.slotId)
+end
+
+function RefugeTowerDataProxy:GetRewardData(respData)
+	local data = MsgType.Response_Tower_Reward:New(respData)
+	if (CS.EErrorCode.__CastFrom(data.errorCode) ~= CS.EErrorCode.EEC_Success) then
+		return
+	end
+
+	local cfg = CS.ItemconfigManager.inst:GetConfig(data.reward.itemId)
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.queueItem)
+	if (cfg ~= nil) then
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", 0, data.reward.itemId, data.reward.count)
+
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	else
+		local queueItem = CS.queueItem(CS.ReceiveInfoUIType.GetItem, "", data.reward.itemId, 0, data.reward.count)
+
+		func(csEventControllerInst, csGameEventType.ReceiveEvent.NEWITEM_MSG, queueItem)
+	end
+
+	for i = 1, #data.towerList do
+		if(self.towerList[i] == nil)then
+			local tempData = RefugeData:new()
+			tempData:InitData(data.towerList[i])
+			self.towerList[i] = tempData
+		else
+			local selfData = self.towerList[i]
+			selfData:InitData(data.towerList[i])
+		end
+	end
+
+	self.haveNotGetAward = false
+	for i = 1, #self.towerList do
+		if(self.towerList[i].index < self.nextIndex)then
+			if(self.towerList[i].sum >= 1 and self.towerList[i].sum < 2)then
+				if(self.towerList[i].normalState ~= 3)then
+					self.haveNotGetAward = true
+					break
+				end
+			elseif self.towerList[i].sum >= 2 then
+				if(self.towerList[i].normalState ~= 3)then
+					self.haveNotGetAward = true
+					break
+				end
+				if(self.towerList[i].vipState ~= 3 and csVipState.__CastFrom(CS.UserDataProxy.inst.playerData.vipState) == csVipState.Vip)then
+					self.haveNotGetAward = true
+					break
+				end
+			end
+		end
+	end
+
+	if(tonumber(self.remainTime) <= 0)then
+		if(self.haveNotGetAward)then
+			-- 仍然保留在界面上
+			csEventControllerInst:TriggerEvent(csGameEventType.MenuEvent.REFRESHREFUGEBTN)
+		else
+			-- 界面上按钮消失
+			local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+			local func = funcGeneric(CS.System.Boolean)
+			func(csEventControllerInst, csGameEventType.MenuEvent.SETREFUGEBTNSTATE, false)
+		end
+	end
+
+	EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.RefreshUI_RefugePanelUI)
+	EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Refresh_RefugeRedPoint)
+end
+
+function RefugeTowerDataProxy:calculateTime()
+	if (timerId ~= nil) then
+		csGameTimerInst:RemoveTimer(timerId)
+		timerId = nil
+	end
+
+	realRemainTime = csGameTimerInst.serverNow + self.remainTime
+	timerId =
+	csGameTimerInst:AddTimer(
+		1,
+		function()
+			if (tonumber(self.remainTime) > 0) then
+				self.remainTime = realRemainTime - csGameTimerInst.serverNow
+			else
+
+				EventDispatcher:dispatchEvent(GameEvent.RefugeEvent.Request_RefugeInfo)
+				csGameTimerInst:RemoveTimer(timerId)
+				timerId = nil
+			end
+		end
+	)
+end
+
+function RefugeTowerDataProxy:GetTowerDataById(id)
+	return self.towerList[id]
+end
+
+function RefugeTowerDataProxy:Clear()
+end
+
+function RefugeTowerDataProxy:GetData()
+end
+
+RefugeData = class()
+
+function RefugeData:InitData(_data)
+	self.id = _data.id
+	self.rank = _data.rank
+	self.index = _data.index
+	self.normalState = _data.rewardState
+	self.vipState = _data.vipRewardState
+	self.configData = RefugeFloorConfigManager:GetConfig(_data.id)
+	self.sum = 0
+	if(self.configData ~= nil)then
+		if(self.configData.reward1_id ~= "" and tonumber(self.configData.reward1_id) ~= 0)then
+			self.sum = self.sum + 1
+		end
+		if(self.configData.reward2_id ~= "" and tonumber(self.configData.reward2_id) ~= 0)then
+			self.sum = self.sum + 1
+		end
+	end
+end
+
+RefugeRewardData = class()
+
+function RefugeRewardData:InitData(_itemId,_count,_curState,_isVip,_floorId)
+	self.itemId = _itemId
+	self.count = _count
+	self.curState = _curState
+	self.isVip = _isVip
+	self.floorId = _floorId
+end

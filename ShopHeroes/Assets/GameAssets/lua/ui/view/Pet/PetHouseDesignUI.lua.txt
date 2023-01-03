@@ -1,0 +1,245 @@
+--PetHouseDesignUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_ObjList = typeof(CS.ObjList)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+local CS_GUIHelper = CS.GUIHelper
+
+local CS_PetDataProxyInst = CS.PetDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+PetHouseDesignUI = class(ViewBase)
+
+function PetHouseDesignUI:ctor()
+	self.viewID = Constants.ViewName.PetHouseDesignUI
+	PetHouseDesignUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = false
+end
+------------------------------------------------
+
+function PetHouseDesignUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.tx_petName = contentPane:GetText("tx_petName")
+	self.slider_exp = contentPane:GetObjByName("slider_exp"):GetComponent("Slider")
+	self.tx_sliderTx = contentPane:GetText("tx_sliderTx")
+	self.tx_petLv = contentPane:GetText("tx_petLv")
+	self.tx_reputation = contentPane:GetText("tx_reputation")
+	self.tx_energy = contentPane:GetText("tx_energy")
+
+	self.btn_left = contentPane:GetButton("btn_left")
+	self.btn_right = contentPane:GetButton("btn_right")
+
+	self.btn_exit = contentPane:GetButton("btn_exit")
+	self.btn_dressUp = contentPane:GetButton("btn_dressUp")
+	self.btn_detail = contentPane:GetButton("btn_detail")
+	self.btn_feed = contentPane:GetButton("btn_feed")
+	self.tx_feed = contentPane:GetText("tx_feed")
+	self.tx_feedCountdown = contentPane:GetText("tx_feedCountdown")
+	self.obj_feedCountdown = contentPane:GetObjByName("obj_feedCountdown")
+
+	self.btn_energyTip = contentPane:GetButton("btn_energyTip")
+	self.obj_energyTip = contentPane:GetObjByName("obj_energyTip")
+	self.btn_energyTipMask = contentPane:GetButton("btn_energyTipMask")
+end
+
+function PetHouseDesignUI:onInit()
+	self:initComp()
+
+	self.btn_left:ButtonClickTween(
+		function()
+			self:turnPage(true)
+		end
+	)
+
+	self.btn_right:ButtonClickTween(
+		function()
+			self:turnPage(true)
+		end
+	)
+
+	self.btn_exit:ButtonClickTween(
+		function()
+			self:onBtn_exitClick()
+		end
+	)
+
+	self.btn_dressUp:ButtonClickTween(
+		function()
+			self:onBtn_dressUpClick()
+		end
+	)
+
+	self.btn_detail:ButtonClickTween(
+		function()
+			self:onBtn_detailClick()
+		end
+	)
+
+	self.btn_feed:ButtonClickTween(
+		function()
+			self:onBtn_feedClick()
+		end
+	)
+
+	self.btn_energyTip.onClick:AddListener(
+		function()
+			self:onBtn_energyTipClick()
+		end
+	)
+
+	self.btn_energyTipMask.onClick:AddListener(
+		function()
+			self.obj_energyTip:SetActive(false)
+			self.btn_energyTipMask.gameObject:SetActive(false)
+		end
+	)
+end
+
+function PetHouseDesignUI:onHide()
+	print("PetHouseDesignUI onHide")
+	self:clearTimer()
+	self.obj_energyTip:SetActive(false)
+	self.btn_energyTipMask.gameObject:SetActive(false)
+end
+
+function PetHouseDesignUI:onShowed()
+	print("PetHouseDesignUI onShowed")
+end
+
+function PetHouseDesignUI:UpdateData(chgPetDataUid)
+	if self.data.petUid == chgPetDataUid then
+		self:SetData(CS_PetDataProxyInst:GetPetDataByPetUid(chgPetDataUid))
+	end
+end
+
+function PetHouseDesignUI:SetData(petData)
+	self.data = petData
+	self:clearTimer()
+
+	local list = CS_PetDataProxyInst:GetNotStorePetDatas()
+
+	self.btn_left.gameObject:SetActive(list.Count > 1)
+	self.btn_right.gameObject:SetActive(list.Count > 1)
+
+	if self.data ~= nil then
+		
+		local petCfg = PetConfigManager:GetConfig(self.data.petInfo.petId)
+		
+		CS.AudioManager.inst:PlaySound(petCfg.pet_music_id)
+		
+		self.tx_petName.text = CS_LanguageManagerInst:GetValueByKey(self.data.petInfo.petName)
+		self.tx_petLv.text = tostring(self.data.petInfo.petLevel)
+
+		local curConfig = PetUpdateConfigManager:GetConfig(self.data.petInfo.petLevel)
+		local nextConfig = PetUpdateConfigManager:GetConfig(self.data.petInfo.petLevel + 1)
+		self.isMaxLv = false
+
+		if nextConfig == nil then
+			self.isMaxLv = true
+		end
+
+		self.tx_reputation.text = tostring(0) --预留声望
+		self.slider_exp.value = self.isMaxLv and 1 or self.data.petInfo.petExp / (nextConfig.exp * 1.0)
+		self.tx_sliderTx.text =
+			self.isMaxLv and CS_LanguageManagerInst:GetValueByKey("已满级") or
+			tostring(self.data.petInfo.petExp) .. "/" .. tostring(nextConfig.exp)
+
+		self.btn_energyTip.enabled = self.data.petNextFeedTime <= 0
+
+		local energy = self.data.petInfo.petEnergy
+
+		if self.data.petNextFeedTime > 0 then
+			CS_GUIHelper.SetSingleUIGray(self.btn_feed.transform, true)
+			self.btn_feed.interactable = false
+			self.obj_feedCountdown:SetActive(true)
+			self.tx_feed.text = ""
+			self.tx_energy.color = CS_GUIHelper.GetColorByColorHex("ffffff")
+			energy = curConfig.energy
+
+			self:setTimer()
+		else
+			CS_GUIHelper.SetSingleUIGray(self.btn_feed.transform, false)
+			self.btn_feed.interactable = true
+			self.obj_feedCountdown:SetActive(false)
+			self.tx_feed.text = CS_LanguageManagerInst:GetValueByKey("喂食")
+			self.tx_energy.color = CS_GUIHelper.GetColorByColorHex("fd4f4f")
+			energy = math.ceil(curConfig.energy / 2)
+		end
+
+		self.tx_energy.text = tostring(energy)
+	end
+end
+
+function PetHouseDesignUI:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function PetHouseDesignUI:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function PetHouseDesignUI:turnPage(isLeft)
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua3")
+	local func_3 = funcGeneric(CS.System.Boolean, CS.System.Boolean, CS.System.Int32)
+
+	func_3(CS_EventControllerInst, CS_GameEventType.PetCompEvent.PET_TURNPAGE, false, isLeft, self.data.petUid)
+end
+
+function PetHouseDesignUI:onBtn_exitClick()
+	CS_EventControllerInst:TriggerEvent(CS_GameEventType.ShopDesignEvent.EXITPETHOUSE)
+end
+
+function PetHouseDesignUI:onBtn_dressUpClick()
+	EventDispatcher:dispatchEvent(GameEvent.PetEvent.ShowUI_ChangePetDressUpUI, self.data)
+end
+
+function PetHouseDesignUI:onBtn_detailClick()
+	EventDispatcher:dispatchEvent(GameEvent.PetEvent.ShowUI_PetDetailUI, self.data)
+end
+
+function PetHouseDesignUI:onBtn_feedClick()
+	EventDispatcher:dispatchEvent(GameEvent.PetEvent.ShowUI_FeedPetUI, self.data)
+end
+
+function PetHouseDesignUI:onBtn_energyTipClick()
+	self.obj_energyTip:SetActive(true)
+	self.btn_energyTipMask.gameObject:SetActive(true)
+end
+
+function PetHouseDesignUI:setTimer()
+	self:clearTimer()
+
+	self.tx_feedCountdown.text = CS_TimeUtils.timeSpanStrip(self.data.petNextFeedTime, true)
+
+	self.timerId =
+		CS_GameTimerInst:AddTimer(
+		1,
+		function()
+			self.tx_feedCountdown.text = CS_TimeUtils.timeSpanStrip(self.data.petNextFeedTime, true)
+		end
+	)
+end
+
+function PetHouseDesignUI:clearTimer()
+	if self.timerId ~= 0 then
+		CS_GameTimerInst:RemoveTimer(self.timerId)
+		self.timerId = 0
+	end
+
+	self.tx_feedCountdown.text = ""
+end
+
+------------------------------------------------

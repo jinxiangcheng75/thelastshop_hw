@@ -1,0 +1,50 @@
+local icon
+local allStars = {}
+local nameText
+local lastImg
+local descUpText
+local descText
+local unlockObj
+local lockImg
+
+require("config/LuxuryConfigManager")
+
+local csLanguageManagerInst = CS.LanguageManager.inst
+
+local data
+
+function InitComp()
+	icon = self:GetObjByName("icon"):GetComponent("GUIIcon")
+	allStars[1] = self:GetObjByName("star1"):GetComponent("GUIIcon")
+	allStars[2] = self:GetObjByName("star2"):GetComponent("GUIIcon")
+	allStars[3] = self:GetObjByName("star3"):GetComponent("GUIIcon")
+	allStars[4] = self:GetObjByName("star4"):GetComponent("GUIIcon")
+	allStars[5] = self:GetObjByName("star5"):GetComponent("GUIIcon")
+	--nameText = self:GetObjByName("nameText"):GetComponent("Text")
+	descUpText = self:GetObjByName("descUp"):GetComponent("Text")
+	descText = self:GetObjByName("descText"):GetComponent("Text")
+	--unlockObj = self:GetObjByName("unlockObj")
+	--lockImg = self:GetObjByName("lockImg"):GetComponent("Image")
+	--lastImg = self:GetObjByName("lastBg"):GetComponent("Image")
+end
+
+function SetData(_data)
+	data = _data
+	--local curLevel = CS.UserDataProxy.inst.playerData.curLuxuryLevel
+	icon:SetSprite(data.atlas,data.icon)
+	--nameText.text = csLanguageManagerInst:GetValueByKey("{0}星-{1}",data.stars,csLanguageManagerInst:GetValueByKey(data.type))
+	descUpText.text = csLanguageManagerInst:GetValueByKey("{0}星.{1}",tostring(data.stars),data.type)
+	descText.text = LuxuryConfigManager:GetDescStr(tonumber(data.buff_type),tostring(data.buff_val))
+	--icon:SetSprite(data.atlas,data.icon)
+	--lastImg.enabled = tonumber(data.level) <= curLevel
+	--unlockObj:SetActive(tonumber(data.level) <= curLevel)
+	--lockImg.enabled = tonumber(data.level) > curLevel
+	--icon:SetSprite(data.atlas,data.icon)
+	for i = 1, #allStars do
+		if(i <= tonumber(data.stars))then
+			allStars[i]:SetSprite("luxury_atlas","yingxiong_xingcheng")
+		else
+			allStars[i]:SetSprite("luxury_atlas","yingxiong_xingcheng1")
+		end
+	end
+end

@@ -1,0 +1,113 @@
+--TipsAgainAffirmUI
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local Vector2 = CS.UnityEngine.Vector2
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+TipsAgainAffirmUIType =
+{
+	allBtn = 0,
+	justOkBtn = 1,
+}
+
+--确认提示界面
+TipsAgainAffirmUI = class(ViewBase)
+
+function TipsAgainAffirmUI:ctor()
+	self.viewID = Constants.ViewName.TipsAgainAffirmUI
+	TipsAgainAffirmUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+------------------------------------------------
+
+
+function TipsAgainAffirmUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.tx_title = contentPane:GetText("tx_title");
+	self.btn_close = contentPane:GetButton("btn_close");
+	self.tx_tips = contentPane:GetText("tx_tips");
+	self.btn_cancel = contentPane:GetButton("btn_cancel");
+	self.btn_apply = contentPane:GetButton("btn_apply");
+
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+
+function TipsAgainAffirmUI:onInit()
+
+	self:initComp()
+	self.btn_applyClickHandler = nil;
+
+	self.btn_close:ButtonClickTween(function ()
+			self:hide()
+		end)
+
+	self.btn_cancel:ButtonClickTween(function ()
+			self:hide()
+		end)
+
+	self.btn_apply:ButtonClickTween(function ()
+			self:onBtn_ApplyClick()
+		end)
+
+end
+
+--type 0 确认按钮、取消按钮 1 仅确认按钮
+
+function TipsAgainAffirmUI:SetData(title,tips,callback,type)
+
+	type = type or TipsAgainAffirmUIType.allBtn
+
+	self.btn_cancel.gameObject:SetActive(type == TipsAgainAffirmUIType.allBtn)
+	if type == TipsAgainAffirmUIType.allBtn then
+		self.btn_apply.transform:GetComponent("RectTransform").anchoredPosition = Vector2(240,-4)
+	else
+		self.btn_apply.transform:GetComponent("RectTransform").anchoredPosition = Vector2(0,-4)
+	end
+
+	self.tx_title.text = title
+	self.tx_tips.text = tips
+	self.btn_applyClickHandler = callback
+
+end
+
+function TipsAgainAffirmUI:DoShowAnimation()
+
+	TipsAgainAffirmUI.super.DoShowAnimation(self)
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function TipsAgainAffirmUI:DoHideAnimation()
+	self.uiAnimator:Play("hide")
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(
+		animLength,
+		1,
+		function()
+			self.uiAnimator:CrossFade("null", 0)
+			self.uiAnimator:Update(0)
+			self:HideView()
+		end
+	)
+end
+
+
+function TipsAgainAffirmUI:onBtn_ApplyClick()
+
+	self:hide()
+	if self.btn_applyClickHandler ~= nil then
+		self.btn_applyClickHandler();
+	end
+
+end

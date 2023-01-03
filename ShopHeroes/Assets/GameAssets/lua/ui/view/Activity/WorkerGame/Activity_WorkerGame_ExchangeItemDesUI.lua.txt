@@ -1,0 +1,264 @@
+--Activity_WorkerGame_ExchangeItemDesUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_itemConfigManagerInst = CS.ItemconfigManager.inst
+local CS_EquipConfigManagerInst = CS.EquipConfigManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+
+Activity_WorkerGame_ExchangeItemDesUI = class(ViewBase)
+
+function Activity_WorkerGame_ExchangeItemDesUI:ctor()
+	self.viewID = Constants.ViewName.Activity_WorkerGame_ExchangeItemDesUI
+	Activity_WorkerGame_ExchangeItemDesUI.super.init(self, self.viewID)
+	self.sortingLayerName = "window"
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.activity_workerGame
+end
+------------------------------------------------
+
+
+function Activity_WorkerGame_ExchangeItemDesUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.btn_mask = contentPane:GetButton("btn_mask");
+	self.btn_close = contentPane:GetButton("btn_close");
+	self.btn_info = contentPane:GetButton("btn_info");
+	self.img_tuzhi = contentPane:GetImage("img_tuzhi");
+	self.obj_equipLv = contentPane:GetObjByName("obj_equipLv")
+	self.tx_equipLv = contentPane:GetText("tx_equipLv")
+	self.icon_item = contentPane:GetGUIIcon("icon_item")
+	self.tx_itemName = contentPane:GetText("tx_itemName")
+	self.tx_itemType = contentPane:GetText("tx_itemType")
+	self.tx_itemDes = contentPane:GetText("tx_itemDes")
+	self.btn_exchange = contentPane:GetButton("btn_exchange");
+	self.tx_needCoinCount = contentPane:GetText("tx_needCoinCount")
+	self.btn_left = contentPane:GetButton("btn_left")
+	self.btn_right = contentPane:GetButton("btn_right")
+
+	self.luxuryNumImg = contentPane:GetImage("luxuryNumImg")
+	self.luxuryNumText = contentPane:GetText("luxuryNumText")
+
+	self.workerObj = contentPane:GetObjByName("workerList")
+	local workerObjList = self.workerObj:GetComponent("ObjList").objList
+	self.workerList = {}
+	for i = 0, workerObjList.Count - 1 do
+		self.workerList[#self.workerList + 1] = workerObjList[i]:GetComponent("needWorker")
+	end
+
+	self.uiAnimator = contentPane.uiAnimator
+
+end
+
+
+function Activity_WorkerGame_ExchangeItemDesUI:onInit()
+
+	self:initComp()
+
+	self.btn_mask.onClick:AddListener(
+		function ()
+			self:hide()
+		end)
+
+
+	self.btn_close:ButtonClickTween(
+		function ()
+			self:hide()
+		end)
+
+	self.btn_info:ButtonClickTween(
+		function ()
+			self:onInfoBtnClick()
+		end)
+
+	self.btn_exchange:ButtonClickTween(
+		function ()
+			self:onExchangeBtnClick()
+		end)
+
+	self.btn_left:ButtonClickTween(function ()
+			self:turnPage(true)
+		end)
+
+	self.btn_right:ButtonClickTween(function ()
+			self:turnPage(false)
+		end)
+
+end
+
+function Activity_WorkerGame_ExchangeItemDesUI:turnPage(isLeft)
+
+	local data = Activity_WorkerGameProxy.inst:GetTurnPageExchangeData(self.data.index,isLeft)
+
+	if data ~= nil then
+		self:SetData(data)
+	end
+
+end
+
+function Activity_WorkerGame_ExchangeItemDesUI:onInfoBtnClick()
+
+	--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua3")
+	--local func = funcGeneric(CS.System.String, CS.System.Int32,CS.System.Collections.Generic.List(CS.EquipItem))
+	--local itemCfg = CS_itemConfigManagerInst:GetConfig(self.data.itemId)
+	--local equipQualityCfg = CS_EquipConfigManagerInst:GetEquipQualityConfig(itemCfg.effect,1)
+	--func(CS_EventControllerInst, CS_GameEventType.SHOWUI_EQUIPITEMUI,"", equipQualityCfg.id,get_csharp_list(CS.EquipItem))
+
+
+	local itemCfg = CS_itemConfigManagerInst:GetConfig(self.data.itemId)
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua1")
+	local func = funcGeneric(CS.System.Int32)
+	func(CS_EventControllerInst, CS_GameEventType.SHOWUI_EQUIPINFOUIBYDRAWINGID,itemCfg.effect)
+
+end
+
+function Activity_WorkerGame_ExchangeItemDesUI:onExchangeBtnClick()
+
+	if self.data.cost > Activity_WorkerGameProxy.inst.coin then
+		EventDispatcher:dispatchEvent(GameEvent.MsgTipEvent.ShowTextMsgTip,CS_LanguageManagerInst:GetValueByKey("活动币不足"),"FF2828")
+		return
+	else
+		EventDispatcher:dispatchEvent(GameEvent.Activity_WorkerGameEvent.Request_OperatingActivity_Exchange,self.data.index)
+		self:hide()
+	end
+
+end
+
+function Activity_WorkerGame_ExchangeItemDesUI:SetData(exchangeItemData)
+
+	self.data = exchangeItemData
+
+	local noneNum = Activity_WorkerGameProxy.inst:GetNoneExchangeDataNum()
+
+	self.btn_left.gameObject:SetActive(noneNum > 1)
+	self.btn_right.gameObject:SetActive(noneNum > 1)
+
+	self.luxuryNumImg.enabled = self.data.itemType == 40
+	self.luxuryNumText.text = ""
+
+	self.btn_info.gameObject:SetActive(self.data.itemType == 16)
+	self.img_tuzhi.enabled = self.data.itemType == 16
+	self.obj_equipLv:SetActive(self.data.itemType == 16)
+	self.workerObj:SetActive(self.data.itemType == 16)
+
+	local itemCfg = CS_itemConfigManagerInst:GetConfig(self.data.itemId)
+
+	if self.data.itemType == 16 then --图纸
+
+		local equipDrawingCfg = CS_EquipConfigManagerInst:GetEquipDrawingsCfg(itemCfg.effect)
+		self.icon_item:SetSprite(equipDrawingCfg.atlas,equipDrawingCfg.icon)
+		self.tx_equipLv.text = tostring(equipDrawingCfg.level)
+		self.tx_itemType.text = CS_LanguageManagerInst:GetValueByKey("图纸")
+
+		for i = 1, #self.workerList do
+			local curWorkerItem = self.workerList[i]
+			if(i <= equipDrawingCfg.artisan_id.Length)then
+				curWorkerItem.gameObject:SetActive(true)
+				local workerCfg = CS.WorkerConfigManager.inst:GetConfig(equipDrawingCfg.artisan_id[i - 1])
+				if(workerCfg ~= nil)then
+					curWorkerItem.workerIcon:SetSprite("portrait_atlas", workerCfg.icon)
+				end
+
+				curWorkerItem.workerLv.text = CS.LanguageManager.inst:GetValueByKey("{0}级", tostring(equipDrawingCfg.artisan_lv[i - 1]))
+
+				local workerData = CS.RoleDataProxy.inst:GetWorker(workerCfg.id)
+				if(workerData.state == CS.EWorkerState.Unlock and workerData.level >= equipDrawingCfg.artisan_lv[i - 1])then
+					curWorkerItem.workerLv.color = CS.GUIHelper.GetColorByColorHex("#FFFFFF")
+				else
+					curWorkerItem.workerLv.color = CS.GUIHelper.GetColorByColorHex("#CC2201")
+				end
+			else
+				curWorkerItem.gameObject:SetActive(false)
+			end
+		end
+
+	elseif self.data.itemType == 40 then --家具
+
+		self.tx_itemType.text = CS_LanguageManagerInst:GetValueByKey("家具")
+		self.icon_item:SetSprite(itemCfg.atlas,itemCfg.icon)
+
+		local furnitureCfg = CS.FurnitureConfigManager.inst:getConfig(tonumber(itemCfg.effect))
+
+		if furnitureCfg ~= nil then
+
+			local luxury = 0
+
+			if furnitureCfg.type_1 == 1 then --墙壁
+
+				local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS.UserDataProxy.inst.shopData.shopLevel)
+
+				luxury = math.ceil((cfg.size_x / 2 + cfg.size_y / 2 ) * furnitureCfg.luxury)
+
+			elseif furnitureCfg.type_1 == 2 then --地板
+
+				local cfg = CS.ExtensionConfigManager.inst:GetExtensionConfig(CS.UserDataProxy.inst.shopData.shopLevel)
+
+				luxury = math.ceil((cfg.size_x / 2) * (cfg.size_y / 2) * furnitureCfg.luxury)
+
+			else
+				luxury = furnitureCfg.luxury
+			end
+
+			self.luxuryNumText.text = tostring(luxury)
+
+		end
+
+	elseif self.data.itemType == 41 then --装扮
+
+		self.tx_itemType.text = CS_LanguageManagerInst:GetValueByKey("服饰")
+		self.icon_item:SetSprite(itemCfg.atlas,itemCfg.icon)
+
+	end
+
+	self.tx_itemName.text = CS_LanguageManagerInst:GetValueByKey(itemCfg.name)
+	self.tx_itemDes.text = CS_LanguageManagerInst:GetValueByKey(itemCfg.desc)
+
+	self.tx_needCoinCount.text = tostring(self.data.cost)
+	self.tx_needCoinCount.color = Activity_WorkerGameProxy.inst.coin < self.data.cost and CS.GUIHelper.GetColorByColorHex("FF2828") or CS.GUIHelper.GetColorByColorHex("FFFFFF")
+
+end
+
+function Activity_WorkerGame_ExchangeItemDesUI:onShowed()
+
+end
+
+function Activity_WorkerGame_ExchangeItemDesUI:onHide()
+
+end
+
+function Activity_WorkerGame_ExchangeItemDesUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function Activity_WorkerGame_ExchangeItemDesUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+
+------------------------------------------------

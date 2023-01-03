@@ -1,0 +1,11 @@
+local JSON = require("utils/JSON")
+
+JsonUtils = {}
+
+function JsonUtils:encode(tb)
+	return JSON:encode(tb)
+end
+
+function JsonUtils:decode(jsonstr)
+	return JSON:decode(jsonstr)
+end

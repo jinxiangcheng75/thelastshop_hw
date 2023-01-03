@@ -1,0 +1,240 @@
+require("const/Constants")
+require("class")
+require("utils/XLuaUtils")
+require("Role/IndoorRole")
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_IndoorRoleActionConfigManagerInst = CS.IndoorRoleActionConfigManager.inst
+local CS_MapUtils = CS.MapUtils
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local Vector3 = CS.UnityEngine.Vector3
+local Vector3Int = CS.UnityEngine.Vector3Int
+local CS_UnityUtils = CS.UnityUtils
+
+local StoryRole = class(IndoorRole)
+
+function StoryRole:Init(gameObj)
+	self.gameObject = gameObj
+	self.storyNpcConfig = nil
+	self.callback = nil
+	self.faultTolerantTimer = 0
+	self:init(
+		self.gameObject.transform,
+		self.gameObject:GetComponent(typeof(CS.RoleMoveByAStar)),
+		self.gameObject:GetComponent(typeof(CS.CharacterAttacher))
+	)
+
+	self:SetBubbleClickHandler(
+		function()
+			self:onBubbleClick()
+		end
+	)
+end
+
+function StoryRole:SetData(storyNpcConfig, callback)
+
+	self.storyNpcConfig = storyNpcConfig
+	self.callback = callback
+
+	if tonumber(self.storyNpcConfig.story_type) == 4 then --金条商人 小车来
+
+		CS.FGUI.inst:SetAllUIInteractable(false)
+		CS.FGUI.inst:SetAllUIAlpha(0)
+		EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.HideHeadTips)
+		
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.DressUpSystem)
+		func(CS_CharacterManagerInst,"SkeletonDataCar",nil,CS.EGender.Male,0.14,false,function (system)
+
+				system.transform.localScale = Vector3(0.35,0.35,0.35)
+				system.transform.localPosition = CS.FGUI.inst.isLandscape and Vector3(-16,6.5,0) or Vector3(-18,7.5,0)
+
+				system.transform:DOLocalMove(Vector3(-13,5,0),4):SetEase(CS.DG.Tweening.Ease.OutSine):OnStart(function ()
+
+						system:SetSortingAndOrderLayer("map_Actor",9999)
+						system:SetDirection(CS.RoleDirectionType.Right)
+						system:Play("run",true)
+						CS.D2DragCamera.inst:SetNpc(system.gameObject, true, CS.FGUI.inst.isLandscape and 3 or 8)
+
+					end):OnComplete(function ()
+
+						system:Play("idle",true)
+						CS_GameTimerInst:AddTimer(2,1,function ()
+								if CS_UnityUtils.EqualsNull(system.gameObject) == false then
+									CS.UnityEngine.GameObject.Destroy(system.gameObject)
+								end
+							end)
+						self:animStart(false)
+
+					end)
+
+
+			end,nil)
+
+	else
+		self:animStart(true)
+	end
+
+
+end
+
+function StoryRole:animStart(needSaveInitPos)
+
+	if self.storyNpcConfig.story_pre == nil or self.storyNpcConfig.story_pre == "" then --没有前置对话 直接进入下一步
+		self:createModel(
+			function()
+				CS.FGUI.inst:SetAllUIInteractable(false)
+				CS.FGUI.inst:SetAllUIAlpha(0)
+				EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.HideHeadTips)
+				self:Move(CS.StaticConstants.specialRoleInitPos, Vector3Int(4, 22, 0),needSaveInitPos)
+			end
+		)
+	else
+
+		CS.FGUI.inst:SetAllUIInteractable(false)
+		CS.FGUI.inst:SetAllUIAlpha(0)
+		EventDispatcher:dispatchEvent(GameEvent.ShopMapEditEvent.HideHeadTips)
+
+		EventDispatcher:dispatchEvent(
+			GameEvent.DialogEvent.StartDialog,
+			self.storyNpcConfig.story_pre,
+			tonumber(self.storyNpcConfig.story_npc),
+			function()
+				self:createModel(
+					function()
+						self:Move(CS.StaticConstants.specialRoleInitPos, Vector3Int(4, 22, 0),needSaveInitPos)
+					end)
+			end)
+	end
+
+	local failoverTime = 20
+	if tonumber(self.storyNpcConfig.story_type) == 4 then --金条商人 容错时间拉长
+		failoverTime = 30
+	end
+
+	--容错 20s内事件未完成 自动结束
+	self.faultTolerantTimer = CS_GameTimerInst:AddTimer(failoverTime,1,function ()
+			self.faultTolerantTimer = 0
+			self:onBubbleClick()
+		end)
+
+end
+
+function StoryRole:createModel(callback)
+
+	local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacterByModel")
+	local func = funcGeneric(CS.DressUpSystem)
+
+	func(
+		CS_CharacterManagerInst,
+		tonumber(self.storyNpcConfig.story_npc),
+		0.14,
+		true,
+		function(system)
+			self.character = system
+
+			if CS.ManagerBinder.inst.mGameState ~= CS.kGameState.Shop then
+				return
+			end
+
+			self.gameObject.name =
+			tostring(self.storyNpcConfig.story_type) ..
+			"_" .. tostring(self.storyNpcConfig.story_parameter) .. "_" .. tostring(self.storyNpcConfig.story_npc)
+			system.transform:SetParent(self.attacher.actorParent)
+			system.transform.localPosition = Vector3.zero
+			system:SetDirection(CS.RoleDirectionType.Right)
+			--self:SetCellPos(CS.StaticConstants.specialRoleInitPos)
+			--self:onMoveEndComplete()
+
+			if callback ~= nil then
+				callback()
+			end
+		end
+	)
+
+end
+
+function StoryRole:Move(startPos, endPos,needSaveInitPos)
+	GUIManager.inst:BackMainView()
+
+	self:SetCellPos(startPos)
+	self:UpdateSortingOrder()
+	CS.FGUI.inst:showGlobalMask(2.6)
+
+	CS.D2DragCamera.inst:SetNpc(self.gameObject, needSaveInitPos,CS.FGUI.inst.isLandscape and 3 or 4.5)
+
+	self:move(CS.IndoorMap.inst:FindPath(self.currCellPos, endPos))
+end
+
+function StoryRole:onMoveEndComplete()
+	self:setOrder(
+		CS_MapUtils.GetTileMapOrder(self.transform.position.y - 0.2, self.transform.position.x, 1, 1),
+		"map_Actor"
+	)
+
+	if self.character ~= nil then
+		local idleAnimationName =
+		CS_IndoorRoleActionConfigManagerInst:GetRandomAction(self.character.gender, CS.kIndoorRoleActionType.normal_standby)
+		self.character:Play(idleAnimationName, true)
+	end
+
+	self:showPopup()
+end
+
+function StoryRole:showPopup()
+	CS.AtlasAssetHandler.inst:GetAtlasSprite(
+		"main_atlas",
+		"zhuejiemian_tishitanhao",
+		function(gsprite)
+			self.transform.position = Vector3(self.transform.position.x, self.transform.position.y, -10)
+			CS.IndoorMap.inst.indoorMask:SetActive(true)
+			self:ShowSpPop(gsprite.sprite, 1, false, false, CS.UnityEngine.Color.white, false, 1.6)
+			GUIManager.inst:BackMainView()
+			EventDispatcher:dispatchEvent(
+				GameEvent.DialogEvent.NPCMoveEndCompent,
+				"点击我的<Color=#3aff5c>泡泡</Color>。",
+				tonumber(self.storyNpcConfig.story_npc),
+				self.attacher.spRoot,
+				"0|14|0"
+			)
+		end
+	)
+
+end
+
+function StoryRole:onBubbleClick()
+	EventDispatcher:dispatchEvent(GameEvent.DialogEvent.DialogUIViewClear)
+	CS.IndoorMap.inst.indoorMask:SetActive(false)
+	CS.D2DragCamera.inst.npcIsMoving = false
+	CS.D2DragCamera.inst:RestorePositionAndOrthgraphicSize()
+
+	self:HidePopup(
+		function()
+			EventDispatcher:dispatchEvent(
+				GameEvent.DialogEvent.StartDialog,
+				self.storyNpcConfig.story,
+				tonumber(self.storyNpcConfig.story_npc),
+				function()
+					if self.callback ~= nil then
+						self.callback()
+					end
+				end
+			)
+
+			self:DestroySelf()
+		end
+	)
+end
+
+function StoryRole:DestroySelf()
+
+	if self.faultTolerantTimer > 0 then
+		CS_GameTimerInst:RemoveTimer(self.faultTolerantTimer)
+		self.faultTolerantTimer = 0
+	end
+
+	CS.UnityEngine.GameObject.Destroy(self.gameObject)
+end
+
+return StoryRole

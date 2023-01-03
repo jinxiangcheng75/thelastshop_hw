@@ -1,0 +1,119 @@
+--GamestateLogin
+local BaseState = require("state/BaseState")
+local ManagerBinderInst = require("ManagerBinder")
+local coroutine_cs = require("coroutine_cs")
+
+local csEventController = CS.EventController
+local csGameEventType = CS.GameEventType
+local Addressables = CS.UnityEngine.AddressableAssets.Addressables
+local GameStateLogin = class(BaseState)
+local csManagerBinder = CS.ManagerBinder
+local startLoadScene = false
+local CSGameStartInst = CS.CSGameStart.Inst
+
+function GameStateLogin:HeartbeatDataInit()
+	
+	CS.NetworkManager.inst._heartbeat = 0;
+	CS.NetworkManager.inst._lastDay = 0;
+	CS.NetworkManager.inst._onlineTime = 0;
+	CS.NetworkManager.inst._mailTime = 0;
+	CS.NetworkManager.inst._chatIndex = 0;
+	CS.NetworkManager.inst._raceLampIndex = 0;
+	CS.NetworkManager.inst._activityBuffVersion = 0;
+	CS.NetworkManager.inst._ver1 = 0;
+	CS.NetworkManager.inst._ver2 = 0;
+	CS.NetworkManager.inst._ver3 = 0;
+	CS.NetworkManager.inst._ver4 = 0;
+	CS.NetworkManager.inst._ver5 = 0;
+	CS.NetworkManager.inst._ver6 = 0;
+	CS.NetworkManager.inst._ver7 = 0;
+	CS.NetworkManager.inst._ver8 = 0;
+	CS.NetworkManager.inst._ver9 = 0;
+	CS.NetworkManager.inst._ver10 = 0;
+	CS.NetworkManager.inst._verStr = "";
+	CS.NetworkManager.inst.newSystemMsgEvent = 0;
+	
+	CS.NetworkManager.inst.isOnline = true;
+	CS.NetworkManager.inst.lastKeepAliveEnd = true;
+	CS.NetworkManager.inst.keepaliveErrorCount = 0;
+	CS.NetworkManager.inst.KeepAlivePause = false;
+	
+end
+
+function GameStateLogin:onEnter(transition)
+	--进入
+	print("enter GameStateLogin")
+	CS.FGUI.inst:hideLoading()
+	CS.ManagerBinder.inst.mGameState = CS.kGameState.Login
+
+	CS.NetworkManager.inst:PauseKeepAlive(true) --停止心跳
+	
+	--CS.FGUI.inst:StartExcessAnimation(false)
+	if (CS.AccountDataProxy.inst.isLogined == true) then
+		--CS.GUIManager.ClearAll();
+		CS.AccountDataProxy.inst:OnLogOut()
+		--self:HeartbeatDataInit() --初始化心跳缓存 C#有问题 新包打开
+		CS.FGUI.inst:SetLoginBGVisible(true)
+		startLoadScene = false
+		self:loadStateMap()
+		CS.LanguageManager.inst:Clear()
+	else
+		csEventController.inst:TriggerEvent(csGameEventType.SHOWUI_LOGIN)
+		CS.FGUI.inst:StartExcessAnimation(false, false)
+		CS.NetworkManager.inst:PauseKeepAlive(false)
+	end
+	
+	CS.ManagerBinder.inst.stateIsChanging = false
+end
+
+function GameStateLogin:loadStateMap()
+	print("GameStateTown:loadIndoorMap")
+	coroutine_cs.start(
+		function()
+			if (startLoadScene == false) then
+				startLoadScene = true
+				local aop = csManagerBinder.inst.mSceneMgr:loadScene("ReLogin")
+				coroutine.yield(aop)
+			end
+			coroutine_cs.wait(0.5)
+			CS.ManagerBinder.inst:clear()
+			CS.ManagerBinder.inst:GC()
+			GUIManager.inst:ClearAllView()
+			coroutine_cs.wait(0.2)
+			ManagerBinderInst:clearDataProxy() --清理数据  Tips：这里清理的迟了 其中的AccountDataProxy要立马清理 来到此场景则代表已经不在登录状态
+			coroutine_cs.wait(0.5)
+
+			CS.FGUI.inst:StartExcessAnimation(false, false)
+			
+			CS.FGUI.inst:SetAllUIInteractable(true)
+			CS.FGUI.inst:SetAllUIAlpha(1)
+			
+			CSGameStartInst:ReCheckUpdate(function ()
+					--弹窗 让它退出游戏
+					CS.FGUI.inst.msgtipUI.gameObject:SetActive(true);
+					CS.FGUI.inst.msgtipUI:setShowInfo(3);
+				end,
+				function ()
+					csManagerBinder.inst:ReLoadCfgManagerAsync(
+						function()
+							ManagerBinder.inst:initConfigs()
+							CS.ManagerBinder.inst.mGameState = CS.kGameState.Login
+							CS.FGUI.inst:hideLoading()
+							csEventController.inst:TriggerEvent(csGameEventType.SHOWUI_LOGIN)
+							self:HeartbeatDataInit() --初始化心跳缓存 C#有问题 先在开启心跳前初始化心跳 新包注释掉
+							CS.NetworkManager.inst:PauseKeepAlive(false)
+						end
+					)
+				end)
+			
+		end
+	)
+end
+
+function GameStateLogin:onExit()
+	print("exit GameStateLogin")
+	csEventController.inst:TriggerEvent(csGameEventType.HIDEUI_LOGIN)
+	CS.FGUI.inst:SetLoginBGVisible(false)
+end
+
+return GameStateLogin

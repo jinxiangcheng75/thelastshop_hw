@@ -1,0 +1,382 @@
+-- BuyVipUIView
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("data/MallDataProxy")
+require("utils/XLuaUtils")
+require("config/RechargeConfigManager")
+require("config/VipInfoConfingManager")
+local csEventControllerInst = CS.EventController.inst
+local csGameEventType = CS.GameEventType
+local EventDispatcher = require("event/EventDispatcher")
+local cs_LanguageManagerInst = CS.LanguageManager.inst
+local csObjListType = typeof(CS.ObjList)
+local CS_type_luaList = typeof(CS.LuaListItem)
+local csVipState = CS.K_Vip_State
+local csVector2 = CS.UnityEngine.Vector2
+local csWdParConfigManagerInst = CS.WorldParConfigManager.inst
+local csGameTimerInst = CS.GameTimer.inst
+local csTimeUtils = CS.TimeUtils
+local csEVIPType = CS.EVIPType
+local csUserDataProxyInst = CS.UserDataProxy.inst
+local csGUIHelper = CS.GUIHelper
+
+local csPayInst = CS.GamePay.inst
+
+local data
+local timeTimerId
+local allItemData = {}
+local allRewardData = {}
+local allMonthData = {}
+local isInit
+
+BuyVipUIView = class(ViewBase)
+
+function BuyVipUIView:ctor()
+	self.viewID = Constants.ViewName.BuyVipUIView
+	BuyVipUIView.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+end
+
+function BuyVipUIView:initComp()
+	local contentPane = self.contentPanel
+
+	self.topObj = contentPane:GetObjByName("topObj")
+	self.Text = contentPane:GetText("Text")
+	self.preImg = contentPane:GetObjByName("preImg"):GetComponent("RectTransform")
+	self.closeBtn = contentPane:GetButton("closeBtn")
+	self.infoBtn = contentPane:GetButton("infoBtn")
+	self.lockObj = contentPane:GetObjByName("lockObj")
+	self.unlockObj = contentPane:GetObjByName("unlockObj")
+	self.middleTitleText = contentPane:GetText("middleTitleText")
+	self.timeText = contentPane:GetText("timeText")
+	self.Slider = contentPane:GetObjByName("Slider"):GetComponent("Slider")
+	self.nextIcon = contentPane:GetGUIIcon("nextIcon")
+	self.nextName = contentPane:GetText("nextName")
+	self.monthBtn = contentPane:GetButton("monthBtn")
+	self.yearBtn = contentPane:GetButton("yearBtn")
+	self.monthPriceText = contentPane:GetText("monthPriceText")
+	if(self.monthPriceText ~= nil)then
+		self.monthRect = self.monthPriceText.gameObject:GetComponent("RectTransform")
+	end
+	self.yearPriceText = contentPane:GetText("yearPriceText")
+	if(self.yearPriceText ~= nil)then
+		self.yearRect = self.yearPriceText.gameObject:GetComponent("RectTransform")
+	end
+	self.yearOnePriceText = contentPane:GetText("yearOnePriceText")
+	if(self.yearOnePriceText ~= nil)then
+		self.yearOneRect = self.yearOnePriceText.gameObject:GetComponent("RectTransform")
+	end
+	self.bottomTitleText = contentPane:GetText("bottomTitleText")
+	self.vipSmallTitle = contentPane:GetText("vipSmallTitle")
+	self.monthGemImg = contentPane:GetImage("monthGenImg")
+	self.yearGemImg = contentPane:GetImage("yearGemImg")
+	self.yearOneGemImg = contentPane:GetImage("yearOneGemImg")
+
+	self.privilegeObj = contentPane:GetObjByName("privilegeObj"):GetComponent(csObjListType)
+	local localAllItem = self.privilegeObj.objList
+	self.allItems = {}
+	for i = 1, localAllItem.Count do
+		self.allItems[i] = localAllItem[i - 1]:GetComponent(CS_type_luaList)
+	end
+	self.middleAllReward = contentPane:GetObjByName("middleAllReward"):GetComponent(csObjListType)
+	local localAllReward = self.middleAllReward.objList
+	self.allRewards = {}
+	for i = 1, localAllReward.Count do
+		self.allRewards[i] = localAllReward[i - 1]:GetComponent("GUIIcon")
+	end
+end
+
+function BuyVipUIView:onInit()
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(function()
+			self:closeBtnClick()
+		end)
+
+	self.infoBtn:ButtonClickTween(function()
+			-- self:closeBtnClick()
+			EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_VipInfoUI)
+		end)
+
+	self.monthBtn:ButtonClickTween(function()
+			if(csWdParConfigManagerInst:GetConfig(8007).parameters == 1) then
+				-- self:closeBtnClick()
+				csPayInst:Pay(MallDataProxy.inst.vipPayData.payProduct.priceId,MallDataProxy.inst.vipPayData.payProduct.productId,MallDataProxy.inst.vipPayData.payProduct.payActivityType,MallDataProxy.inst.vipPayData.payProduct.payActivityId,function (isSuccess)
+						if(isSuccess)then
+							--print("充值成功")
+							--EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallBuyVipOtherComUI,data.)
+						end
+					end
+				)
+			elseif csWdParConfigManagerInst:GetConfig(8007).parameters == 2 then
+				if(csUserDataProxyInst.playerData.gem >= csWdParConfigManagerInst:GetConfig(8008).parameters)then
+					EventDispatcher:dispatchEvent(GameEvent.MallEvent.REQUEST_PAYIOSBUY,MallDataProxy.inst.vipPayData.payProduct.priceId,MallDataProxy.inst.vipPayData.payProduct.payActivityType,MallDataProxy.inst.vipPayData.payProduct.payActivityId)
+				else
+					--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					--local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+					--func(
+					--csEventControllerInst,
+					--csGameEventType.SHOWUI_TEXTMSGTIP,
+					--cs_LanguageManagerInst:GetValueByKey("金条不足"),
+					--csGUIHelper.GetColorByColorHex("FF2828")
+					--)
+					EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,csWdParConfigManagerInst:GetConfig(8008).parameters - csUserDataProxyInst.playerData.gem)
+				end
+			end
+		end)
+
+	self.yearBtn:ButtonClickTween(function()
+			if(csWdParConfigManagerInst:GetConfig(8007).parameters == 1) then
+				-- self:closeBtnClick()
+				csPayInst:Pay(MallDataProxy.inst.vipYearData.payProduct.priceId,MallDataProxy.inst.vipYearData.payProduct.productId,MallDataProxy.inst.vipYearData.payProduct.payActivityType,MallDataProxy.inst.vipYearData.payProduct.payActivityId,function (isSuccess)
+						if(isSuccess)then
+							--print("充值成功")
+							--EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallBuyVipOtherComUI,data.)
+						end
+					end
+				)
+			elseif csWdParConfigManagerInst:GetConfig(8007).parameters == 2 then
+				if(csUserDataProxyInst.playerData.gem >= csWdParConfigManagerInst:GetConfig(8009).parameters)then
+					EventDispatcher:dispatchEvent(GameEvent.MallEvent.REQUEST_PAYIOSBUY,MallDataProxy.inst.vipYearData.payProduct.priceId,MallDataProxy.inst.vipYearData.payProduct.payActivityType,MallDataProxy.inst.vipYearData.payProduct.payActivityId)
+				else
+					--local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+					--local func = funcGeneric(CS.System.String, CS.UnityEngine.Color)
+					--func(
+					--csEventControllerInst,
+					--csGameEventType.SHOWUI_TEXTMSGTIP,
+					--cs_LanguageManagerInst:GetValueByKey("金条不足"),
+					--csGUIHelper.GetColorByColorHex("FF2828")
+					--)
+					EventDispatcher:dispatchEvent(GameEvent.UI.ShowUI_GameHintUI,31,nil,csWdParConfigManagerInst:GetConfig(8007).parameters - csUserDataProxyInst.playerData.gem)
+				end
+			end
+		end)
+end
+
+function BuyVipUIView:onHide()
+	-- print("BuyVipUIView onHide")
+	if(timeTimerId ~= nil)then
+		csGameTimerInst:RemoveTimer(timeTimerId)
+		timeTimerId = nil
+	end
+end
+
+function BuyVipUIView:onShowed()
+	-- print("BuyVipUIView onShowed")
+end
+
+function BuyVipUIView:closeBtnClick()
+	self:hide()
+end
+
+function BuyVipUIView:setUIData(fromType) -- 0 - 从店主详情界面来 1 - 从商城界面来 2 - 过期
+	--self.topObj:SetActive(fromType == 1 or fromType == 2)
+	local promptTime = CS.WorldParConfigManager.inst:GetConfig(8001).parameters
+
+	if (not isInit) then
+		allItemData = VipInfoConfingManager:GetConfigByType(1)
+		allRewardData = VipInfoConfingManager:GetConfigByType(2)
+		allMonthData = VipInfoConfingManager:GetConfigByType(3)
+		isInit = true
+	end
+
+	local vipData = MallDataProxy.inst.vipData
+	local vipPayData = MallDataProxy.inst.vipPayData
+	local vipYearData = MallDataProxy.inst.vipYearData
+
+	self:setPriceData(vipPayData,vipYearData)
+
+	if (csVipState.__CastFrom(vipData.state) == csVipState.Vip and vipData.remainTime > 0) then
+		self.Text.enabled = false
+		self.preImg.sizeDelta = csVector2(self.preImg.sizeDelta.x, 100)
+		self.lockObj:SetActive(false)
+		self.unlockObj:SetActive(true)
+
+		self.monthBtn.gameObject:SetActive(false)
+		self.yearBtn.gameObject:SetActive(false)
+		self.bottomTitleText.enabled = true
+		self.vipSmallTitle.text = cs_LanguageManagerInst:GetValueByKey("每月福利")
+
+		local totalTime = 0
+
+		if (csEVIPType.__CastFrom(vipData.type) == csEVIPType.Month) then
+
+			self.middleTitleText.text = cs_LanguageManagerInst:GetValueByKey("距离下一奖励还有")
+			totalTime = 30 * 24 * 60 * 60
+		else
+			self.middleTitleText.text = cs_LanguageManagerInst:GetValueByKey("您的包年特权时间为")
+			totalTime = 365 * 24 * 60 * 60
+		end
+		self.bottomTitleText.text = cs_LanguageManagerInst:GetValueByKey("正在享受特权中...")
+
+		if (fromType == 0) then
+			self.vipSmallTitle.text = cs_LanguageManagerInst:GetValueByKey("当前特权")
+		end
+		if (#allMonthData < tonumber(vipData.level + 1)) then
+			self.nextIcon.iconImage.enabled = false
+			self.nextName.enabled = false
+		else
+			self.nextIcon.iconImage.enabled = true
+			self.nextName.enabled = true
+
+			local nextLvCfg = allMonthData[vipData.level + 1]
+			self.nextName.text = cs_LanguageManagerInst:GetValueByKey(nextLvCfg.title)
+			if (nextLvCfg.pic_1 ~= "-1" and nextLvCfg.pic_2 ~= "-1") then
+				self.nextIcon:SetSprite(nextLvCfg.pic_1, nextLvCfg.pic_2)
+			end
+		end
+
+		if(vipData.remainTime <= promptTime)then
+			if(not self.monthBtn.gameObject.activeSelf)then
+				self.monthBtn.gameObject:SetActive(true)
+			end
+			if(not self.yearBtn.gameObject.activeSelf)then
+				self.yearBtn.gameObject:SetActive(true)
+			end
+			if(self.bottomTitleText.enabled)then
+				self.bottomTitleText.enabled = false
+			end
+		end
+		if (vipData.remainTime > 0) then
+			self.timeText.text = csTimeUtils.timeSpanStrip(vipData.remainTime)
+			self.Slider.value = totalTime - vipData.remainTime
+		end
+
+		if (timeTimerId ~= nil) then
+			csGameTimerInst:RemoveTimer(timeTimerId)
+			timeTimerId = nil
+		end
+		self.timeText.text = csTimeUtils.timeSpanStrip(vipData.remainTime)
+
+		self.Slider.maxValue = totalTime
+		self.Slider.value = totalTime - vipData.remainTime
+		timeTimerId = csGameTimerInst:AddTimer(1, function()
+				if(vipData.remainTime <= promptTime)then
+					if(not self.monthBtn.gameObject.activeSelf)then
+						self.monthBtn.gameObject:SetActive(true)
+					end
+					if(not self.yearBtn.gameObject.activeSelf)then
+						self.yearBtn.gameObject:SetActive(true)
+					end
+					if(self.bottomTitleText.enabled)then
+						self.bottomTitleText.enabled = false
+					end
+				end
+				if (vipData.remainTime > 0) then
+					self.timeText.text = csTimeUtils.timeSpanStrip(vipData.remainTime)
+					self.Slider.value = totalTime - vipData.remainTime
+				else
+					csGameTimerInst:RemoveTimer(timeTimerId)
+					timeTimerId = nil
+				end
+			end)
+	else
+		self.Text.enabled = true
+		if(fromType == 2)then
+			self.Text.text = cs_LanguageManagerInst:GetValueByKey("特权到期立刻续约")
+		else
+			self.Text.text = cs_LanguageManagerInst:GetValueByKey("启动特权获得专属功能")
+		end
+		self.preImg.sizeDelta = csVector2(self.preImg.sizeDelta.x, 148)
+		self.lockObj:SetActive(true)
+		self.unlockObj:SetActive(false)
+		self.monthBtn.gameObject:SetActive(true)
+		self.yearBtn.gameObject:SetActive(true)
+		self.bottomTitleText.enabled = false
+
+		--local monthWpCfg = csWdParConfigManagerInst:GetConfig(8002)
+		--local monthCfg = RechargeConfigManager:GetConfig(monthWpCfg.parameters)
+
+		--local yearWpCfg = csWdParConfigManagerInst:GetConfig(8003)
+		--local yearCfg = RechargeConfigManager:GetConfig(yearWpCfg.parameters)
+
+
+		self.vipSmallTitle.text = cs_LanguageManagerInst:GetValueByKey("每月福利")
+		self:setBottomIcon()
+	end
+
+	self:setMiddleIcon()
+
+end
+
+function BuyVipUIView:setPriceData(vipPayData,vipYearData)
+	if(csWdParConfigManagerInst:GetConfig(8007).parameters == 1)then
+		print("月卡价值"..csPayInst:GetProductPrice(vipPayData.payProduct.productId))
+		self.monthPriceText.text = csPayInst:GetProductPrice(vipPayData.payProduct.productId) .. "/" .. cs_LanguageManagerInst:GetValueByKey("月")
+
+		print("年卡价值"..csPayInst:GetProductPrice(vipYearData.payProduct.productId))
+		local yearPriceStr = csPayInst:GetProductPrice(vipYearData.payProduct.productId)
+		local splitIndex = 1
+		for i = 1, #yearPriceStr do
+			if(tonumber(string.sub(yearPriceStr,i,i)) ~= nil)then
+				splitIndex = i
+				break
+			end
+		end
+		local monetaryUnit = string.sub(yearPriceStr,1,splitIndex - 1)
+		local yearPrice = tonumber(string.sub(yearPriceStr,splitIndex,-1))
+		self.yearPriceText.text = yearPriceStr .. "/" .. cs_LanguageManagerInst:GetValueByKey("年")
+		if(yearPrice ~= nil)then
+			self.yearOnePriceText.text = monetaryUnit .. yearPrice / 12 .. "/" .. cs_LanguageManagerInst:GetValueByKey("月")
+		else
+			self.yearOnePriceText.text = ""
+		end
+
+		self.monthGemImg.enabled = false
+		self.yearGemImg.enabled = false
+		self.yearOneGemImg.enabled = false
+
+		self.monthRect.anchoredPosition = csVector2(0,self.monthRect.anchoredPosition.y)
+		self.yearRect.anchoredPosition = csVector2(0,self.yearRect.anchoredPosition.y)
+		self.yearOneRect.anchoredPosition = csVector2(0,self.yearOneRect.anchoredPosition.y)
+	elseif csWdParConfigManagerInst:GetConfig(8007).parameters == 2 then
+		self.monthPriceText.text = math.floor(csWdParConfigManagerInst:GetConfig(8008).parameters) .. "/" .. cs_LanguageManagerInst:GetValueByKey("月")
+		self.yearPriceText.text = math.floor(csWdParConfigManagerInst:GetConfig(8009).parameters) .. "/" .. cs_LanguageManagerInst:GetValueByKey("年")
+		self.yearOnePriceText.text = math.floor(csWdParConfigManagerInst:GetConfig(8009).parameters / 12) .. "/" .. cs_LanguageManagerInst:GetValueByKey("月")
+
+		if(csUserDataProxyInst.playerData.gem >= csWdParConfigManagerInst:GetConfig(8008).parameters)then
+			self.monthPriceText.color = CS.UnityEngine.Color.white
+		else
+			self.monthPriceText.color = CS.UnityEngine.Color.red
+		end
+
+		if(csUserDataProxyInst.playerData.gem >= csWdParConfigManagerInst:GetConfig(8009).parameters)then
+			self.yearPriceText.color = CS.UnityEngine.Color.white
+		else
+			self.yearPriceText.color = CS.UnityEngine.Color.red
+		end
+
+		self.monthGemImg.enabled = true
+		self.yearGemImg.enabled = true
+		self.yearOneGemImg.enabled = true
+
+		self.monthRect.anchoredPosition = csVector2(30,self.monthRect.anchoredPosition.y)
+		self.yearRect.anchoredPosition = csVector2(34,self.yearRect.anchoredPosition.y)
+		self.yearOneRect.anchoredPosition = csVector2(26,self.yearOneRect.anchoredPosition.y)
+	end
+end
+
+function BuyVipUIView:setMiddleIcon()
+	if (allItemData == nil or #allItemData <= 0) then
+		return
+	end
+
+	for i = 1, #self.allItems do
+		self.allItems[i]:SetData(allItemData[i])
+	end
+end
+
+function BuyVipUIView:setBottomIcon()
+	if (allRewardData == nil or #allRewardData <= 0) then
+		return
+	end
+
+	for i = 1, #self.allRewards do
+		if (allRewardData[i].pic_1 ~= "-1" and allRewardData[i].pic_2 ~= "-1") then
+			self.allRewards[i]:SetSprite(allRewardData[i].pic_1, allRewardData[i].pic_2)
+		end
+	end
+end
+------------------------------------------------

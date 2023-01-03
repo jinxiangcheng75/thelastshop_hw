@@ -1,0 +1,167 @@
+--PetChangeNameUI
+
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+
+local EventDispatcher = require("event/EventDispatcher")
+
+local CS_type_ObjList = typeof(CS.ObjList)
+
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+
+local CS_PetDataProxyInst = CS.PetDataProxy.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+
+PetChangeNameUI = class(ViewBase)
+
+function PetChangeNameUI:ctor()
+	self.viewID = Constants.ViewName.PetChangeNameUI
+	PetChangeNameUI.super.init(self, self.viewID)
+	self.sortingLayerName = "popup"
+	self.isShowResPanel = false
+end
+------------------------------------------------
+
+
+function PetChangeNameUI:initComp()
+	local contentPane = self.contentPanel
+
+	self.closeBtn =  contentPane:GetButton("closeBtn");
+	self.maskBtn =  contentPane:GetButton("maskBtn");
+	self.cancelBtn = contentPane:GetButton("canelBtn")
+	self.okBtn = contentPane:GetButton("okBtn")
+	self.nameInput = contentPane:GetObjByName("nameInput"):GetComponent("InputField")
+
+	self.uiAnimator = contentPane.uiAnimator
+	
+end
+
+
+function PetChangeNameUI:onInit()
+
+	self.petId = 0
+	self.petNickName = ""
+
+	self:initComp()
+
+	self.closeBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end)
+
+	self.maskBtn.onClick:AddListener(
+		function ()
+			self:closeBtnClick()
+		end)
+
+	self.cancelBtn:ButtonClickTween(
+		function ()
+			self:closeBtnClick()
+		end)
+
+	self.okBtn:ButtonClickTween(
+		function ()
+			self:okBtnClick()
+		end)
+
+end
+
+
+function PetChangeNameUI:onHide()
+	print("PetChangeNameUI onHide")
+end
+
+function  PetChangeNameUI:onShowed()
+	print("PetChangeNameUI onShowed")
+end
+
+
+function PetChangeNameUI:DoShowAnimation()
+
+	self:onShowed()
+
+	self.uiAnimator:CrossFade("show", 0);
+	self.uiAnimator:Update(0);
+	self.uiAnimator:Play("show");
+
+end
+
+function PetChangeNameUI:DoHideAnimation()
+
+	self.uiAnimator:Play("hide");
+	local animLength = self.uiAnimator:GetClipLength("common_popUpUI_hide")
+
+	CS_GameTimerInst:AddTimer(animLength,1,function ()
+			self.uiAnimator:CrossFade("null", 0);
+			self.uiAnimator:Update(0);
+			self:HideView();
+		end)
+
+end
+
+function PetChangeNameUI:SetData(petUid,petNickName)
+
+	self.petUid = petUid
+	self.petNickName = petNickName
+
+	self.nameInput.text = petNickName
+
+end
+
+
+function PetChangeNameUI:shiftIn()
+	self.contentObject:SetActive(true)
+end
+
+function PetChangeNameUI:shiftOut()
+	self.contentObject:SetActive(false)
+end
+
+function PetChangeNameUI:closeBtnClick()
+	self:hide()
+end
+
+function PetChangeNameUI:okBtnClick()
+
+	local inputName = self.nameInput.text
+
+	if self.petNickName == inputName then --同名 直接关闭界面 不发请求
+		self:hide()
+		return
+
+	end
+
+
+	local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent_Lua2")
+	local func_textMsgTip = funcGeneric(CS.System.String,CS.UnityEngine.Color)
+	
+	if inputName == "" then
+		
+		func_textMsgTip(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("名称不能为空"), CS.GUIHelper.GetColorByColorHex("FF2828"))
+		return 
+		
+	else
+
+		local result = (CS.WordFilter.inst:filter(inputName))
+
+		if result then
+
+			func_textMsgTip(CS_EventControllerInst,CS_GameEventType.SHOWUI_TEXTMSGTIP,CS_LanguageManagerInst:GetValueByKey("名称中包含敏感词汇"), CS.GUIHelper.GetColorByColorHex("FF2828"))
+			self.nameInput.text = ""
+			return
+
+		end
+
+	end
+
+	
+	EventDispatcher:dispatchEvent(GameEvent.PetEvent.REQUEST_PET_CHANGENAME,self.petUid,inputName)
+
+	self:hide()
+end
+
+------------------------------------------------

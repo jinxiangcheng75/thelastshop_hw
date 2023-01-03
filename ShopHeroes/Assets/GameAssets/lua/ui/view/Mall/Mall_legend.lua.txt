@@ -1,0 +1,66 @@
+
+--Mall_legend
+
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_LuaListItem = typeof(CS.LuaListItem)
+
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_GUIHelper = CS.GUIHelper
+local CS_TimeUtils = CS.TimeUtils
+
+require("class")
+require("utils/XLuaUtils")
+local luaClass_Welfare_CtrlBase = require("ui/view/Welfare/Welfare_CtrlBase")
+local EventDispatcher = require("event/EventDispatcher")
+
+local Mall_legend = class(luaClass_Welfare_CtrlBase)
+
+function Mall_legend:initComp(luaBehaviour)
+
+	local contentPane = luaBehaviour
+	self.superList = contentPane:GetObjByName("superList"):GetComponent(CS_type_superList)
+
+end
+
+function Mall_legend:Init(luaBehaviour,obj_nothing)
+
+	self:initComp(luaBehaviour)
+
+	self.obj_nothing = obj_nothing
+	self.legendGiftList = nil
+
+	self.superList.itemRenderer = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+	self.superList.itemUpdateInfo = function(index,item)
+		self:superListItemRenderer(index,item)
+	end
+
+end
+
+function Mall_legend:superListItemRenderer(index,item)
+
+	item:SetData({obj = item.gameObject, giftData = self.legendGiftList[index + 1]})
+
+end
+
+
+function Mall_legend:RefreshUIData()
+
+	self.legendGiftList = DirectPurchaseProxy.inst:GetGiftsList(3)
+
+	self.superList.totalItemCount = #self.legendGiftList
+
+	self.obj_nothing:SetActive(#self.legendGiftList == 0)
+
+end
+
+function Mall_legend:Clear()
+
+end
+
+return Mall_legend

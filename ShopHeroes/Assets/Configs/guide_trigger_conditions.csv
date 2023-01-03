@@ -1,0 +1,4 @@
+id,unlock_type,unlock_value,end_level,type,child_type,index,type_des,condition_type,condition_value,condition_des,result_id,connect_id
+v:number,v:number,v:number,v:number,v:number,v:number,v:number,v:string,v:number,v:number,v:string,v:number,v:number
+id,开放类型1：引导id；2：店主等级,开放参数,不再触发的等级,类型：大类  1->店主等级 1-1店主到达对应等级；2->英雄等级 2-1:英雄到达对应等级  2-2:英雄等级到达上限 ；3->完成当前的触发引导（条件id） 3-1完成对应的条件id,类型：细分小类,序号,大类描述：,条件参数,参数数值,参数描述：,结果表id：guide_trigger_result表,下一步关联的条件id（完成本步，在进行关联判定）
+22001,1,99999,10,2,2,1,英雄等级达到上限,,,英雄等级达到当前上限,5001,

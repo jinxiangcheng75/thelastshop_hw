@@ -1,0 +1,156 @@
+
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+local CS_WorldParConfigManagerInst = CS.WorldParConfigManager.inst
+local CS_GameTimerInst = CS.GameTimer.inst
+local CS_GUIHelper = CS.GUIHelper
+-----------------------------------------------------------------------------------------------------------------------------------
+local EventDispatcher = require("event/EventDispatcher")
+local Vector2 = CS.UnityEngine.Vector2
+
+--AcheivementItem_growUpGift
+
+local obj_luaGift
+local button
+local tx_name
+local tx_desc
+local img_iconBg
+local icon_gift
+local tx_giftBtn
+local icon_award
+local tx_awardNum
+
+local gift_type
+local growUpGift_flag
+local gemMonthCard_flag
+
+function InitComp()
+
+	button = self:GetButton("button")
+	tx_name = self:GetText("tx_name")
+	tx_desc = self:GetText("tx_desc")
+	img_iconBg = self:GetImage("img_iconBg")
+	icon_gift = self:GetGUIIcon("icon_gift")
+	obj_luaGift = self:GetObjByName("obj_luaGift")
+	tx_giftBtn = self:GetText("tx_giftBtn")
+	icon_award = self:GetGUIIcon("icon_award")
+	tx_awardNum = self:GetText("tx_awardNum")
+
+	button.onClick:AddListener(function ()
+			onButtonClick()
+		end)
+
+end
+
+function SetData(type) --1 成长礼包 2 金条礼包
+	
+	gift_type = type
+	
+	if type == 1 then --成长礼包
+	
+		img_iconBg.enabled = true
+		icon_gift:SetSprite("mallItem_atlas","chengzhang_libao")
+		icon_gift.iconImage.rectTransform.sizeDelta = Vector2(170,170)
+		
+		growUpGift_flag = MallDataProxy.inst:GetLVGrowthData().flag
+
+		tx_name.text = CS_LanguageManagerInst:GetValueByKey("成长礼包")
+
+		if growUpGift_flag == "0" then --未购买
+
+			tx_name.text = tx_name.text..CS_LanguageManagerInst:GetValueByKey("【未购买】")
+
+		elseif growUpGift_flag == "1" then --已购买
+
+			tx_name.text = tx_name.text..CS_LanguageManagerInst:GetValueByKey("【已购买】")
+
+		end
+
+		local num = 13600
+		local worldparCfg = CS_WorldParConfigManagerInst:GetConfig(360)
+		if worldparCfg ~= nil then
+			num = worldparCfg.parameters
+		end
+				
+		tx_desc.text = CS_LanguageManagerInst:GetValueByKey("店主升级可领取累计<color=#9af046>{0}</color>金条",tostring(math.ceil(num)))
+		tx_giftBtn.text = CS_LanguageManagerInst:GetValueByKey("查看详情")
+		tx_awardNum.gameObject:SetActive(false)
+		
+	elseif type == 2 then --金条礼包
+		
+		img_iconBg.enabled = false
+		icon_gift:SetSprite("mallItem_atlas","shangcheng_yuekajintiao","",false,true)
+		
+		gemMonthCard_flag = GemMonthCardDataProxy.inst.remainCount > 0
+		
+		tx_name.text = CS_LanguageManagerInst:GetValueByKey("金条月卡")
+
+		if not gemMonthCard_flag then --未购买
+
+			local num = 1650
+			local worldparCfg = CS_WorldParConfigManagerInst:GetConfig(361)
+			if worldparCfg ~= nil then
+				num = worldparCfg.parameters
+			end
+			
+			tx_name.text = tx_name.text..CS_LanguageManagerInst:GetValueByKey("【未购买】")
+			tx_desc.text = CS_LanguageManagerInst:GetValueByKey("30日累计领取<color=#9af046>{0}</color>金条",tostring(math.ceil(num)))
+			
+			tx_giftBtn.text = CS_LanguageManagerInst:GetValueByKey("查看详情")
+
+		elseif gemMonthCard_flag then --已购买
+
+			tx_name.text = tx_name.text.."<color=#9af046>"..CS_LanguageManagerInst:GetValueByKey("【已购买】").."</color>"
+			tx_desc.text = CS_LanguageManagerInst:GetValueByKey("剩余领取次数：{0}次",tostring(GemMonthCardDataProxy.inst.remainCount))
+			
+			if GemMonthCardDataProxy.inst.flag == 0 then --未领取
+
+				button.enabled = true
+				CS_GUIHelper.SetUIGray(button.transform,false)
+				tx_giftBtn.text = ""
+				tx_awardNum.gameObject:SetActive(true)
+				
+				local num = 50
+				local worldparCfg = CS_WorldParConfigManagerInst:GetConfig(362)
+				if worldparCfg ~= nil then
+					num = worldparCfg.parameters
+				end
+				
+				tx_awardNum.text = tostring(math.ceil(num))
+				
+				
+				if GemMonthCardDataProxy.inst.rewardItemAtlas ~= "-1" then
+					icon_award:SetSprite(GemMonthCardDataProxy.inst.rewardItemAtlas,GemMonthCardDataProxy.inst.rewardItemIcon)
+				end
+				
+			else --已领取
+				
+				button.enabled = false
+				CS_GUIHelper.SetUIGray(button.transform,true)		
+				tx_giftBtn.text = CS_LanguageManagerInst:GetValueByKey("明日领取")
+				tx_awardNum.gameObject:SetActive(false)
+						
+			end
+			
+		end
+		
+	end
+
+end
+
+function onButtonClick()
+
+	if gift_type == 1 then --成长礼包
+		
+		EventDispatcher:dispatchEvent(GameEvent.WelfareEvent.ShowUI_WelfareUI,WelfareContentType.levelGrowth)
+		
+	elseif gift_type == 2 then --金条礼包
+		
+		if not gemMonthCard_flag then
+			EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallUI,3)
+		elseif gemMonthCard_flag and GemMonthCardDataProxy.inst.flag == 0 then
+			EventDispatcher:dispatchEvent(GameEvent.GemMonthEvent.Request_GemMonthCardReward)
+		end
+		
+	end
+	
+end

@@ -1,0 +1,305 @@
+---------------------------------------------------------------------
+require("const/Constants")
+require("class")
+require("ui/ViewBase")
+require("utils/XLuaUtils")
+require("data/MallDataProxy")
+require("data/DailyRewardDataProxy")
+local type_cs_Button = typeof(CS.UnityEngine.UI.Button)
+local type_cs_Text = typeof(CS.UnityEngine.UI.Text)
+local type_cs_Image = typeof(CS.UnityEngine.UI.Image)
+local CS_type_superList = typeof(CS.Mosframe.DynamicScrollView)
+local CS_type_luaList = typeof(CS.LuaListItem)
+
+local GameTimerInst = CS.GameTimer.inst
+local CS_TimeUtils = CS.TimeUtils
+
+local csPayInst = CS.GamePay.inst
+
+GiftMallUI = class(ViewBase)
+
+GiftMallUI.currIndex = 0
+
+GiftMallUI.currLvGrowthData = nil
+function GiftMallUI:ctor()
+	print("GiftMallUI:ctor")
+	self.viewID = "GiftMallUI"
+	GiftMallUI.super.init(self, self.viewID)
+end
+
+function GiftMallUI:onInit()
+	self.sortingLayerName = "window"
+
+	self.isShowResPanel = true
+	self.topResPanelType = CS.TopPlayerShowType.noSetting
+
+	self.currIndex = 0
+
+	local comp = self.contentPanel
+	self.closeBtn = comp:GetButton("CloseButton")
+	self.GiftsToggleGroup = comp:GetObjByName("stateGroup"):GetComponent("ToggleGroupEX")
+	self.GiftsToggleGroup:StartMethod()
+	self.levelGrowthRedDot = comp:GetObjByName("levelGrowthRedDot")
+	self.SpecialGiftRedDot = comp:GetObjByName("tehuiRedDot")
+
+	self.levelGrowthPanel = comp:GetObjByName("LevelGrowthPanel")
+
+	--等级成长奖励面板
+	self.growthPanelComp = self.levelGrowthPanel:GetComponent("LuaBehaviour")
+	if self.growthPanelComp ~= nil then
+		self.explainText = self.growthPanelComp:GetText("ExplainText")
+		self.payButton = self.growthPanelComp:GetButton("PayButton")
+		self.yigoumai = self.growthPanelComp:GetObjByName("yigoumai")
+		self.payPriceText = self.growthPanelComp:GetText("PayPriceText")
+		self.lvstallList = self.growthPanelComp:GetObjByName("lvstallList"):GetComponent(CS_type_superList)
+	end
+
+	if (self.lvstallList ~= nil) then
+		self.lvstallList.itemRenderer = function(index, item)
+			self:GrowthListItemRenderer(index, item)
+		end
+	end
+
+	self.obj_xianshi = comp:GetObjByName("obj_xianshi")
+	local xianshiComp = self.obj_xianshi:GetComponent("LuaBehaviour")
+	if xianshiComp ~= nil then
+		self.xianshiGiftsList = {}
+		self.superList_xianshi = xianshiComp:GetObjByName("superList"):GetComponent(CS_type_superList)
+		self.superList_xianshi.itemRenderer = function(index, item)
+			self:setXianshiGiftListItemRenderer(index, item)
+		end
+	end
+
+	self.obj_gongjiang = comp:GetObjByName("obj_gongjiang")
+	local gongjiangComp = self.obj_gongjiang:GetComponent("LuaBehaviour")
+	if gongjiangComp ~= nil then
+		self.gongjiangGiftsList = {}
+		self.superList_gongjiang = gongjiangComp:GetObjByName("superList"):GetComponent(CS_type_superList)
+		self.superList_gongjiang.itemRenderer = function(index, item)
+			self:setGongjiangGiftListItemRenderer(index, item)
+		end
+	end
+
+	self.obj_tehui = comp:GetObjByName("obj_tehui")
+	local tehuiComp = self.obj_tehui:GetComponent("LuaBehaviour")
+	if tehuiComp ~= nil then
+		self.tehuiGiftsList = {}
+		self.superList_tehui = tehuiComp:GetObjByName("superList"):GetComponent(CS_type_superList)
+		self.superList_tehui.itemRenderer = function(index, item)
+			self:setTehuiGiftListItemRenderer(index, item)
+		end
+
+		self.tehui_tx_countdown = tehuiComp:GetObjByName("tx_countdown"):GetComponent("Text")
+		self.tehuiTimerId = 0
+	end
+
+	self.obj_nothing = comp:GetObjByName("obj_nothing")
+
+	-------------------------------------------------------------------------------------------------------------
+	self.GiftsToggleGroup.OnSelectedIndexValueChange = function(index)
+		print("点击了标签" .. tostring(index))
+		self:GiftTableChange(index)
+	end
+
+	self.closeBtn:ButtonClickTween(
+		function()
+			self:hide()
+		end
+	)
+end
+
+function GiftMallUI:refreshDirectPurchaseData()
+	if self.currIndex == 0 or self.currIndex == 1 then
+		self:UpdateUI()
+	end
+end
+
+--刷新界面
+function GiftMallUI:UpdateUI()
+	self:GiftTableChange(self.currIndex)
+end
+
+function GiftMallUI:SetTableByIndex(index)
+
+	if self.GiftsToggleGroup.selectedIndex == index then
+		self:GiftTableChange(index)
+	else
+		self.GiftsToggleGroup.selectedIndex = index
+	end
+
+end
+
+function GiftMallUI:onShowed()
+	print("GiftMallUI界面打开")
+
+	--红点
+	self.levelGrowthRedDot:SetActive(MallDataProxy.inst:GetFirstGrowthReward() > 0)
+	self.SpecialGiftRedDot:SetActive(DailyRewardDataProxy.inst:HasReward())
+
+end
+
+function GiftMallUI:GiftTableChange(index)
+	CS.FGUI.inst:showGlobalMask(0.5)
+	if (self.currIndex ~= index) then
+		CS.AudioManager.inst:PlaySound(11)
+	end
+
+	self.obj_nothing:SetActive(false)
+
+	--if index == self.currIndex then return end
+	self.currIndex = index
+	self.obj_tehui:SetActive(index == 0)
+	self.obj_xianshi:SetActive(index == 1)
+	self.obj_gongjiang:SetActive(index == 2)
+	self.levelGrowthPanel:SetActive(index == 3)
+
+	if index == 0 then
+		self:SetTehuiState()
+	elseif index == 1 then
+		self:SetXianshiState()
+	elseif index == 2 then
+		self:SetGongjiangState()
+	elseif index == 3 then
+		self.currLvGrowthData = MallDataProxy.inst:GetLVGrowthData()
+		local _count = GrowthRewardConfigManager:GetRewardListCount()
+		self.lvstallList.totalItemCount = _count
+		local shuoming = CS.LanguageManager.inst:GetValueByKey("领袖之路成长计划")
+		self.explainText.text = (shuoming:gsub("\\([nt])", {n = "\n", t = "\t"}))
+		self.payButton.gameObject:SetActive(self.currLvGrowthData.flag == "0")
+		self.yigoumai:SetActive(self.currLvGrowthData.flag == "1")
+		--if self.currLvGrowthData.flag == "0" then
+		self.payPriceText.text = csPayInst:GetProductPrice(self.currLvGrowthData.orderID)
+
+		self.payButton:ButtonClickTween(
+			function()
+				csPayInst:Pay(
+					300,
+					self.currLvGrowthData.orderID,
+					6,
+					self.currLvGrowthData.payActivityId,
+					function(isSuccess)
+						if (isSuccess) then
+							print("充值成功")
+							--EventDispatcher:dispatchEvent(GameEvent.MallEvent.ShowUI_MallBuyVipOtherComUI,data.)
+						end
+					end
+				)
+			end
+		)
+		--end
+
+		local cindex = 0
+		cindex = MallDataProxy.inst:GetFirstGrowthReward()
+		self.lvstallList:scrollByItemIndex(cindex - 1)
+
+		--关闭红点
+		self.levelGrowthRedDot:SetActive(false)
+	end
+end
+-----------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------
+--等级成长奖励面板
+
+function GiftMallUI:GrowthListItemRenderer(index, item)
+	local luaListItem = item.gameObject:GetComponent(CS_type_luaList)
+	local rewardcfg = GrowthRewardConfigManager:GetConfig(index + 1)
+	if luaListItem ~= nil and rewardcfg ~= nil then
+		luaListItem:SetData(tonumber(rewardcfg.id))
+		luaListItem.onitemclick = function(id)
+			self:growthListitemClick(id)
+		end
+	end
+end
+
+function GiftMallUI:growthListitemClick(itemid)
+	CS.FGUI.inst:showGlobalMask(1)
+	local rep = MsgType.Request_User_ShopperLevelPurchaseReward:New()
+	rep.id = itemid
+	rep:Send()
+end
+-----------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+
+function GiftMallUI:setXianshiGiftListItemRenderer(index, item)
+	item:SetData({obj = item.gameObject, giftData = self.xianshiGiftsList[index + 1]})
+end
+
+function GiftMallUI:setGongjiangGiftListItemRenderer(index, item)
+	item:SetData({obj = item.gameObject, giftData = self.gongjiangGiftsList[index + 1]})
+end
+
+function GiftMallUI:setTehuiGiftListItemRenderer(index, item)
+	local isDailyGet = index + 1 > #self.tehuiGiftsList
+
+	item:SetData(
+		{obj = item.gameObject, type = isDailyGet and 1 or 0, data = isDailyGet and nil or self.tehuiGiftsList[index + 1]}
+	)
+end
+
+function GiftMallUI:SetXianshiState()
+	self.xianshiGiftsList = DirectPurchaseProxy.inst:GetGiftsList(2)
+
+	self.superList_xianshi.totalItemCount = #self.xianshiGiftsList
+
+	if #self.xianshiGiftsList == 0 then
+		self.obj_nothing:SetActive(true)
+	end
+end
+
+function GiftMallUI:SetGongjiangState()
+	self.gongjiangGiftsList = DirectPurchaseProxy.inst:GetGiftsList(3)
+
+	self.superList_gongjiang.totalItemCount = #self.gongjiangGiftsList
+
+	if #self.gongjiangGiftsList == 0 then
+		self.obj_nothing:SetActive(true)
+	end
+end
+
+function GiftMallUI:SetTehuiState()
+	self.SpecialGiftRedDot:SetActive(false)
+
+	--倒计时
+	if(MallDataProxy.inst.dailySaleRemainTime ~= nil)then
+		if (MallDataProxy.inst.dailySaleRemainTime > 0) then
+			self.tehui_tx_countdown.text = CS_TimeUtils.timeSpan3Str(MallDataProxy.inst.dailySaleRemainTime)
+		end
+
+		--self.tehuiTimerId = GameTimerInst:AddTimer(1,function()
+		--if(MallDataProxy.inst.dailySaleRemainTime > 0)then
+		--self.tehui_tx_countdown.text = CS_TimeUtils.timeSpan3Str(MallDataProxy.inst.dailySaleRemainTime)
+		--else
+		--GameTimerInst:RemoveTimer(self.tehuiTimerId)
+		--self.tehuiTimerId = 0
+		--end
+		--end
+		--)
+		self.looptimer =
+		GameTimerInst:AddLoopTimerComp(
+			self.tehui_tx_countdown.gameObject,
+			1,
+			function()
+				if (MallDataProxy.inst.dailySaleRemainTime > 0) then
+					self.tehui_tx_countdown.text = CS_TimeUtils.timeSpan3Str(MallDataProxy.inst.dailySaleRemainTime)
+				else
+					GameTimerInst:removeLoopTimer(self.looptimer)
+				end
+			end
+		)
+	end
+
+	self.tehuiGiftsList = {}
+
+	if (MallDataProxy.inst.dailySaleList ~= nil) then
+		self.tehuiGiftsList = MallDataProxy.inst.dailySaleList.saleList
+	end
+
+	self.superList_tehui.totalItemCount = #self.tehuiGiftsList + 1
+end
+
+function GiftMallUI:onHide()
+	if self.tehuiTimerId ~= 0 then
+		GameTimerInst:RemoveTimer(self.tehuiTimerId)
+		self.tehuiTimerId = 0
+	end
+end

@@ -1,0 +1,161 @@
+--Constants
+require("utils/LuaUtils")
+
+Constants = {}
+
+Constants.Common = {
+	Store_Android = "",
+	Store_iOS = "",
+}
+
+Constants.Asset = {
+	HotfixList = "hotfix_file_list.json",
+	VersionFile = "version_file.json"
+}
+
+Constants.Net = {
+	Host= "",
+	AssetHost="",
+	VersionFile="version.json",
+}
+
+Constants.PrefKey = {
+	HotfixVer = "hotfix_ver"
+}
+
+Constants.ViewName = {
+	TestNew = "TestNewView",
+	GameHint_tip = "GameHintView",
+	UnionAidUIView = "UnionAidUIView",
+	DailySignUIView = "DailySignUIView",
+	UnionAidMemberByGemUIView = "UnionAidMemberByGemUIView",
+	MallUIView = "MallUIView",
+	UnionTaskUIView = "UnionTaskUIView",
+	UnionRenownDetailUI = "UnionRenownDetailUI",
+	UnionTaskCheckView = "UnionTaskCheckView",
+	MallBuyItemUIView = "MallBuyItemUIView",
+	MallBuyVipUIView = "MallBuyVipUIView",
+	MallRefreshUIView = "MallRefreshUIView",
+	VipInfoUIView = "VipInfoUIView",
+	UnionWealUI = "UnionWealUI",
+	UnionWealUpDetailUI = "UnionWealUpDetailUI",
+	UnionBuffDesPanel = "UnionBuffDesPanel",
+	RaceLampMsgTipUI = "RaceLampMsgTipUI",
+	UnlockNewSystemUIView = "UnlockNewSystemUIView",
+	MainGiftUI = "MainGiftUI",
+	GiftDetailUI = "GiftDetailUI",
+	GiftDesPanel = "GiftDesPanel",
+	RoleExchangeUIView = "RoleExchangeUIView",
+	MainPetUI = "MainPetUI",
+	PetDetailUI = "PetDetailUI",
+	FeedPetUI = "FeedPetUI",
+	PetChangeNameUI = "PetChangeNameUI",
+	PetHouseDesignUI = "PetHouseDesignUI",
+	PetBuyBoothUI = "PetBuyBoothUI",
+	MallDealInfoUIView = "MallDealInfoUIView",
+	PetSettingUI = "PetSettingUI",
+	StorePetHouseConfirmUI = "StorePetHouseConfirmUI",
+	RoleAddNewUIView = "RoleAddNewUIView",
+	CreateNewPetUI = "CreateNewPetUI",
+	ChangePetDressUpUI = "ChangePetDressUpUI",
+	MallBuyVipComUIView = "MallBuyVipComUIView",
+	BuyVipUIView = "BuyVipUIView",
+	VipGetRewardUIView = "VipGetRewardUIView",
+	PetLevelUpUI = "PetLevelUpUI",
+	Activity_WorkerGamePanel = "Activity_WorkerGamePanel",
+	GuideTaskInfoUIView = "GuideTaskInfoUIView",
+	GuideTaskUIView = "GuideTaskUIView",
+	GuideTriggerUIView = "GuideTriggerUIView",
+	CreatRoleUIView = "CreatRoleUIView",
+	Activity_WorkerGameScoreRewardPanel = "Activity_WorkerGameScoreRewardPanel",
+	BindingUIView = "BindingUIView",
+	Activity_WorkerGame_RefeshExchangeDataConfirmUI = "Activity_WorkerGame_RefeshExchangeDataConfirmUI",
+	Activity_WorkerGame_ExchangeItemDesUI = "Activity_WorkerGame_ExchangeItemDesUI",
+	WorkerGameCoinGiftsUI = "WorkerGameCoinGiftsUI",
+	ShopDesignUI = "ShopDesignUI",
+	OnlineInfoUIView = "OnlineInfoUIView",
+	FurnitureSelectionUI = "FurnitureSelectionUI",
+	CustomizeSelectionUI = "CustomizeSelectionUI",
+	LuxuryInfoUIView = "LuxuryInfoUIView",
+	LuxuryRankUIView = "LuxuryRankUIView",
+	FurnitureUpgradePanel = "FurnitureUpgradePanel",
+	FurnitureUpgradeFinishPanel = "FurnitureUpgradeFinishPanel",
+	LuxuryLevelUpUIView = "LuxuryLevelUpUIView",
+	GiftMallView = "GiftMallUI",
+	DialogUIView = "DialogUIView",
+	Activity_WorkerGame_messRankUI = "Activity_WorkerGame_messRankUI",
+	RefugeUIView = "RefugeUIView",
+	RefugeExchangeUIView = "RefugeExchangeUIView",
+	RefugePrepareUIView = "RefugePrepareUIView",
+	RefugeSelectHeroUIView = "RefugeSelectHeroUIView",
+	RefugeUseItemUIView = "RefugeUseItemUIView",
+	RefugeAdventureUIView = "RefugeAdventureUIView",
+	TipsAgainAffirmUI = "TipsAgainAffirmUI",
+	LuaTextTipUI = "LuaTextTipUI",
+	ProbabilityPublicUI = "ProbabilityPublicUI",
+	WelfareUI = "WelfareUI",
+	SevenDayBuyPassUI = "SevenDayBuyPassUI",
+	ShopRankUIView = "ShopRankUIView",
+	ExchangeUIView = "ExchangeUIView",
+	BlackMarketItemInfo = "BlackMarketItemInfo",
+	LookBackInfoUIView = "LookBackInfoUIView",
+	
+	--热更新增界面  iOS 1.2.4，1.2.6  Android 1.0.2 --  .02资源版本
+	LookOtherUserRoleEquipUI = "LookOtherUserRoleEquipUI",
+	RoleInfoView = "RoleInfoView",
+	
+	-------------------------------------------------------------------------------------------
+	EquipStarUpTriggerUI = "EquipStarUpTriggerUI",
+	HeroUseGeneItemUI = "HeroUseGeneItemUI",
+	
+	RuinsTipUIView = "RuinsTipUIView",
+	RuinsMainUIView = "RuinsMainUIView",
+	RuinsPrepareUIView = "RuinsPrepareUIView",
+	RuinsFinishUIView = "RuinsFinishUIView",
+	LuxuryTipUIView = "LuxuryTipUIView",
+	GiftSevenUIView = "GiftSevenUIView",
+	
+	--强更后界面(9.15) iOS 1.3.2 Android 1.0.4
+	GoldenCityMessUIView = "GoldenCityMessUIView",
+	GoldenCityRewardListUIView = "GoldenCityRewardListUIView",
+	GoldenCityUIView = "GoldenCityUIView",
+	GoldenCityPrepareUIView = "GoldenCityPrepareUIView",
+	GoldenCityAdventureUIView = "GoldenCityAdventureUIView",
+	ActivityPointUIView = "ActivityPointUIView",
+	ChatView = "ChatView",
+	ActivityPointMallInfoUIView = "ActivityPointMallInfoUIView",
+	
+	Activity_ScoreAwardGamePanel = "Activity_ScoreAwardGamePanel",
+	Activity_ScoreAwardGameScoreRewardPanel = "Activity_ScoreAwardGameScoreRewardPanel",
+	Activity_ScoreAwardGame_messRankUI = "Activity_ScoreAwardGame_messRankUI",
+	
+	UnionSelfTaskDetailUI = "UnionSelfTaskDetailUI",
+	CanWearEquipHeroTipsView = "CanWearEquipHeroTipsView",
+	UseAdvancedOrLockEquipTipsUI = "UseAdvancedOrLockEquipTipsUI",
+	
+	Activity_DeadRising_MainUI = "Activity_DeadRising_MainUI",
+	Activity_DeadRising_messRankUI = "Activity_DeadRising_messRankUI",
+	Activity_DeadRisingScoreRewardUI = "Activity_DeadRisingScoreRewardUI",
+	Activity_DeadRising_HeroTeamUI = "Activity_DeadRising_HeroTeamUI",
+	Activity_DeadRising_MortarShopUI = "Activity_DeadRising_MortarShopUI",
+	Activity_DeadRising_SelectHeroUI = "Activity_DeadRising_SelectHeroUI",
+	Activity_DeadRising_SelectItemUI = "Activity_DeadRising_SelectItemUI",
+	
+}
+
+
+table_read_only(Constants)
+
+NetworkStatusCode = {
+	Ok = 0,
+	NoConnection = 1,
+	GetResponseErr = 2,
+	NoResponse = 3,
+	NullResponse = 4,
+	StatusFailed = 5,
+	NullStream = 6,
+	EmptyData = 7,
+	DeserializeFailed = 8,
+}
+
+table_read_only(NetworkStatusCode)

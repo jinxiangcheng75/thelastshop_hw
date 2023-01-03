@@ -1,0 +1,133 @@
+
+-- HeartbeatSystem
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("network/NetworkManager")
+require("network/MsgType")
+local EventDispatcher = require("event/EventDispatcher")
+local coroutine_cs = require("coroutine_cs")
+
+local CS_UserDataProxyInst = CS.UserDataProxy.inst
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+
+HeartbeatSystem = class(BaseSystem)
+HeartbeatSystem.super = BaseSystem
+
+
+function HeartbeatSystem:ctor()
+
+	self._heartbeat = 0
+	self.ver1 = 0
+	
+end
+
+function HeartbeatSystem:ReInitSystem()
+	
+	self._heartbeat = 0
+	self.ver1 = 0
+	
+end
+
+function HeartbeatSystem:AddListeners()
+
+
+end
+
+function HeartbeatSystem:RemoveListeners()
+
+end
+
+function HeartbeatSystem:OnInit()
+
+	
+	NetworkEvent:SetCallback(
+		MsgTypeCmd.Response_Heartbeat2_Cmd,
+		function(resp)
+			print("Response_Heartbeat2 success", resp)
+			self:getHeartbeatData(resp)
+		end,
+		function(code)
+			print("Response_Heartbeat2 fail --- code", code)
+		end
+	)
+	
+	
+	
+	
+	self:startKeepAlive()
+
+end
+
+-------------------------------------------------------------------------------------------------------------------------
+
+--lua侧开启心跳
+function HeartbeatSystem:startKeepAlive()
+
+	xlua.private_accessible(CS.NetworkManager)
+
+	coroutine_cs.start(
+		function()
+
+			while true do
+
+				coroutine_cs.wait(5)
+
+				if CS.AccountDataProxy.inst ~= nil and CS.AccountDataProxy.inst.isLogined and CS.NetworkManager.inst.lastKeepAliveEnd and CS.NetworkManager.inst.isOnline then
+
+					self:sendHeartbeatData();
+
+				end
+
+				coroutine_cs.wait(5)
+			end
+
+		end
+	)
+
+end
+
+-------------------------------------------------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------------------------------------------------
+
+--lua侧收到心跳
+function HeartbeatSystem:getHeartbeatData(respData)
+	
+	local data = MsgType.Response_Heartbeat2:New(respData)
+
+	if data.errorCode ~= MsgType.EErrorCode.EEC_Success then
+		return
+	end
+	
+	self._heartbeat = data.heartbeat
+	
+	self.ver1 = data.ver1
+	
+	if data.newPointActivity2Event == 1 then --勇气挑战活动拉取数据
+		
+		EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckData)
+		EventDispatcher:dispatchEvent(GameEvent.Activity_ScoreAwardGameEvent.Request_PointActivity2_CheckReward)
+		
+	end
+	
+	
+end
+
+--lua侧发送心跳
+function HeartbeatSystem:sendHeartbeatData()
+	
+	local rep = MsgType.Request_Heartbeat2:New()
+	rep.heartbeat = self._heartbeat
+	rep.ver1 = self.ver1
+	rep.unionId = CS_UserDataProxyInst.playerData.unionId
+	rep:Send()
+		
+end
+
+-------------------------------------------------------------------------------------------------------------------------

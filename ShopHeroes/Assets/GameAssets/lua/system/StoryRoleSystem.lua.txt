@@ -1,0 +1,206 @@
+
+require("class")
+require("system/BaseSystem")
+require("event/GameEvent")
+require("const/Constants")
+require("ui/view/Dialog/DialogUIView")
+
+
+local EventDispatcher = require("event/EventDispatcher")
+local CS_EventControllerInst = CS.EventController.inst
+local CS_GameEventType = CS.GameEventType
+local CS_PlayerPrefs = CS.UnityEngine.PlayerPrefs
+local CS_AccountDataProxyInst = CS.AccountDataProxy.inst
+
+local luaClass_StoryRole = require("Role/StoryRole/StoryRole")
+
+StoryRoleSystem = class(BaseSystem)
+StoryRoleSystem.super = BaseSystem
+
+function StoryRoleSystem:ctor()
+end
+
+function StoryRoleSystem:AddListeners()
+
+	EventDispatcher:addEvent(GameEvent.StoryRoleEvent.AddStoryRole,self,self.addStoryRole)
+	EventDispatcher:addEvent(GameEvent.DialogEvent.StartDialog,self,self.startDialog)
+	EventDispatcher:addEvent(GameEvent.DialogEvent.ShowTips,self,self.showTips)
+	EventDispatcher:addEvent(GameEvent.DialogEvent.DialogUIViewClear,self,self.clearDialogUIView)
+	EventDispatcher:addEvent(GameEvent.DialogEvent.ShowFinger,self,self.showFinger)
+	EventDispatcher:addEvent(GameEvent.DialogEvent.HideFinger,self,self.hideFinger)
+	EventDispatcher:addEvent(GameEvent.DialogEvent.ShowMask,self,self.showMask)
+	EventDispatcher:addEvent(GameEvent.DialogEvent.HideMask,self,self.hideMask)
+	EventDispatcher:addEvent(GameEvent.DialogEvent.NPCMoveEndCompent,self,self.npcMoveEndCompent)
+
+end
+
+function StoryRoleSystem:RemoveListeners()
+
+	EventDispatcher.removeEvent(GameEvent.StoryRoleEvent.AddStoryRole,self,self.addStoryRole)
+	EventDispatcher:removeEvent(GameEvent.DialogEvent.StartDialog,self,self.startDialog)
+	EventDispatcher:removeEvent(GameEvent.DialogEvent.ShowTips,self,self.showTips)
+	EventDispatcher:removeEvent(GameEvent.DialogEvent.DialogUIViewClear,self,self.clearDialogUIView)
+	EventDispatcher:removeEvent(GameEvent.DialogEvent.ShowFinger,self,self.showFinger)
+	EventDispatcher:removeEvent(GameEvent.DialogEvent.HideFinger,self,self.hideFinger)
+	EventDispatcher:removeEvent(GameEvent.DialogEvent.ShowMask,self,self.showMask)
+	EventDispatcher:removeEvent(GameEvent.DialogEvent.HideMask,self,self.hideMask)
+	EventDispatcher:removeEvent(GameEvent.DialogEvent.NPCMoveEndCompent,self,self.npcMoveEndCompent)
+
+end
+
+function StoryRoleSystem:addStoryRole(data) --type 礼包 2 /活动 3 /.../ parame --携带参数 callback --最终执行method
+
+	if CS.GuideManager.inst.isInTriggerGuide or CS.IndoorMap.inst == nil then
+		EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+		return
+	end
+	
+	local storyType = data.storyType
+	local parame = data.parame
+	local callback = data.callback
+
+	local storyNpcCfg =  StoryNpcConfigManager:GetConfig(storyType,parame)
+
+	if storyNpcCfg ~= nil then
+
+		if CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_StoryNpc_"..tostring(storyNpcCfg.story_id),"-1") == "1" then
+			EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+			return
+		end
+
+		if CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_StoryNpc_ActivityWorkerGame_"..tostring(Activity_WorkerGameProxy.inst.version).."_"..tostring(storyNpcCfg.story_id),"-1") == "1" then
+			EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+			return
+		end
+		
+		if CS_PlayerPrefs.GetString(CS_AccountDataProxyInst.account.."_GoldenCity_"..tostring(GoldenCityDataProxy.inst.version).."_"..tostring(storyNpcCfg.story_id),"-1") == "1" then
+			EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+			return
+		end
+
+		--如果礼包已被购买 则直接结束
+		if tonumber(storyNpcCfg.story_type == 2) and DirectPurchaseProxy.inst:GetDirectPurchaseDataById(tonumber(storyNpcCfg.story_parameter)) == nil then
+			EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+			return
+		end
+		
+		CS.GoOperationManager.inst.isDoing = true
+		
+		local gameObj = CS.IndoorMap.inst:CreateIndoorStoryRole()
+
+		local storyRole = luaClass_StoryRole.new()
+		storyRole:Init(gameObj)
+		storyRole:SetData(storyNpcCfg,callback)
+
+	else
+
+		EventDispatcher:dispatchEvent(GameEvent.EventSystem.EventEnd)
+		CS.Logger.error("未找到对应剧情顾客配置， storyType： "..tostring(storyType).."    parame： "..tostring(parame))
+
+	end
+
+
+end
+
+function StoryRoleSystem:startDialog(content,modelId,callback)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.DialogUIView,
+		function(view)
+			view:SetData(content,modelId,callback)
+		end
+	)
+
+end
+
+function StoryRoleSystem:showTips(content,modelId)
+
+	local dialogUIView = GUIManager.inst:GetWindow(Constants.ViewName.DialogUIView, false)
+
+	if dialogUIView ~= nil and dialogUIView.isShowing == true then
+		dialogUIView:SetTipsData(content,modelId)
+	else
+		GUIManager.inst:OpenView(
+			Constants.ViewName.DialogUIView,
+			function(view)
+				view:SetTipsData(content,modelId)
+			end
+		)
+	end
+
+end
+
+function StoryRoleSystem:clearDialogUIView()
+
+	--GUIManager.inst:HideView(Constants.ViewName.DialogUIView)
+
+	local dialogUIView = GUIManager.inst:GetWindow(Constants.ViewName.DialogUIView, false)
+
+	if dialogUIView ~= nil and dialogUIView.isShowing == true then
+		dialogUIView:Clear()
+	end
+
+end
+
+
+function StoryRoleSystem:showFinger(targetTf,offset)
+
+	GUIManager.inst:OpenView(
+		Constants.ViewName.DialogUIView,
+		function(view)
+			view:ShowFinger(targetTf,offset)
+		end)
+
+end
+
+function StoryRoleSystem:hideFinger()
+
+	local dialogUIView = GUIManager.inst:GetWindow(Constants.ViewName.DialogUIView, false)
+
+	if dialogUIView ~= nil and dialogUIView.isShowing == true then
+		dialogUIView:HideFinger()
+	end
+
+end
+
+function StoryRoleSystem:showMask()
+
+	local dialogUIView = GUIManager.inst:GetWindow(Constants.ViewName.DialogUIView, false)
+
+	if dialogUIView ~= nil and dialogUIView.isShowing == true then
+		dialogUIView:showMask()
+	end
+
+end
+
+function StoryRoleSystem:hideMask()
+
+	local dialogUIView = GUIManager.inst:GetWindow(Constants.ViewName.DialogUIView, false)
+
+	if dialogUIView ~= nil and dialogUIView.isShowing == true then
+		dialogUIView:hideMask()
+	end
+
+end
+
+
+function StoryRoleSystem:npcMoveEndCompent(content,modelId,targetTf,offset)
+
+	local dialogUIView = GUIManager.inst:GetWindow(Constants.ViewName.DialogUIView, false)
+
+	if dialogUIView ~= nil and dialogUIView.isShowing == true then
+		dialogUIView:SetTipsData(content,modelId)
+		dialogUIView:ShowFinger(targetTf,offset)
+		dialogUIView:showMask()
+	else
+		GUIManager.inst:OpenView(
+			Constants.ViewName.DialogUIView,
+			function(view)
+				view:SetTipsData(content,modelId)
+				view:ShowFinger(targetTf,offset)
+				view:showMask()
+			end)
+
+	end
+
+end

@@ -1,0 +1,119 @@
+--AssetHandler
+
+require("class")
+require("utils/XLuaUtils")
+require("utils/JsonUtils")
+local coroutine_cs = require("coroutine_cs")
+
+local csAddressableGenericHelper = CS.AddressableGenericHelper
+local AsyncOperationStatus = CS.UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus
+local csUIDependencyAssetHandler = CS.UIDependencyAssetHandler
+local csConfigAssetHandler = CS.ConfigAssetHandler
+
+--
+
+local function loadTextAssetAsync(key, callback)
+end
+
+ConfigAssetHandler = class()
+local configKey = "Assets/GameAssets/configs.zip.bytes"
+
+function ConfigAssetHandler:handle(callback)
+	print("ConfigAssetHandler:handle")
+	coroutine_cs.start(
+		function()
+			local aop = csAddressableGenericHelper.LoadTextAssetAsync(configKey)
+			coroutine.yield(aop)
+			if (aop.Status == AsyncOperationStatus.Succeeded) then
+				UIDependencyAssetHandler:parse(aop.Result.bytes)
+				callback()
+			else
+				--
+			end
+		end
+	)
+end
+
+function ConfigAssetHandler:parse(data)
+	csConfigAssetHandler.ParseData(data)
+end
+
+--
+
+UIDependencyAssetHandler = class()
+local uidepKey = "Assets/GameAssets/settings/uidependency.json"
+function UIDependencyAssetHandler:handle(callback)
+	print("UIDependencyAssetHandler:handle")
+	coroutine_cs.start(
+		function()
+			local aop = csAddressableGenericHelper.LoadTextAssetAsync(uidepKey)
+			coroutine.yield(aop)
+			if (aop.Status == AsyncOperationStatus.Succeeded) then
+				UIDependencyAssetHandler:parse(aop.Result.text)
+				callback()
+			else
+				--
+			end
+		end
+	)
+end
+
+function UIDependencyAssetHandler:parse(data)
+	csUIDependencyAssetHandler.ParseData(data)
+end
+
+VersionAssetHandler = class()
+local versionKey = "Assets/GameAssets/settings/version.json"
+--[[ version.json
+{
+"v":"0.0.1",
+"b":"",
+"host":"https://shop-hero.poptiger.cn",
+"n":"0",
+"n_url":""
+}
+]]
+function VersionAssetHandler:handle(callback)
+	print("VersionAssetHandler:handle")
+	coroutine_cs.start(
+		function()
+			local aop = csAddressableGenericHelper.LoadTextAssetAsync(versionKey)
+			coroutine.yield(aop)
+			if (aop.Status == AsyncOperationStatus.Succeeded) then
+				local txt = aop.Result.text
+				print("VersionAssetHandler:handle ver:", txt)
+				local versionJson = JsonUtils:decode(txt)
+				VersionAssetHandler:process(versionJson)
+				callback()
+			else
+				--
+			end
+		end
+	)
+end
+
+function VersionAssetHandler:process(verJson)
+	if (verJson.n == "1") then
+		--goto download new version
+		CS.UnityEngine.Application.OpenURL(verJson.n_url)
+		return
+	end
+	print("CS.NetworkConfig.Host 1 ", CS.NetworkConfig.Host)
+
+	-- local _host = ""
+	-- if verJson.localserver == 1 then
+	-- 	_host = verJson.localhost
+	-- else
+	-- 	_host = verJson.host
+	-- end
+	-- if (_host ~= CS.NetworkConfig.Host) then
+	-- 	--更新服务器地址
+	-- 	-- print(CS.NetworkConfig:SetHost)
+	-- 	CS.NetworkConfig.SetHost(_host)
+	-- 	print("CS.NetworkConfig.Host", CS.NetworkConfig.Host)
+	-- 	CS.ManagerBinder.inst.mNetworkMgr:LuaCallTest()
+	-- 	local requestFactory = CS.ManagerBinder.inst.mNetworkMgr.mRequestHandlerFactory
+	-- 	local requestHandler = requestFactory:getHandler(CS.kRequestHandlerType.Http)
+	-- 	requestHandler:setHost(_host)
+	-- end
+end

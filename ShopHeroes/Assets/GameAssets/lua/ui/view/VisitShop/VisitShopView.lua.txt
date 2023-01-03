@@ -1,0 +1,102 @@
+require("class")
+require("ui/ViewBase")
+
+local EventDispatcherInis = require("event/EventDispatcher")
+
+local CS_CharacterManagerInst = CS.CharacterManager.inst
+local CS_LanguageManagerInst = CS.LanguageManager.inst
+--local GameStateManagerInst = require("state/GameStateManager")
+
+VisitShopView = class(ViewBase)
+
+local type_cs_Button = typeof(CS.UnityEngine.UI.Button)
+local type_cs_Text = typeof(CS.UnityEngine.UI.Text)
+local type_cs_Image = typeof(CS.UnityEngine.UI.Image)
+
+function VisitShopView:ctor()
+	print("VisitShopView:ctor")
+	self.viewID = "VisitShopView"
+	VisitShopView.super.init(self, self.viewID)
+end
+
+function VisitShopView:onInit()
+	self.sortingLayerName = "window"
+	local comp = self.contentPanel
+	self.closeBtn = comp:GetButton("ExitBtn")
+	self.playLvText = comp:GetText("LVText")
+	self.nameText = comp:GetText("NameText")
+	self.iconGO = comp:GetObjByName("RoleHeadIcon")
+	self.userIdText = comp:GetText("userID")
+	self.UnionidBtn = comp:GetButton("UnionidButton")
+	self.tiptextobj = comp:GetObjByName("tiptext")
+	self.headGraphicSystem = nil
+	self.closeBtn:ButtonClickTween(
+		function()
+			--GameStateManagerInst:GOTOLastState()
+			EventDispatcherInis:dispatchEvent(GameEvent.Exit_VisitShop)
+		end
+	)
+end
+
+function VisitShopView:onShowed()
+	self:setInfo()
+end
+
+function VisitShopView:onHide()
+	self.headGraphicSystem = nil
+end
+--local headGraphicSystem = nil
+
+function VisitShopView:setInfo()
+	local mapdata = UserIndoorDataProxy.inst:GetData()
+	self.playLvText.text = tostring(mapdata.userData.level)
+	self.nameText.text = CS_LanguageManagerInst:GetValueByKey(mapdata.userData.nickName)
+	self.userIdText.text = CS_LanguageManagerInst:GetValueByKey(mapdata.userData.nickName) .. "#" .. mapdata.userUId
+
+	if self.headGraphicSystem == nil or self.headGraphicSystem:IsNull() == true then
+		local funcGeneric = xlua.get_generic_method(CS.CharacterManager, "GetCharacter")
+		local func = funcGeneric(CS.GraphicDressUpSystem)
+		local headIconTf = self.iconGO.transform
+		func(
+			CS_CharacterManagerInst,
+			CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(mapdata.userData.gender),
+			CS.SpineUtils.RoleDressToHeadDressIdList(mapdata.userData.userDress),
+			CS.EGender.__CastFrom(mapdata.userData.gender),
+			1.4,
+			true,
+			function(system)
+				self.headGraphicSystem = system
+				system.transform:SetParent(headIconTf)
+				system.transform.localScale = CS.UnityEngine.Vector3.one * 0.4
+				system.transform.localPosition = CS.UnityEngine.Vector3(0, -255, 0)
+				system:SetDirection(CS.RoleDirectionType.Right)
+			end
+		)
+	else
+		CS_CharacterManagerInst:ReSetCharacter(
+			self.headGraphicSystem,
+			CS_CharacterManagerInst:GetPeopleShapeNudeSpinePath(mapdata.userData.gender),
+			CS.SpineUtils.RoleDressToHeadDressIdList(mapdata.userData.userDress),
+			CS.EGender.__CastFrom(mapdata.userData.gender)
+		)
+	end
+
+	self.tiptextobj:SetActive(false)
+
+	if (mapdata.unionId ~= nil and mapdata.unionId ~= "") then
+		if (mapdata.unionId == CS.UserDataProxy.inst.playerData.unionId) then
+			self.tiptextobj:SetActive(true)
+		else
+			self.UnionidBtn.gameObject:SetActive(true)
+			self.UnionidBtn:ButtonClickTween(
+				function()
+					local funcGeneric = xlua.get_generic_method(CS.EventController, "TriggerEvent")
+					local func = funcGeneric(CS.System.String)
+					func(CS.EventController.inst, CS.GameEventType.UnionEvent.UNION_REQUEST_DATA, mapdata.unionId)
+				end
+			)
+		end
+	else
+		self.UnionidBtn.gameObject:SetActive(false)
+	end
+end
